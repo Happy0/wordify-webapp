@@ -4,18 +4,17 @@ import play.Project._
 
 object ApplicationBuild extends Build {
 
-  val appName         = "liscrabble"
-  val appVersion      = "1.0-SNAPSHOT"
+  import BuildSettings._
+  import Dependencies._
 
-  val appDependencies = Seq(
-    // Add your project dependencies here,
-    jdbc,
-    anorm
-  )
+  val appName = "liscrabble"
+  val appVersion = "1.0-SNAPSHOT"
 
+  lazy val modules = Seq(scrabble)
 
-  val main = play.Project(appName, appVersion, appDependencies).settings(
-    // Add your own project settings here      
-  )
+  lazy val scrabble = project("scalascrabble")
+
+  val main = play.Project(appName, appVersion).settings(
+    libraryDependencies ++= Seq(scalaz)) dependsOn scrabble
 
 }

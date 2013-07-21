@@ -1,0 +1,3 @@
+[submodule "modules/scalascrabble"]
+	path = modules/scalascrabble
+	url = git://github.com/Happy0/scalascrabble.git
