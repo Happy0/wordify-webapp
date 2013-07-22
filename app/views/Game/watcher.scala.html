@@ -2,9 +2,9 @@
 
 <html>
 
-    <link rel="stylesheet" type="text/css" href="@routes.Assets.at("stylesheets/board.css")">
+    <link rel="stylesheet" type="text/css" href="@routes.Assets.at("stylesheets/board.css")"/>
+    <link rel="stylesheet" type="text/css" href="@routes.Assets.at("stylesheets/tile.css")"/>
 
 
- <div class="board_wrap">
- 	<div class = "board">@Html(ui.BoardRenderer.render(board))</div>
+ 	<div class="board">@Html(ui.BoardRenderer.render(board))</div>
 </html>

@@ -1,6 +1,6 @@
 div.board_wrap {
 	float: left;
-	border: 1px solid #ccc;
+	border: 1px solid #d5c3a2;
 	position: relative;
 	border-radius:5px;
 }
@@ -18,26 +18,26 @@ div.square {
 	width: 32px;
 	height: 32px;
 	text-align: center;
-	font-size: 10px;
+	font-size: 8px;
 }
 
-div.square .normal {
+div.square.normal {
 	background-color: #e8ddc7;
 }
 
-div.square .doubleletter {
+div.square.doubleletter {
 	background-color: #3ef;
 }
 
-div.square .tripleletter {
+div.square.tripleletter {
 	background-color:#77f;
 }
 
-div.square .doubleword {
+div.square.doubleword {
 	background-color:#f9b;
 }
 
-div.square .tripleword {
+div.square.tripleword {
 	background-color:#f55;
 }
 

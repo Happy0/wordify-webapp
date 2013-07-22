@@ -1,0 +1,31 @@
+.tile {
+	width: 32px;
+	height: 32px;
+	background-color: #b09978;
+	position: absolute;
+}
+
+.tile.letter {
+	font-weight: bold;
+
+}
+
+.tile.blank {
+	font-weight: bold;
+	font-color: red;
+
+}
+
+.lettertext {
+	font-size: 14px;
+	top: 5px;
+	position: relative;                                                                                                 
+}
+
+.value {
+	right: 8px;	
+	position: absolute;
+	font-size: 8px;
+	                                                                                                 
+	
+}

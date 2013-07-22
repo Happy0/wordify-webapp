@@ -2,7 +2,7 @@ package controllers
 
 import play.api._
 import play.api.mvc._
-import scrabble.Board
+import scrabble.{Board, Pos, Letter}
 
 object Application extends Controller {
   
@@ -11,7 +11,7 @@ object Application extends Controller {
   }
   
   def watcher = Action{
-    Ok(views.html.Game.watcher(Board.init))
+    Ok(views.html.Game.watcher(Board.init.placeLetter(Pos.posAt(1,4).get, Letter('A', 1) ).get ) )
   }
   
 }
