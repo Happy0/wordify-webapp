@@ -1,13 +1,15 @@
 package ui
 
-import scrabble.Board
-import scrabble.Pos
-import scrabble.Square
-import scrabble.NormalSquare
-import scrabble.DoubleLetterSquare
-import scrabble.TripleLetterSquare
-import scrabble.DoubleWordSquare
-import scrabble.TripleWordSquare
+import scrabble.{
+  Board,
+  Pos,
+  Square,
+  NormalSquare,
+  DoubleLetterSquare,
+  TripleLetterSquare,
+  DoubleWordSquare,
+  TripleWordSquare
+}
 
 object BoardRenderer {
 
@@ -21,10 +23,10 @@ object BoardRenderer {
 
   /* @TODO: In the non-prototype version this should take a game in progress so that it can use some of
    *  the state to show things like the last move */
-  def render(board: Board) : String = {
+  def render(board: Board): String = {
 
     val squares = for {
-      render <- renderPositions
+      render <- renderPositions.iterator
       sq <- board squareAt render.pos
       tile = sq.tile
 
@@ -50,6 +52,6 @@ object BoardRenderer {
 
     } yield { str }
 
-    squares mkString
+    squares mkString ("\n")
   }
 }

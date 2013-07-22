@@ -14,7 +14,7 @@ object ApplicationBuild extends Build {
 
   lazy val scrabble = project("scalascrabble")
 
-  val main = play.Project(appName, appVersion).settings(
+  val liscrabble = _root_.play.Project(appName, appVersion).settings(
     libraryDependencies ++= Seq(scalaz)) dependsOn scrabble
 
 }
