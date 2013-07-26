@@ -14,13 +14,15 @@ import scrabble.{
 
 object BoardRenderer {
 
-  def toRenderPosition(pos: Pos) = RenderPosition(pos, (pos.y - 1) * 32, (pos.x - 1) * 32)
-
   case class RenderPosition(pos: Pos, top: Int, left: Int)
 
-  val positionsOrdered = Pos.allPositions.map(x => x._2).toList.sortBy { case Pos(x, y, _) => (x, y) }
+  val renderPositions = {
+    def toRenderPosition(pos: Pos) = RenderPosition(pos, (pos.y - 1) * 32, (pos.x - 1) * 32)
 
-  val renderPositions = positionsOrdered map toRenderPosition
+    val positionsOrdered = Pos.allPositions.map(x => x._2).toList.sortBy { case Pos(x, y, _) => (x, y) }
+
+    positionsOrdered map toRenderPosition
+  }
 
   /* @TODO: In the non-prototype version this should take a game in progress so that it can use some of
    *  the state to show things like the last move */
@@ -47,15 +49,17 @@ object BoardRenderer {
         case _ => ("", "")
       }
 
-      squareContains = sq.tile.fold(squareText)(renderTile)
+      squareLabel = """<div class="specialtext">%s</div>""".format(squareText)
 
-      str = """<div class="square %s" id="%s" style="top:%dpx;left:%dpx;"> """.format(
+      squareContains = sq.tile.fold(squareLabel)(renderTile)
+
+      squareDiv = """<div class="square %s" id="%s" style="top:%dpx;left:%dpx;"> """.format(
         classText,
         render.pos.gridCordinates,
         render.top,
-        render.left) ++ squareContains ++ " </div>"
+        render.left) ++ squareContains ++ "</div>"
 
-    } yield str
+    } yield squareDiv
 
     squares mkString ("\n")
   }

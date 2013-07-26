@@ -21,6 +21,13 @@ div.square {
 	font-size: 8px;
 }
 
+div.specialtext {
+	position: absolute;
+	top: 10px;
+	left: 8px;
+
+}
+
 div.square.normal {
 	background-color: #e8ddc7;
 }

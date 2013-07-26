@@ -1,0 +1,12 @@
+@(title: String, moreCss: Html = Html(""))(body: Html)
+
+@moreCss = {
+    @cssTag("board.css")
+    @cssTag("tile.css")
+    @moreCss
+}
+
+@Base.layout(title = title, moreCss = moreCss) {
+	@body    
+    
+}
