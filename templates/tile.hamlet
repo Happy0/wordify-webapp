@@ -1,0 +1,7 @@
+<div .tile .letter>
+    <div .lettertext> 
+        $maybe letter <- tileLetter tile
+            #{letter}
+
+    <div .value>
+        <sub>#{tileValue tile}

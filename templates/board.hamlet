@@ -1,0 +1,2 @@
+$forall row <- rows
+    <div>^{templateRow row}

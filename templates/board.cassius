@@ -1,0 +1,40 @@
+.board_wrap
+    float: left
+    border: 1px solid #d5c3a2
+    position: relative
+    border-radius: 5px
+
+.board
+    width: 480px
+    height: 480px
+    position: relative
+    border-radius: 5px
+
+.square
+    border: 1px solid #d5c3a2
+    position: absolute
+    width: 32px
+    height: 32px
+    text-align: center
+    font-size: 8px
+    display: block
+
+.specialtext
+    position: absolute
+    top: 10px
+    left: 8px
+
+.square.normal
+    background-color: #e8ddc7
+
+.square.doubleletter
+    background-color: #3ef
+
+.square.tripleletter
+    background-color: #77f
+
+.square.doubleword
+    background-color: #f9b
+
+.square.tripleword
+    background-color: #f55
