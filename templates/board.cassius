@@ -5,16 +5,16 @@
     border-radius: 5px
 
 .board
-    width: 480px
-    height: 480px
+    width: #{boardWidth}px
+    height: #{boardWidth}px
     position: relative
     border-radius: 5px
 
 .square
     border: 1px solid #d5c3a2
     position: absolute
-    width: 32px
-    height: 32px
+    width: #{tileWidth}px
+    height: #{tileWidth}px
     text-align: center
     font-size: 8px
     display: block

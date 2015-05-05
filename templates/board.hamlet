@@ -1,2 +1,3 @@
-$forall row <- rows
-    <div>^{templateRow row}
+<div .board_wrap>
+    $forall row <- rows
+        ^{templateRow row}

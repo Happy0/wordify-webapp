@@ -8,11 +8,15 @@ module Widgets.Board.Board (initialBoard) where
     import Data.List
     import Data.List.Split
 
+    {- TODO: Style / deal with blank letter tiles -}
+
     initialBoard :: Widget
     initialBoard = $(widgetFile "board")
         where
             rows = layoutBoard emptyBoard
-
+            width = 32 :: Int
+            tileWidth = show $ (width :: Int)
+            boardWidth = show $ width * 15
 
     templateRow row = [whamlet|
         $forall square <- row
@@ -24,10 +28,7 @@ module Widgets.Board.Board (initialBoard) where
                 <div class="square #{squareClass}" style="top:#{xPosition}px; left:#{yPosition}px;">
                     $maybe tile <- tileIfOccupied square
                         ^{templateTile tile}
-                    $nothing
-                        
         |]
-
         where
             xPosition = (xPos pos -1) * 32
             yPosition = (yPos pos -1) * 32
