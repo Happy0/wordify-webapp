@@ -23,14 +23,12 @@ module Widgets.Board.Board (initialBoard) where
         [whamlet|
                 <div class="square #{squareClass}" style="top:#{xPosition}px; left:#{yPosition}px;">
                     $maybe tile <- tileIfOccupied square
-                        ^{templateTile tile}
-                    $nothing
-                        
+                        ^{templateTile tile}    
         |]
 
         where
-            xPosition = (xPos pos -1) * 32
-            yPosition = (yPos pos -1) * 32
+            xPosition = (xPos pos - 1) * 32
+            yPosition = (yPos pos - 1) * 32
 
             (squareClass, squareText) = case square of
                 DoubleLetter(_) -> ("doubleletter" :: Text, "DL" :: Text)

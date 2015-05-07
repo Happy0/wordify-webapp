@@ -48,7 +48,7 @@ instance Yesod App where
     makeSessionBackend _ = fmap Just $ defaultClientSessionBackend
         120    -- timeout in minutes
         "config/client_session_key.aes"
-
+{-
     defaultLayout widget = do
         master <- getYesod
         mmsg <- getMessage
@@ -62,7 +62,7 @@ instance Yesod App where
         pc <- widgetToPageContent $ do
             addStylesheet $ StaticR css_bootstrap_css
             $(widgetFile "default-layout")
-        withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet")
+        withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet") -}
 
     -- The page to be redirected to when authentication is required.
     authRoute _ = Just $ AuthR LoginR
