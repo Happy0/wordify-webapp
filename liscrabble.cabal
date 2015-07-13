@@ -23,6 +23,7 @@ library
                      Handler.Common
                      Handler.Home
                      Widgets.Board.Board
+                     Widgets.Game.Rack
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
