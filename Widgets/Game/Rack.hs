@@ -6,13 +6,18 @@ module Widgets.Game.Rack (initialiseRack) where
     initialiseRack :: [Tile] -> Widget
     initialiseRack tiles = 
         [whamlet|
-                <div style="width=#{rackLength}px height=#{rackHeight}px">
+                <div id="rack" style="width:#{rackLength}px;height:#{rackHeight}px">
                     $forall tile <- tiles
-                        ^{templateTile tile}
+                        <span style="float:left"> ^{templateTile tile}
+
+                    $forall slot <- [0 , emptySlots]
+                        <span style="float:left"> baws
         |]
         where
             rackLength = show (32 * 7 :: Int)
             rackHeight = show (32 :: Int)
+            tilesOnRack = length tiles
+            emptySlots = 7 - tilesOnRack
 
     templateTile tile = $(widgetFile "tile")
 

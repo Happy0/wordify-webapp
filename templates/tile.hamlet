@@ -4,4 +4,4 @@
             #{letter}
 
     <div .value>
-        <sub>#{tileValue tile}
+        #{tileValue tile}

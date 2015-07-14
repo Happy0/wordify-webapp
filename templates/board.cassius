@@ -1,4 +1,6 @@
 .board_wrap
+    width: #{boardWidth}px
+    height: #{boardWidth}px
     float: left
     border: 1px solid #d5c3a2
     position: relative
