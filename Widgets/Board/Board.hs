@@ -23,12 +23,24 @@ module Widgets.Board.Board (initialBoard) where
             ^{templateSquare square}
      |]
 
-    templateSquare (pos, square) = 
-        [whamlet|
-                <div class="square #{squareClass}" style="top:#{xPosition}px; left:#{yPosition}px;">
-                    $maybe tile <- tileIfOccupied square
-                        ^{templateTile tile}
-        |]
+    templateSquare (pos, square) =
+        do
+            [whamlet|
+                    <div class="square #{squareClass}" data-x=#{xPos pos} data-y=#{yPos pos} style="top:#{xPosition}px; left:#{yPosition}px;">
+                        $maybe tile <- tileIfOccupied square
+                            ^{templateTile tile}
+            |]
+            toWidget
+                [julius|
+                    $(".square").droppable({accept: ".tile", 
+                        drop: function( event, ui ) {
+                                console.dir($(this));
+                        },
+                        out: function(event, ui) {
+
+                        }
+                    });
+                |]
         where
             xPosition = (xPos pos -1) * 32
             yPosition = (yPos pos -1) * 32
