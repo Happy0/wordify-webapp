@@ -1,7 +1,11 @@
-module Widgets.Game.Rack (initialiseRack) where
+module Widgets.Game.Rack (emptyRack, initialiseRack) where
 
     import Wordify.Rules.Tile
     import Import
+
+    -- Todo: Make empty
+    emptyRack :: Widget
+    emptyRack = initialiseRack $ (Letter 'B' 2) : (take 5 $ repeat (Letter 'A' 5))
 
     initialiseRack :: [Tile] -> Widget
     initialiseRack tiles =
@@ -40,8 +44,8 @@ module Widgets.Game.Rack (initialiseRack) where
                                     return !event;
                     };
 
-                $(".slot").draggable({ snap: ".square", revert : sendBackToSlot });
-                $(".slot").disableSelection();
+                $(".tile").draggable({ snap: ".square", revert : sendBackToSlot });
+                $(".tile").disableSelection();
                 |]
         where
             rackLength = show (32 * 7 :: Int)

@@ -19,12 +19,8 @@ getHomeR :: Handler Html
 getHomeR = do
     defaultLayout $ do
         setTitle "My Page Title"
-        [whamlet|
-            <div>^{initialBoard}
-            <div>^{rack}
-         |]
+        $(widgetFile "game")
          where
-            rack = initialiseRack $ (Letter 'B' 2) : (take 5 $ repeat (Letter 'A' 5))
     {-
     (formWidget, formEnctype) <- generateFormPost sampleForm
     let submission = Nothing :: Maybe (FileInfo, Text)
