@@ -24,7 +24,7 @@ getHomeR = do
             <div>^{rack}
          |]
          where
-            rack = initialiseRack $ take 5 $ repeat (Letter 'A' 5)
+            rack = initialiseRack $ (Letter 'B' 2) : (take 5 $ repeat (Letter 'A' 5))
     {-
     (formWidget, formEnctype) <- generateFormPost sampleForm
     let submission = Nothing :: Maybe (FileInfo, Text)

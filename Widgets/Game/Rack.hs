@@ -10,18 +10,38 @@ module Widgets.Game.Rack (initialiseRack) where
             addScriptRemote "http://code.jquery.com/ui/1.11.4/jquery-ui.js"
 
             [whamlet|
-                    <div id="rack" style="width:#{rackLength}px;height:#{rackHeight}px">
+                    <div id="rack" style="width:#{rackLength}px;height:#{rackHeight}px;position:relative;">
                         $forall tile <- tiles
-                            <span style="float:left"> ^{templateTile tile}
+                            <span class="slot"> ^{templateTile tile}
 
                         $forall slot <- [0 , emptySlots]
                             <span style="float:left"> baws
             |]
             toWidget
+                [cassius|
+                    #rack
+                        list-style-type: none
+                    .slot
+                        float: left
+                        margin-right: 2px
+                |]
+            toWidget
                 [julius|
-                    $(".tile").draggable({ snap: ".square" });
+                    var sendBackToSlot = function(event, ui) {
+                                    // on older version of jQuery use "draggable"
+                                    // $(this).data("draggable")
+                                    // on 2.x versions of jQuery use "ui-draggable"
+                                    // $(this).data("draggable")
+                                    $(this).data("uiDraggable").originalPosition = {
+                                        top : 0,
+                                        left : 0
+                                    };
 
+                                    return !event;
+                    };
 
+                $(".slot").draggable({ snap: ".square", revert : sendBackToSlot });
+                $(".slot").disableSelection();
                 |]
         where
             rackLength = show (32 * 7 :: Int)
