@@ -14,23 +14,29 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
             addScriptRemote "http://code.jquery.com/ui/1.11.4/jquery-ui.js"
 
             [whamlet|
-                    <div id="rack">
+                <div #rack-container>
+                    <div #rack>
                         $forall tile <- tiles
-                            <span class="slot"> ^{templateTile tile}
+                            <span .slot> ^{templateTile tile}
 
                         $forall slot <- [0 , emptySlots]
-                            <span style="float:left"> baws
+                            <span .slot>
             |]
             toWidget
                 [cassius|
+                    #rack-container
+                        left: 25%
+                        position: absolute;
+
                     #rack
                         width: #{rackLength}
                         height: #{rackHeight}
-                        background-color: red
+                        background-color: brown
                         float: left
                     .slot
                         float: left
                         margin-right: 2px
+                        width: 32px
                 |]
             toWidget
                 [julius|
@@ -47,12 +53,12 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
                                     return !event;
                     };
 
-                    $(".tile").draggable({ snap: ".square", revert : sendBackToSlot });
-                    $(".tile").disableSelection();
-                    $("#rack").sortable();
+                    // Todo: Try to find some way to make the tiles on the rack re-arrangable
+                    $(".tile").draggable({ snap: ".square", revert : sendBackToSlot});
+                    $(".slot").disableSelection();
                 |]
         where
-            rackLength = show (32 * 7 :: Int)
+            rackLength = show (32 * 8 :: Int)
             rackHeight = show (32 + 10:: Int)
             tilesOnRack = length tiles
             emptySlots = 7 - tilesOnRack

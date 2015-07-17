@@ -1,2 +1,8 @@
-.board-container
-    padding-bottom: 5px
+.game-container:
+    width: 100%
+
+.middle
+    position: absolute;
+    left: 35%
+    margin-top: 100px
+    margin: 0 auto;

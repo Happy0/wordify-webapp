@@ -3,7 +3,8 @@
     height: #{boardWidth}px
     border: 1px solid #d5c3a2
     border-radius: 5px
-    margin-bottom: 20px
+    margin-bottom: 40px
+    margin-top: 40px
     position: relative
 
 .board

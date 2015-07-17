@@ -1,3 +1,4 @@
-<div style="position: relative;">
-    ^{initialBoard}
-    ^{emptyRack}
+<div .game-container>
+    <div .middle>
+        ^{initialBoard}
+        ^{emptyRack}
