@@ -55,7 +55,7 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
 
                     // Todo: Try to find some way to make the tiles on the rack re-arrangable
                     $(".tile").draggable({ snap: ".square", revert : sendBackToSlot});
-                    $(".slot").disableSelection();
+                    $(".tile").disableSelection();
                 |]
         where
             rackLength = show (32 * 8 :: Int)

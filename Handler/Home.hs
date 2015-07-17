@@ -18,7 +18,7 @@ import Wordify.Rules.Tile
 getHomeR :: Handler Html
 getHomeR = do
     defaultLayout $ do
-        setTitle "My Page Title"
+        setTitle "Wordify"
         $(widgetFile "game")
 
 postHomeR :: Handler Html
