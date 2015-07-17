@@ -14,7 +14,7 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
             addScriptRemote "http://code.jquery.com/ui/1.11.4/jquery-ui.js"
 
             [whamlet|
-                    <div id="rack" style="width:#{rackLength}px;height:#{rackHeight}px;position:relative;">
+                    <div id="rack">
                         $forall tile <- tiles
                             <span class="slot"> ^{templateTile tile}
 
@@ -24,7 +24,10 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
             toWidget
                 [cassius|
                     #rack
-                        list-style-type: none
+                        width: #{rackLength}
+                        height: #{rackHeight}
+                        background-color: red
+                        float: left
                     .slot
                         float: left
                         margin-right: 2px
@@ -44,12 +47,12 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
                                     return !event;
                     };
 
-                $(".tile").draggable({ snap: ".square", revert : sendBackToSlot });
-                $(".tile").disableSelection();
+                    $(".tile").draggable({ snap: ".square", revert : sendBackToSlot });
+                    $(".tile").disableSelection();
                 |]
         where
             rackLength = show (32 * 7 :: Int)
-            rackHeight = show (32 :: Int)
+            rackHeight = show (32 + 10:: Int)
             tilesOnRack = length tiles
             emptySlots = 7 - tilesOnRack
 

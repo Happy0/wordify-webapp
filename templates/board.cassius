@@ -5,11 +5,11 @@
     border: 1px solid #d5c3a2
     position: relative
     border-radius: 5px
+    margin-bottom: 20px
 
 .board
     width: #{boardWidth}px
     height: #{boardWidth}px
-    position: relative
     border-radius: 5px
 
 .square

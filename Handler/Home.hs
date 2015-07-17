@@ -20,16 +20,6 @@ getHomeR = do
     defaultLayout $ do
         setTitle "My Page Title"
         $(widgetFile "game")
-         where
-    {-
-    (formWidget, formEnctype) <- generateFormPost sampleForm
-    let submission = Nothing :: Maybe (FileInfo, Text)
-        handlerName = "getHomeR" :: Text
-    defaultLayout $ do
-        aDomId <- newIdent
-        setTitle "Welcome To Yesod!"
-        $(widgetFile "homepage")
-        -}
 
 postHomeR :: Handler Html
 postHomeR = do
