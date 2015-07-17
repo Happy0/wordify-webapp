@@ -49,6 +49,7 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
 
                     $(".tile").draggable({ snap: ".square", revert : sendBackToSlot });
                     $(".tile").disableSelection();
+                    $("#rack").sortable();
                 |]
         where
             rackLength = show (32 * 7 :: Int)

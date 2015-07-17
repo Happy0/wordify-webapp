@@ -4,6 +4,7 @@
     border: 1px solid #d5c3a2
     border-radius: 5px
     margin-bottom: 20px
+    position: relative
 
 .board
     width: #{boardWidth}px
