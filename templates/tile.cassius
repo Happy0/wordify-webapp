@@ -14,8 +14,10 @@
 .lettertext
     font-size: 14px
     top: 5px
-    position: relative
+    position: absolute
 
 .value
     padding-left: 11px
     font-size: 9px
+    position: absolute
+    padding-top:20px

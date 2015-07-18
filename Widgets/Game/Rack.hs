@@ -37,25 +37,28 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
                         float: left
                         margin-right: 2px
                         width: 32px
+                        height: 32px
                 |]
             toWidget
                 [julius|
-                    var sendBackToSlot = function(event, ui) {
-                                    // on older version of jQuery use "draggable"
-                                    // $(this).data("draggable")
-                                    // on 2.x versions of jQuery use "ui-draggable"
-                                    // $(this).data("draggable")
-                                    $(this).data("uiDraggable").originalPosition = {
-                                        top : 0,
-                                        left : 0
-                                    };
-
-                                    return !event;
-                    };
 
                     // Todo: Try to find some way to make the tiles on the rack re-arrangable
-                    $(".tile").draggable({ snap: ".square", revert : sendBackToSlot});
+                    $(".tile").draggable({ snap: ".square,.slot", revert: "invalid"});
                     $(".tile").disableSelection();
+
+                    $(".slot").not(":has(.tile)").droppable(
+                        {accept:".tile",
+                        drop: function( event, ui ) {
+                          // When dropped, the element is not attached to the DOM element. Instead, its position is changed relative to where it
+                          // was originally. We manually attach it to the DOM element. When subsequently dragged, it seems to go under the board,
+                          // so we set a z-index
+                          ui.draggable.detach().appendTo(this);
+                          ui.draggable.attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
+                          $(this).droppable("disable");
+                        }});
+
+
+
                 |]
         where
             rackLength = show (32 * 8 :: Int)
