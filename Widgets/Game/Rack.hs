@@ -56,7 +56,11 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
                               ui.draggable.detach().appendTo(this);
                               ui.draggable.attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
                               makeEmptySlotsDroppable();
+
+                              $(this).droppable("disable");
                             }});
+
+                        $(".slot").not(":has(.tile)").droppable("enable");
                     }
 
                     makeEmptySlotsDroppable();
