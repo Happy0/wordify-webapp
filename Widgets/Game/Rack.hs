@@ -46,16 +46,23 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
                     $(".tile").draggable({ snap: ".square,.slot", revert: "invalid"});
                     $(".tile").disableSelection();
 
-                    $(".slot").not(":has(.tile)").droppable(
-                        {accept:".tile",
-                        drop: function( event, ui ) {
-                          // When dropped, the element is not attached to the DOM element. Instead, its position is changed relative to where it
-                          // was originally. We manually attach it to the DOM element. When subsequently dragged, it seems to go under the board,
-                          // so we set a z-index
-                          ui.draggable.detach().appendTo(this);
-                          ui.draggable.attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
-                          $(this).droppable("disable");
-                        }});
+                    var makeEmptySlotsDroppable = function() {
+                        $(".slot").not(":has(.tile)").droppable(
+                            {accept:".tile",
+                            drop: function( event, ui ) {
+                              // When dropped, the element is not attached to the DOM element. Instead, its position is changed relative to where it
+                              // was originally. We manually attach it to the DOM element. When subsequently dragged, it seems to go under the board,
+                              // so we set a z-index
+                              ui.draggable.detach().appendTo(this);
+                              ui.draggable.attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
+                              makeEmptySlotsDroppable();
+                            }});
+                    }
+
+                    makeEmptySlotsDroppable();
+
+
+
 
 
 
