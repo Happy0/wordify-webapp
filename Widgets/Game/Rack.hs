@@ -42,8 +42,15 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
             toWidget
                 [julius|
 
-                    // Todo: Try to find some way to make the tiles on the rack re-arrangable
-                    $(".tile").draggable({ snap: ".square,.slot", revert: "invalid"});
+                    $(".tile").draggable({ snap: ".square,.slot",
+                        revert: function (isValid) {
+                        // If the user drops the tile on a spot that is not droppable, we return the tile to the rack
+                            if (!isValid) {
+                                dropOnEmptySlot($(this));
+                                return true;
+                            }
+                        }     
+                    });
                     $(".tile").disableSelection();
 
                     var makeEmptySlotsDroppable = function() {
@@ -63,19 +70,22 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
                         $(".slot").not(":has(.tile)").droppable("enable");
                     }
 
+                    /**
+                     * Drops the given tile on the first available empty spot
+                    */
+                    var dropOnEmptySlot = function(tile) {
+                        var emptyTarget = $(".slot").not(":has(.tile)").first();
+                        tile.attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
+                        tile.appendTo(emptyTarget);
+                    }
+
                     makeEmptySlotsDroppable();
-
-
-
-
-
-
                 |]
         where
             rackLength = show (32 * 8 :: Int)
             rackHeight = show (32 + 10:: Int)
             tilesOnRack = length tiles
-            emptySlots = 7 - tilesOnRack
+            emptySlots = ((7 - tilesOnRack) + 1)
 
     templateTile tile = $(widgetFile "tile")
 
