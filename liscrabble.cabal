@@ -22,6 +22,7 @@ library
                      Settings.StaticFiles
                      Handler.Common
                      Handler.Home
+                     Widgets.Game.TestGame
                      Widgets.Board.Board
                      Widgets.Game.Rack
 
@@ -85,6 +86,8 @@ library
                  , time
                  , haskellscrabble >= 1.0
                  , split > 0.2 && <= 0.3
+                 , filepath
+                 , semigroups
 
 executable         liscrabble
     if flag(library-only)

@@ -6,6 +6,10 @@ import Yesod.Form.Bootstrap3 (BootstrapFormLayout (..), renderBootstrap3,
 import Widgets.Board.Board
 import Widgets.Game.Rack
 import Wordify.Rules.Tile
+import Widgets.Game.TestGame
+import qualified Data.List.NonEmpty as NE
+import Wordify.Rules.Move
+import Wordify.Rules.Game
 
 
 -- This is a handler function for the GET request method on the HomeR
@@ -19,7 +23,16 @@ getHomeR :: Handler Html
 getHomeR = do
     defaultLayout $ do
         setTitle "Wordify"
-        $(widgetFile "game")
+        game <- lift $ testGame
+        let neMoves = NE.fromList moves
+        let fullGame = join $ fmap (flip (restoreGame) neMoves) $ game
+
+        case fullGame of
+            Left err -> [whamlet|Hello World! #{(show err)}|]
+            Right gm ->
+                let currentBoard = boardWidget $ (board (newGame $ NE.last gm))
+                in $(widgetFile "game")
+
 
 postHomeR :: Handler Html
 postHomeR = do

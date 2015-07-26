@@ -1,4 +1,4 @@
-module Widgets.Board.Board (initialBoard) where
+module Widgets.Board.Board (initialBoard, boardWidget) where
 
     import Import
     import Wordify.Rules.Board
@@ -10,10 +10,10 @@ module Widgets.Board.Board (initialBoard) where
 
     {- TODO: Style / deal with blank letter tiles -}
 
-    initialBoard :: Widget
-    initialBoard = $(widgetFile "board")
+    boardWidget :: Board -> Widget
+    boardWidget board = $(widgetFile "board")
         where
-            rows = layoutBoard emptyBoard
+            rows = layoutBoard board
             width = 32 :: Int
             tileWidth = show $ (width :: Int)
             boardWidth = show $ width * 15
@@ -44,6 +44,32 @@ module Widgets.Board.Board (initialBoard) where
 
                         }
                     });
+
+                    // Adds a new task (function) to be called when the page is finished loading to the existing functions
+                    // that should be called on the page load event
+                    var addWindowLoadEventTask = function(task) {
+                        if(window.attachEvent) {
+                            window.attachEvent('onload', task);
+                            } else {
+                                if(window.onload) {
+                                    var curronload = window.onload;
+                                    var newonload = function() {
+                                        curronload();
+                                        task();
+                                    };
+                                    window.onload = newonload;
+                                } else {
+                                    window.onload = task;
+                                }
+                            }                        
+                    }
+
+                    var disableDraggadleSquares = function() {
+                        $(".square").children(".tile").draggable('disable');
+                    }
+
+                    addWindowLoadEventTask(disableDraggadleSquares);
+
                 |]
         where
             xPosition = (xPos pos -1) * 32
@@ -55,6 +81,9 @@ module Widgets.Board.Board (initialBoard) where
                 DoubleWord(_) -> ("doubleword", "DW")
                 TripleWord(_) -> ("tripleword", "TW")
                 Normal(_) -> ("normal", "")
+
+    initialBoard :: Widget
+    initialBoard = boardWidget emptyBoard
 
     templateTile tile = $(widgetFile "tile")
 

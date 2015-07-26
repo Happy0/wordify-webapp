@@ -2,6 +2,7 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
 
     import Wordify.Rules.Tile
     import Import
+    import qualified Data.List as L
 
     -- Todo: Make empty
     emptyRack :: Widget
@@ -86,6 +87,7 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
             rackHeight = show (32 + 10:: Int)
             tilesOnRack = length tiles
             emptySlots = ((7 - tilesOnRack) + 1)
+            headTile = L.head tiles
 
     templateTile tile = $(widgetFile "tile")
 
