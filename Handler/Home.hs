@@ -30,7 +30,7 @@ getHomeR = do
         case fullGame of
             Left err -> [whamlet|Hello World! #{(show err)}|]
             Right gm ->
-                let currentBoard = boardWidget $ (board (newGame $ NE.last gm))
+                let currentBoard = (board (newGame $ NE.last gm))
                 in $(widgetFile "game")
 
 

@@ -52,6 +52,7 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
                             }
                         }     
                     });
+
                     $(".tile").disableSelection();
 
                     var makeEmptySlotsDroppable = function() {

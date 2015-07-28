@@ -25,6 +25,7 @@ module Widgets.Board.Board (initialBoard, boardWidget) where
 
     templateSquare (pos, square) =
         do
+            addScript $ StaticR js_util_js
             [whamlet|
                     <div class="square #{squareClass}" data-x=#{xPos pos} data-y=#{yPos pos} style="top:#{xPosition}px; left:#{yPosition}px;">
                         $maybe tile <- tileIfOccupied square
@@ -45,30 +46,11 @@ module Widgets.Board.Board (initialBoard, boardWidget) where
                         }
                     });
 
-                    // Adds a new task (function) to be called when the page is finished loading to the existing functions
-                    // that should be called on the page load event
-                    var addWindowLoadEventTask = function(task) {
-                        if(window.attachEvent) {
-                            window.attachEvent('onload', task);
-                            } else {
-                                if(window.onload) {
-                                    var curronload = window.onload;
-                                    var newonload = function() {
-                                        curronload();
-                                        task();
-                                    };
-                                    window.onload = newonload;
-                                } else {
-                                    window.onload = task;
-                                }
-                            }                        
-                    }
-
                     var disableDraggadleSquares = function() {
                         $(".square").children(".tile").draggable('disable');
                     }
 
-                    addWindowLoadEventTask(disableDraggadleSquares);
+                    util.addWindowLoadEventTask(disableDraggadleSquares);
 
                 |]
         where

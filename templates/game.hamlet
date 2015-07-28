@@ -1,4 +1,4 @@
 <div .game-container>
     <div .middle>
-        ^{currentBoard}
+        ^{boardWidget currentBoard}
         ^{emptyRack}

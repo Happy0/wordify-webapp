@@ -22,9 +22,10 @@ library
                      Settings.StaticFiles
                      Handler.Common
                      Handler.Home
-                     Widgets.Game.TestGame
-                     Widgets.Board.Board
                      Widgets.Game.Rack
+                     Widgets.Board.Board
+                     Widgets.Game.MoveList
+                     Widgets.Game.TestGame
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
