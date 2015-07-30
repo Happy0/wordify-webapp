@@ -21,13 +21,13 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
         do
             moveCss
             [whamlet|
-                <table>
+                <table .move_list_table>
                     $forall move <- moves
                         <tr>
                             $case move
                                 $of Scored formed
                                     <td>^{templateScoreMove formed}
-                                    <td>#{overallScore formed}
+                                    <td .move_list_cell .overall_score>#{overallScore formed}
                                 $of Passed
                                     <td>passed
                                 $of Exchanged
@@ -39,23 +39,39 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
     templateScoreMove :: FormedWords -> Widget
     templateScoreMove formed =
         do
+            moveCss
             [whamlet|
-                <table>
+                <table .move_list_move_table>
                     $forall word <- allWordsFormed
                         <tr>
-                            <td>#{prettyPrintIntersections placed word}
-                            <td>#{scoreWord placed word}
+                            <td .move_list_cell>#{prettyPrintIntersections placed word}
+                            <td .move_list_cell>#{scoreWord placed word}
 
             |]
         where
             allWordsFormed = allWords formed
             placed = playerPlacedMap formed
+            numberOfWords = length allWordsFormed
 
     moveCss :: Widget
     moveCss = 
         do
             toWidget
                 [cassius| 
-                    table, th, td
-                        border: 1px solid black
+                    .move_list_table
+                        border-collapse: collapse
+                        border: 2px solid black
+
+                    .move_list_move_table
+                        border-collapse: collapse
+                        border: 2px solid black
+                        width: 100%
+
+                    .overall_score
+                        font-weight: bold
+
+                    .move_list_cell
+                        border: 1px
+                        border-style: solid double
+                        padding: 1px 1px 1px 1px
                 |]
