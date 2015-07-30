@@ -2,3 +2,4 @@
     <div .middle>
         ^{boardWidget currentBoard}
         ^{emptyRack}
+        ^{movesWidget movesPlayed}
