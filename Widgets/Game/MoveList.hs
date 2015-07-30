@@ -39,7 +39,6 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
     templateScoreMove :: FormedWords -> Widget
     templateScoreMove formed =
         do
-            moveCss
             [whamlet|
                 <table .move_list_move_table>
                     $forall word <- allWordsFormed
@@ -51,7 +50,6 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
         where
             allWordsFormed = allWords formed
             placed = playerPlacedMap formed
-            numberOfWords = length allWordsFormed
 
     moveCss :: Widget
     moveCss = 
@@ -73,5 +71,5 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
                     .move_list_cell
                         border: 1px
                         border-style: solid double
-                        padding: 1px 1px 1px 1px
+                        background-color: #C8A684
                 |]
