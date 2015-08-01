@@ -3,37 +3,40 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
     import Wordify.Rules.FormedWord
     import Import
     import Wordify.Rules.Move
+    import Wordify.Rules.Player
 
-    data MoveSummary = Passed | Exchanged | Scored FormedWords | Finished
+    data MoveSummary = Passed String | Exchanged String | Scored String FormedWords | Finished
 
     movesWidget :: [GameTransition] -> Widget
     movesWidget moves = createMoveList $ map toSummary moves
         where
             toSummary move =
                 case move of
-                    ExchangeTransition _ _ _ -> Exchanged
-                    PassTransition _ -> Passed
+                    ExchangeTransition _ player _ -> Exchanged $ name player
+                    PassTransition _ -> Passed "_"
                     GameFinished _ _ _ -> Finished
-                    MoveTransition _ _ formed -> Scored formed
+                    MoveTransition player _ formed -> Scored (name player) formed
 
     createMoveList :: [MoveSummary] -> Widget
     createMoveList moves =
         do
             moveCss
             [whamlet|
-                <table .move_list_table>
-                    $forall move <- moves
-                        <tr>
-                            $case move
-                                $of Scored formed
-                                    <td>^{templateScoreMove formed}
-                                    <td .move_list_cell .overall_score>#{overallScore formed}
-                                $of Passed
-                                    <td>passed
-                                $of Exchanged
-                                    <td>exchanged
-                                $of Finished
-                                    <td> Finished!
+                <div .move_list_container> 
+                    <table .move_list_table>
+                        $forall move <- moves
+                            <tr>
+                                $case move
+                                    $of Scored playerName formed
+                                        <td .move_list_cell> #{playerName}
+                                        <td>^{templateScoreMove formed}
+                                        <td .move_list_cell .overall_score>#{overallScore formed}
+                                    $of Passed playerName
+                                        <td>passed
+                                    $of Exchanged playerName
+                                        <td>exchanged
+                                    $of Finished
+                                        <td> Finished!
             |]
 
     templateScoreMove :: FormedWords -> Widget
@@ -55,7 +58,11 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
     moveCss = 
         do
             toWidget
-                [cassius| 
+                [cassius|
+                    .move_list_container
+                        height: 200px
+                        overflow-y: scroll
+
                     .move_list_table
                         border-collapse: collapse
                         border: 2px solid black
