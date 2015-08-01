@@ -11,7 +11,59 @@ module Widgets.Board.Board (initialBoard, boardWidget) where
     {- TODO: Style / deal with blank letter tiles -}
 
     boardWidget :: Board -> Widget
-    boardWidget board = $(widgetFile "board")
+    boardWidget board = 
+        do
+            [whamlet|
+                <div .board_wrap>
+                    <div .board>
+                        $forall row <- rows
+                            ^{templateRow row}
+            |]
+            toWidget
+                [cassius|
+                    .board_wrap
+                        width: #{boardWidth}px
+                        height: #{boardWidth}px
+                        border: 1px solid #d5c3a2
+                        border-radius: 5px
+                        margin-bottom: 40px
+                        margin-top: 40px
+                        position: relative
+
+                    .board
+                        width: #{boardWidth}px
+                        height: #{boardWidth}px
+                        border-radius: 5px
+
+                    .square
+                        border: 1px solid #d5c3a2
+                        position: absolute
+                        width: #{tileWidth}px
+                        height: #{tileWidth}px
+                        text-align: center
+                        font-size: 8px
+                        display: block
+
+                    .specialtext
+                        position: absolute
+                        top: 10px
+                        left: 8px
+
+                    .square.normal
+                        background-color: #e8ddc7
+
+                    .square.doubleletter
+                        background-color: #3ef
+
+                    .square.tripleletter
+                        background-color: #77f
+
+                    .square.doubleword
+                        background-color: #f9b
+
+                    .square.tripleword
+                        background-color: #f55
+                |]
         where
             rows = layoutBoard board
             width = 32 :: Int
