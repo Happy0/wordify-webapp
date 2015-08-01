@@ -1,7 +1,7 @@
 <div .game-container>
+    <div .move-list-container>
+        ^{scoreWidget currentPlayers movesPlayed}
+
     <div .middle>
         ^{boardWidget currentBoard}
         ^{emptyRack}
-    
-    <div .move-list-container>
-        ^{movesWidget movesPlayed}

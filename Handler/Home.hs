@@ -10,7 +10,7 @@ import Widgets.Game.TestGame
 import qualified Data.List.NonEmpty as NE
 import Wordify.Rules.Move
 import Wordify.Rules.Game
-import Widgets.Game.MoveList
+import Widgets.Game.ScoreBoard
 
 -- This is a handler function for the GET request method on the HomeR
 -- resource pattern. All of your resource patterns are defined in
@@ -30,8 +30,10 @@ getHomeR = do
         case fullGame of
             Left err -> [whamlet|Hello World! #{(show err)}|]
             Right gameTransitions ->
-                let movesPlayed = NE.toList gameTransitions
-                in let currentBoard = (board (newGame $ NE.last gameTransitions))
+                let currentGame = newGame $ NE.last gameTransitions
+                in let currentPlayers = players currentGame
+                in let movesPlayed = NE.toList gameTransitions
+                in let currentBoard = (board currentGame)
                 in $(widgetFile "game")
 
 

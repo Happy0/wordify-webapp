@@ -44,7 +44,7 @@ module Widgets.Game.TestGame (testGame, moves) where
         resultGame bag dict =
           do
             dc <- dict
-            let [player1, player2,player3,player4] = map makePlayer ["a","b","c","d"]
+            let [player1, player2,player3,player4] = map makePlayer ["player 1","player 2","player 3","player 4"]
             makeGame (player1, player2, Just (player3, Just player4)) bag dc
 
     placeMap :: String -> Direction -> (Int, Int) -> M.Map Pos Tile 
