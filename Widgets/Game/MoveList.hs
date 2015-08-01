@@ -62,6 +62,7 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
                     .move_list_container
                         height: 200px
                         overflow-y: scroll
+                        float: left
 
                     .move_list_table
                         border-collapse: collapse
