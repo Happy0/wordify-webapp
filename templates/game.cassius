@@ -1,8 +1,13 @@
-.game-container:
+.game-container
+    margin-top: 100px
     width: 100%
 
-.middle
-    position: absolute;
-    left: 35%
+.move-list-container
     margin-top: 100px
-    margin: 0 auto;
+    float: left
+    margin-left: 100px
+
+.middle
+    position: absolute
+    left: 35%
+    margin: 0 auto

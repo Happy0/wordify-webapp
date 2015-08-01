@@ -22,7 +22,7 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
         do
             moveCss
             [whamlet|
-                <div .move_list_container> 
+                <div .move-list> 
                     <table .move_list_table>
                         $forall move <- moves
                             <tr>
@@ -59,12 +59,13 @@ module Widgets.Game.MoveList (MoveSummary(Passed, Exchanged, Scored), movesWidge
         do
             toWidget
                 [cassius|
-                    .move_list_container
-                        height: 200px
+                    .move-list
+                        height: 300px
                         overflow-y: scroll
                         float: left
 
                     .move_list_table
+                        width: 300px
                         border-collapse: collapse
                         border: 2px solid black
 
