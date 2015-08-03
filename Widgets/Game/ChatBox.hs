@@ -6,13 +6,19 @@ module Widgets.Game.ChatBox (chatWidget) where
     chatWidget =
         do
             [whamlet|
-                <ol>
+                <div class="chat_box">
+                    <ol>
+                        <li>baws
 
             |]
             toWidget
                 [cassius|
                   li
                     list-style: none
+
+                  .chat_box
+                    height: 300px
+                    width: 150px 
 
                   
                 |]

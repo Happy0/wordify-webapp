@@ -11,3 +11,6 @@
     position: absolute
     left: 35%
     margin: 0 auto
+
+.chat-container
+    float: right

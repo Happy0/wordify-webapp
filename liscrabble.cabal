@@ -24,6 +24,7 @@ library
                      Handler.Home
                      Widgets.Game.Rack
                      Widgets.Board.Board
+                     Widgets.Game.ChatBox
                      Widgets.Game.ScoreBoard
                      Widgets.Game.TestGame
 

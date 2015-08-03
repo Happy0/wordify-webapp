@@ -5,3 +5,6 @@
     <div .middle>
         ^{boardWidget currentBoard}
         ^{emptyRack}
+
+    <div .chat-container>
+        ^{chatWidget}

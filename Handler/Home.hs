@@ -10,6 +10,7 @@ import Widgets.Game.TestGame
 import qualified Data.List.NonEmpty as NE
 import Wordify.Rules.Move
 import Wordify.Rules.Game
+import Widgets.Game.ChatBox
 import Widgets.Game.ScoreBoard
 
 -- This is a handler function for the GET request method on the HomeR
