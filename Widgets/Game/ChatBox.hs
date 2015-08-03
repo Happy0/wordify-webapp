@@ -6,9 +6,12 @@ module Widgets.Game.ChatBox (chatWidget) where
     chatWidget =
         do
             [whamlet|
-                <div class="chat_box">
-                    <ol>
-                        <li>baws
+                <div>
+                    <ol .chat-box>
+                        <li> baws
+                        <li> message2
+
+                    <input .chat-input-box>
 
             |]
             toWidget
@@ -16,9 +19,13 @@ module Widgets.Game.ChatBox (chatWidget) where
                   li
                     list-style: none
 
-                  .chat_box
-                    height: 300px
-                    width: 150px 
+                  .chat-box
+                    border: 1px solid
+                    height: 350px
+                    width: 300px
+
+                  .chat-input-box
+                    width: 300px
 
                   
                 |]

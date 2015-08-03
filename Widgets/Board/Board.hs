@@ -27,7 +27,6 @@ module Widgets.Board.Board (initialBoard, boardWidget) where
                         border: 1px solid #d5c3a2
                         border-radius: 5px
                         margin-bottom: 40px
-                        margin-top: 40px
                         position: relative
 
                     .board
