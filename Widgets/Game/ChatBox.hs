@@ -8,7 +8,7 @@ module Widgets.Game.ChatBox (chatWidget) where
             [whamlet|
                 <div>
                     <ol .chat-box>
-                        <li> baws
+                        <li> message1
                         <li> message2
 
                     <input .chat-input-box>
@@ -23,6 +23,7 @@ module Widgets.Game.ChatBox (chatWidget) where
                     border: 1px solid
                     height: 350px
                     width: 300px
+                    overflow: scroll
 
                   .chat-input-box
                     width: 300px
