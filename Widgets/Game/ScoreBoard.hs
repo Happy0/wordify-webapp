@@ -54,7 +54,12 @@ module Widgets.Game.ScoreBoard (MoveSummary(Passed, Exchanged, Scored), scoreWid
                         <tr>
                             <td .move-list-cell> #{name player}
                             <td .move-list-cell> #{score player}
+                    $forall emptySlot <- emptySlots
+                        <td .empty-slot>
+                        <td .empty-slot>
             |]
+            where
+                emptySlots = [0 .. 4 - (length players)]
 
     createMoveList :: [MoveSummary] -> Widget
     createMoveList moves =
