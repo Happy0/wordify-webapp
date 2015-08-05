@@ -29,5 +29,3 @@ getHomeR = do
                 in let movesPlayed = NE.toList gameTransitions
                 in let currentBoard = (board currentGame)
                 in $(widgetFile "game")
-
-
