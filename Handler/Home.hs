@@ -8,6 +8,7 @@ import Widgets.Game.Rack
 import Wordify.Rules.Tile
 import Widgets.Game.TestGame
 import qualified Data.List.NonEmpty as NE
+import Wordify.Rules.Board
 import Wordify.Rules.Move
 import Wordify.Rules.Game
 import Widgets.Game.ChatBox
@@ -15,6 +16,21 @@ import Widgets.Game.ScoreBoard
 
 getHomeR :: Handler Html
 getHomeR = do
+    defaultLayout $ do
+        [whamlet| 
+            <div .empty-game>
+                ^{gameWidget}
+        |]
+    where
+        gameWidget = $(widgetFile "game")
+        currentBoard = emptyBoard
+        currentPlayers = []
+        movesPlayed = []
+
+
+
+blah :: Handler Html
+blah = do
     defaultLayout $ do
         setTitle "Wordify"
         game <- lift $ testGame
@@ -29,3 +45,4 @@ getHomeR = do
                 in let movesPlayed = NE.toList gameTransitions
                 in let currentBoard = (board currentGame)
                 in $(widgetFile "game")
+

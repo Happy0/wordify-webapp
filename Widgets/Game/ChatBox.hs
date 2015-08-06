@@ -8,8 +8,6 @@ module Widgets.Game.ChatBox (chatWidget) where
             [whamlet|
                 <div>
                     <ol .chat-box>
-                        <li> message1
-                        <li> message2
 
                     <input .chat-input-box>
 

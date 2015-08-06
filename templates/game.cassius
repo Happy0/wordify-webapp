@@ -3,7 +3,7 @@
     width: 100%
 
 .move-list-container
-    margin-top: 100px
+    margin-top: 80px
     float: left
     margin-left: 100px
 
@@ -15,5 +15,5 @@
 .chat-container
     float: right
     margin-top: 100px
-    margin-right: 100px
+    margin-right: 150px
 

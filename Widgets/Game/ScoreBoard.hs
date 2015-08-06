@@ -18,6 +18,7 @@ module Widgets.Game.ScoreBoard (MoveSummary(Passed, Exchanged, Scored), scoreWid
                         height: 300px
                         overflow-y: scroll
                         float: left
+                        background-color: #C8A684
 
                     .move-list-table
                         width: 300px
@@ -36,6 +37,7 @@ module Widgets.Game.ScoreBoard (MoveSummary(Passed, Exchanged, Scored), scoreWid
                         border: 1px
                         border-style: solid double
                         background-color: #C8A684
+                        height: 20px
                 |]
         where
             toSummary move =
@@ -54,12 +56,15 @@ module Widgets.Game.ScoreBoard (MoveSummary(Passed, Exchanged, Scored), scoreWid
                         <tr>
                             <td .move-list-cell> #{name player}
                             <td .move-list-cell> #{score player}
+
+
                     $forall emptySlot <- emptySlots
-                        <td .empty-slot>
-                        <td .empty-slot>
+                        <tr>
+                            <td .move-list-cell>
+                            <td .move-list-cell>
             |]
             where
-                emptySlots = [0 .. 4 - (length players)]
+                emptySlots = [1 .. 4 - (length players)]
 
     createMoveList :: [MoveSummary] -> Widget
     createMoveList moves =
