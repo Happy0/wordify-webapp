@@ -17,10 +17,18 @@ import Widgets.Game.ScoreBoard
 getHomeR :: Handler Html
 getHomeR = do
     defaultLayout $ do
-        [whamlet| 
-            <div .empty-game>
-                ^{gameWidget}
+        [whamlet|
+            <div>
+                <button .create-game-button>Create Game
         |]
+        toWidget
+            [julius|
+                var createGame = function() {
+                    alert("Clicked!");
+                };
+
+                $(".create-game-button").click(createGame);
+            |]
     where
         gameWidget = $(widgetFile "game")
         currentBoard = emptyBoard

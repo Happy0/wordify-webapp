@@ -11,9 +11,6 @@ module Widgets.Game.Rack (emptyRack, initialiseRack) where
     initialiseRack :: [Tile] -> Widget
     initialiseRack tiles =
         do
-            addScriptRemote "http://code.jquery.com/jquery-1.10.2.js"
-            addScriptRemote "http://code.jquery.com/ui/1.11.4/jquery-ui.js"
-
             [whamlet|
                 <div #rack-container>
                     <div #rack>
