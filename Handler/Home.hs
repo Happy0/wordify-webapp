@@ -19,7 +19,22 @@ getHomeR = do
     defaultLayout $ do
         [whamlet|
             <div>
-                <button .create-game-button>Create Game
+                <button .btn .btn-info .btn-lg data-toggle="modal" data-target="#create-game-lobby">Create Game
+                <div .modal .fade #create-game-lobby role="dialog">
+                    <div .modal-dialog>
+                        <div .modal-content>
+                            <div .modal-header>
+                                <button .close type="button" data-dismiss="modal">&times;
+                                <h4 class="modal-title">Create Game
+                            <div .modal-body>
+                                <div>
+                                    <p> Number of Players
+                                    <select>
+                                        $forall i <- numPlayerOptions
+                                            <option value="#{show i}"> #{show i}
+                            <div .modal-footer>
+                                <button .btn .btn-default type="button" data-dismiss="modal">Close</button>
+
         |]
         toWidget
             [julius|
@@ -27,13 +42,14 @@ getHomeR = do
                     alert("Clicked!");
                 };
 
-                $(".create-game-button").click(createGame);
+                ///$(".create-game-button").click(createGame);
             |]
     where
         gameWidget = $(widgetFile "game")
         currentBoard = emptyBoard
         currentPlayers = []
         movesPlayed = []
+        numPlayerOptions = [2..4]
 
 
 
