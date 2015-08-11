@@ -1,4 +1,4 @@
-module Widgets.Board.Board (initialBoard, boardWidget) where
+module Widgets.Game.Board (initialBoard, boardWidget) where
 
     import Import
     import Wordify.Rules.Board

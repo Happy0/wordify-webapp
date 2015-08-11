@@ -3,7 +3,7 @@ module Handler.Home where
 import Import
 import Yesod.Form.Bootstrap3 (BootstrapFormLayout (..), renderBootstrap3,
                               withSmallInput)
-import Widgets.Board.Board
+import Widgets.Game.Board
 import Widgets.Game.Rack
 import Wordify.Rules.Tile
 import Widgets.Game.TestGame
@@ -12,6 +12,7 @@ import Wordify.Rules.Board
 import Wordify.Rules.Move
 import Wordify.Rules.Game
 import Widgets.Game.ChatBox
+import Widgets.Game.Game
 import Widgets.Game.ScoreBoard
 
 getHomeR :: Handler Html
@@ -20,6 +21,8 @@ getHomeR = do
         [whamlet|
             <div>
                 <button .btn .btn-info .btn-lg data-toggle="modal" data-target="#create-game-lobby">Create Game
+                ^{emptyGame}
+
                 <div .modal .fade #create-game-lobby role="dialog">
                     <div .modal-dialog>
                         <div .modal-content>
@@ -51,7 +54,6 @@ getHomeR = do
                 $(".create-game-button").click(createGameClicked);
             |]
     where
-        gameWidget = $(widgetFile "game")
         currentBoard = emptyBoard
         currentPlayers = []
         movesPlayed = []
@@ -75,5 +77,6 @@ blah = do
                 in let currentPlayers = players currentGame
                 in let movesPlayed = NE.toList gameTransitions
                 in let currentBoard = (board currentGame)
+                in let tiles = []
                 in $(widgetFile "game")
 

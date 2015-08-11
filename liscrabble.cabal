@@ -23,9 +23,10 @@ library
                      Handler.Common
                      Handler.Home
                      Handler.Game
-                     Widgets.Game.Rack
-                     Widgets.Board.Board
+                     Widgets.Game.Board
                      Widgets.Game.ChatBox
+                     Widgets.Game.Game
+                     Widgets.Game.Rack
                      Widgets.Game.ScoreBoard
                      Widgets.Game.TestGame
 
