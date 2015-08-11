@@ -29,20 +29,26 @@ getHomeR = do
                             <div .modal-body>
                                 <div>
                                     <p> Number of Players
-                                    <select>
+                                    <select #num-players>
                                         $forall i <- numPlayerOptions
                                             <option value="#{show i}"> #{show i}
                             <div .modal-footer>
-                                <button .btn .btn-default type="button" data-dismiss="modal">Close</button>
+                                <button .btn .btn-default .create-game-button type="button">Create</button>
 
         |]
         toWidget
             [julius|
-                var createGame = function() {
-                    alert("Clicked!");
+                var getNumPlayersSelected = function() {
+                    var optionElement = document.getElementById("num-players");
+                    return optionElement.options[optionElement.selectedIndex].value;
                 };
 
-                ///$(".create-game-button").click(createGame);
+                var createGameClicked = function() {
+                    var playersSelected = getNumPlayersSelected();
+                    alert(playersSelected);
+                };
+
+                $(".create-game-button").click(createGameClicked);
             |]
     where
         gameWidget = $(widgetFile "game")
@@ -50,6 +56,7 @@ getHomeR = do
         currentPlayers = []
         movesPlayed = []
         numPlayerOptions = [2..4]
+
 
 
 
