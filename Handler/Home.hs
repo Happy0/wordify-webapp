@@ -16,7 +16,9 @@ import Widgets.Game.Game
 import Widgets.Game.ScoreBoard
 import Yesod.Core
 import Yesod.WebSockets
-import Data.Text (Text)
+import qualified Data.Text as T
+import Network.Mail.Mime
+import System.Random
 
 getHomeR :: Handler Html
 getHomeR = do
@@ -83,6 +85,8 @@ getHomeR = do
 homeWebSocketHandler :: WebSocketsT Handler ()
 homeWebSocketHandler = do
         sendTextData ("hihi" :: Text)
+        (randomStr, _) <- liftIO $ (randomString 8 <$> getStdGen)
+        sendTextData (T.pack randomStr)
 
 blah :: Handler Html
 blah = do

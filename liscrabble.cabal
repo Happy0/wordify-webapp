@@ -20,6 +20,7 @@ library
                      Model
                      Settings
                      Settings.StaticFiles
+                     Controllers.Game.Game
                      Handler.Common
                      Handler.Home
                      Handler.Game
@@ -95,6 +96,8 @@ library
                  , semigroups
                  , transformers
                  , conduit-combinators
+                 , mime-mail
+                 , random
 
 executable         liscrabble
     if flag(library-only)
