@@ -14,9 +14,13 @@ import Wordify.Rules.Game
 import Widgets.Game.ChatBox
 import Widgets.Game.Game
 import Widgets.Game.ScoreBoard
+import Yesod.Core
+import Yesod.WebSockets
+import Data.Text (Text)
 
 getHomeR :: Handler Html
 getHomeR = do
+    webSockets homeWebSocketHandler
     defaultLayout $ do
         [whamlet|
             <div>
@@ -35,6 +39,9 @@ getHomeR = do
                                     <select #num-players>
                                         $forall i <- numPlayerOptions
                                             <option value="#{show i}"> #{show i}
+                                    <p> Your Nickname
+                                        <div>
+                                            <input #nickname>
                             <div .modal-footer>
                                 <button .btn .btn-default .create-game-button type="button">Create</button>
 
@@ -46,9 +53,22 @@ getHomeR = do
                     return optionElement.options[optionElement.selectedIndex].value;
                 };
 
+                var getNickname = function () {
+                    return document.getElementById("nickname").value;
+                }
+
                 var createGameClicked = function() {
                     var playersSelected = getNumPlayersSelected();
-                    alert(playersSelected);
+                    var nickname = getNickname();
+
+                };
+
+                var url = document.URL;
+                url = url.replace("http:", "ws:").replace("https:", "wss:");
+                var conn = new WebSocket(url);
+
+                conn.onmessage = function(e) {
+                    console.dir(e);
                 };
 
                 $(".create-game-button").click(createGameClicked);
@@ -60,7 +80,9 @@ getHomeR = do
         numPlayerOptions = [2..4]
 
 
-
+homeWebSocketHandler :: WebSocketsT Handler ()
+homeWebSocketHandler = do
+        sendTextData ("hihi" :: Text)
 
 blah :: Handler Html
 blah = do

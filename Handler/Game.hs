@@ -1,4 +1,3 @@
-
 module Handler.Game where
 
 import Import
@@ -10,7 +9,7 @@ import Data.Text (Text)
 
 getGameR :: String -> Handler Html
 getGameR string = do
-    webSockets testApp
+    -- webSockets testApp
     defaultLayout $ do
         [whamlet|
             <p> baws
@@ -29,8 +28,9 @@ getGameR string = do
             |]
 
 
-testApp :: WebSocketsT Handler ()
+{-testApp :: WebSocketsT Handler ()
 testApp = do
     sendTextData ("blah blah message 1" :: Text)
     sendTextData $ (("blah blah message 2") :: Text)
     redirect HomeR
+-}
