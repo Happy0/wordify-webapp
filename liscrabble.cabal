@@ -21,9 +21,12 @@ library
                      Settings
                      Settings.StaticFiles
                      Controllers.Game.Game
+                     Controllers.Game.Api
                      Handler.Common
                      Handler.Home
                      Handler.Game
+                     Model.ServerGame
+                     Model.ServerPlayer
                      Widgets.Game.Board
                      Widgets.Game.ChatBox
                      Widgets.Game.Game

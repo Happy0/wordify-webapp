@@ -8,4 +8,8 @@ module Controllers.Game.Game (createGame) where
     import System.Random
 
     createGame :: IO Text
-    createGame = (pack . fst . randomString 8 <$> getStdGen)
+    createGame = 
+        do
+            newGameId <- (pack . fst . randomString 8 <$> getStdGen)
+            -- Create the game lobby here before returning the ID for the game that is being negotiated
+            return newGameId
