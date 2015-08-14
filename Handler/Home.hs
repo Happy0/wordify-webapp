@@ -21,6 +21,8 @@ import Network.Mail.Mime
 import System.Random
 import Controllers.Game.Game
 import Controllers.Game.Api
+import Model.Api
+import Data.Aeson
 
 getHomeR :: Handler Html
 getHomeR = do
@@ -86,9 +88,8 @@ getHomeR = do
 
 homeWebSocketHandler :: WebSocketsT Handler ()
 homeWebSocketHandler = do
-        sendTextData ("hihi" :: Text)
-        newGameId <- createGame
-        sendTextData $ GameCreated newGameId
+        newGameResponse <- liftIO createGame
+        sendTextData $ toJSONResponse newGameResponse
 
 blah :: Handler Html
 blah = do

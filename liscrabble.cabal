@@ -25,6 +25,7 @@ library
                      Handler.Common
                      Handler.Home
                      Handler.Game
+                     Model.Api
                      Model.ServerGame
                      Model.ServerPlayer
                      Widgets.Game.Board

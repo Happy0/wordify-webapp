@@ -6,10 +6,14 @@ module Controllers.Game.Game (createGame) where
     import Prelude
     import System.IO
     import System.Random
+    import Controllers.Game.Api
+    import Model.Api
+    import Model.ServerGame
 
-    createGame :: IO Text
+    createGame :: IO GameCreated
     createGame = 
         do
             newGameId <- (pack . fst . randomString 8 <$> getStdGen)
             -- Create the game lobby here before returning the ID for the game that is being negotiated
-            return newGameId
+            let newGameResponse = GameCreated newGameId
+            return newGameResponse
