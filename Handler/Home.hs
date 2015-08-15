@@ -57,7 +57,7 @@ getHomeR = do
                 var createGameRequest = {
                     "command" : "createGame",
                     "payload" : {
-                        "numPlayers" : null
+                        "players" : null
                     }
 
                 }

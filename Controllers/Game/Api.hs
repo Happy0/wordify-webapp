@@ -25,7 +25,12 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
     instance FromJSON ClientRequest where
         parseJSON (Object request) =
             case HM.lookup "command" request of
-                Just (String "createGame") -> return $ CreateGameRequest 4
-                _ -> error "Expected command to be text"
+                Just (String "createGame") -> 
+                    request .: "payload" >>= parseCreateGame
+                _ -> error "Expected command to have text value"
 
         parseJSON _ = error "Not a JSON object"
+
+    parseCreateGame :: Value -> Parser ClientRequest
+    parseCreateGame (Object object) = CreateGameRequest <$> object .: "players"
+    parseCreateGame _ = error "Expected JSON object for payload"
