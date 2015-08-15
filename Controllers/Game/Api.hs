@@ -10,14 +10,16 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
     import Data.Text
     import qualified Data.HashMap.Strict as HM
 
+
+
     type NumberPlayers = Int
 
-    data ClientRequest = CreateGameRequest NumberPlayers
+    data ClientRequest = CreateGameRequest {numberPlayers :: Int, hostNick :: Text}
 
-    data ServerResponse = GameCreated GameId
+    data ServerResponse = GameCreated {gameId :: GameId, host :: Text}
 
     instance ToJSON ServerResponse where
-        toJSON (GameCreated gameId) = object ["gameId" .= gameId]
+        toJSON (GameCreated gameId host) = object ["gameId" .= gameId, "host" .= host]
 
     instance ServerMessage ServerResponse where
         commandName _ = pack "gameCreated"
@@ -25,12 +27,15 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
     instance FromJSON ClientRequest where
         parseJSON (Object request) =
             case HM.lookup "command" request of
-                Just (String "createGame") -> 
-                    request .: "payload" >>= parseCreateGame
+                Just (String command) -> 
+                    request .: "payload" >>= parseCommand command
                 _ -> error "Expected command to have text value"
 
         parseJSON _ = error "Not a JSON object"
 
+    parseCommand :: Text -> Value -> Parser ClientRequest
+    parseCommand "createGame" value = parseCreateGame value
+
     parseCreateGame :: Value -> Parser ClientRequest
-    parseCreateGame (Object object) = CreateGameRequest <$> object .: "players"
+    parseCreateGame (Object object) = CreateGameRequest <$> object .: "players" <*> object .: "nickname"
     parseCreateGame _ = error "Expected JSON object for payload"

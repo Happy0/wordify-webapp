@@ -8,15 +8,15 @@ module Controllers.Game.Game (performRequest) where
     import System.Random
     import Controllers.Game.Api
     import Model.Api
-    import Model.ServerGame    
+    import Model.ServerGame
 
     performRequest :: ClientRequest -> IO ServerResponse
-    performRequest (CreateGameRequest players) = createGame players
+    performRequest (CreateGameRequest players nickname) = createGame players nickname
 
-    createGame :: Int -> IO ServerResponse
-    createGame players = 
+    createGame :: Int -> Text -> IO ServerResponse
+    createGame players nickname = 
         do
-            newGameId <- (pack . fst . randomString 8 <$> getStdGen)
+            newGameId <- pack . fst . randomString 8 <$> getStdGen
             -- Create the game lobby here before returning the ID for the game that is being negotiated
-            let newGameResponse = GameCreated newGameId
+            let newGameResponse = GameCreated newGameId nickname
             return newGameResponse
