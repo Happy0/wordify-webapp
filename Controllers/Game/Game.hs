@@ -1,4 +1,4 @@
-module Controllers.Game.Game (createGame) where
+module Controllers.Game.Game (performRequest) where
 
     import Control.Monad
     import Data.Text
@@ -8,10 +8,13 @@ module Controllers.Game.Game (createGame) where
     import System.Random
     import Controllers.Game.Api
     import Model.Api
-    import Model.ServerGame
+    import Model.ServerGame    
 
-    createGame :: IO GameCreated
-    createGame = 
+    performRequest :: ClientRequest -> IO ServerResponse
+    performRequest (CreateGameRequest players) = createGame players
+
+    createGame :: Int -> IO ServerResponse
+    createGame players = 
         do
             newGameId <- (pack . fst . randomString 8 <$> getStdGen)
             -- Create the game lobby here before returning the ID for the game that is being negotiated
