@@ -1,8 +1,9 @@
 module Model.Api (ServerMessage, commandName, toJSONResponse) where
 
-    import Data.ByteString.Lazy
-    import Data.Text
     import Data.Aeson
+    import Data.ByteString.Lazy
+    import Data.Maybe
+    import Data.Text
 
     {-
         A server message contains a description of the command to the client

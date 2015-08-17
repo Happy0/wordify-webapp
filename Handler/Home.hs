@@ -54,6 +54,15 @@ getHomeR = do
         |]
         toWidget
             [julius|
+                var createGameRequest = {
+                    "command" : "createGame",
+                    "payload" : {
+                        "players" : null,
+                        "nickname" : null
+                    }
+
+                }
+
                 var getNumPlayersSelected = function() {
                     var optionElement = document.getElementById("num-players");
                     return optionElement.options[optionElement.selectedIndex].value;
@@ -63,18 +72,50 @@ getHomeR = do
                     return document.getElementById("nickname").value;
                 }
 
-                var createGameClicked = function() {
-                    var playersSelected = getNumPlayersSelected();
-                    var nickname = getNickname();
-
-                };
-
                 var url = document.URL;
                 url = url.replace("http:", "ws:").replace("https:", "wss:");
                 var conn = new WebSocket(url);
 
                 conn.onmessage = function(e) {
-                    console.dir(e);
+                    var data = JSON.parse(e.data);
+
+                    parseServerMessage(data);
+                };
+
+                var parseServerMessage = function(serverMessage) {
+                    console.dir(serverMessage);
+
+                    if (serverMessage && serverMessage.command)
+                    {
+
+                        if (serverMessage.command === "gameCreated")
+                        {
+                            handleGameCreated(serverMessage.payload)
+                        }
+
+                    }
+                };
+
+                var handleGameCreated = function(payload)
+                {
+                    console.info("handleGameCreated");
+
+                    var gameId = payload.gameId;
+                    var nickname = payload.host;
+
+                    window.location = "game" + "/" + gameId + "?nick=" + nickname
+                };
+
+
+                var createGameClicked = function() {
+                    var playersSelected = getNumPlayersSelected();
+                    var nickname = getNickname();
+
+                    createGameRequest.payload.players = parseInt(playersSelected);
+                    createGameRequest.payload.nickname = getNickname();
+                    var commandText = JSON.stringify(createGameRequest);
+                    conn.send(commandText);
+                    
                 };
 
                 $(".create-game-button").click(createGameClicked);
@@ -88,8 +129,16 @@ getHomeR = do
 
 homeWebSocketHandler :: WebSocketsT Handler ()
 homeWebSocketHandler = do
-        newGameResponse <- liftIO createGame
-        sendTextData $ toJSONResponse newGameResponse
+        requestText <- receiveData
+        
+        let request = decode requestText :: Maybe ClientRequest
+        case request of
+            Just requestData -> 
+                do
+                    response <- liftIO $ performRequest requestData
+                    sendTextData $ toJSONResponse response
+            Nothing -> 
+                sendTextData $ "Unrecognised command: " ++ requestText
 
 blah :: Handler Html
 blah = do
