@@ -16,10 +16,10 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
 
     data ClientRequest = CreateGameRequest {numberPlayers :: Int, hostNick :: Text}
 
-    data ServerResponse = GameCreated {gameId :: GameId, host :: Text}
+    data ServerResponse = GameCreated {gameId :: GameId}
 
     instance ToJSON ServerResponse where
-        toJSON (GameCreated gameId host) = object ["gameId" .= gameId, "host" .= host]
+        toJSON (GameCreated gameId) = object ["gameId" .= gameId]
 
     instance ServerMessage ServerResponse where
         commandName _ = pack "gameCreated"

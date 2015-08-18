@@ -9,10 +9,13 @@ import Data.Text (Text)
 
 getGameR :: String -> Handler Html
 getGameR string = do
+    request <- getRequest
+    let cookies = reqCookies request
     -- webSockets testApp
     defaultLayout $ do
         [whamlet|
-            <p> baws
+            $forall cookie <- cookies
+                <p> #{show cookie}
         |]
         toWidget
             [julius|

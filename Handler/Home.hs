@@ -23,10 +23,13 @@ import Controllers.Game.Game
 import Controllers.Game.Api
 import Model.Api
 import Data.Aeson
+import Web.Cookie
 
 getHomeR :: Handler Html
 getHomeR = do
     webSockets homeWebSocketHandler
+    let cookie = def {setCookieName = "blah", setCookieValue = "test"}
+    setCookie cookie
     defaultLayout $ do
         [whamlet|
             <div>
@@ -101,9 +104,8 @@ getHomeR = do
                     console.info("handleGameCreated");
 
                     var gameId = payload.gameId;
-                    var nickname = payload.host;
 
-                    window.location = "game" + "/" + gameId + "?nick=" + nickname
+                    window.location = "game" + "/" + gameId;
                 };
 
 

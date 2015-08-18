@@ -102,6 +102,7 @@ library
                  , conduit-combinators
                  , mime-mail
                  , random
+                 , cookie
 
 executable         liscrabble
     if flag(library-only)

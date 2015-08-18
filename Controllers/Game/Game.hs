@@ -18,5 +18,5 @@ module Controllers.Game.Game (performRequest) where
         do
             newGameId <- pack . fst . randomString 8 <$> getStdGen
             -- Create the game lobby here before returning the ID for the game that is being negotiated
-            let newGameResponse = GameCreated newGameId nickname
+            let newGameResponse = GameCreated newGameId
             return newGameResponse
