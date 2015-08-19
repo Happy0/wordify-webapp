@@ -133,14 +133,14 @@ homeWebSocketHandler :: WebSocketsT Handler ()
 homeWebSocketHandler = do
         requestText <- receiveData
         
-        let request = decode requestText :: Maybe ClientRequest
+        let request = eitherDecode requestText :: Either String ClientRequest
         case request of
-            Just requestData -> 
+            Right requestData -> 
                 do
                     response <- liftIO $ performRequest requestData
                     sendTextData $ toJSONResponse response
-            Nothing -> 
-                sendTextData $ "Unrecognised command: " ++ requestText
+            Left reason -> 
+                sendTextData $ toJSONResponse (ClientError $ T.pack reason)
 
 blah :: Handler Html
 blah = do

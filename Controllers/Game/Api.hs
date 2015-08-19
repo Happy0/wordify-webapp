@@ -10,8 +10,6 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
     import Data.Text
     import qualified Data.HashMap.Strict as HM
 
-
-
     type NumberPlayers = Int
 
     data ClientRequest = CreateGameRequest {numberPlayers :: Int, hostNick :: Text}
@@ -31,7 +29,7 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
                     request .: "payload" >>= parseCommand command
                 _ -> error "Expected command to have text value"
 
-        parseJSON _ = error "Not a JSON object"
+        parseJSON _ = error "Invalid JSON"
 
     parseCommand :: Text -> Value -> Parser ClientRequest
     parseCommand "createGame" value = parseCreateGame value

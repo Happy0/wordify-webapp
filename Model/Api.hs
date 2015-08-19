@@ -1,9 +1,21 @@
-module Model.Api (ServerMessage, commandName, toJSONResponse) where
+module Model.Api (ServerMessage, ClientError(ClientError), commandName, toJSONResponse) where
 
     import Data.Aeson
     import Data.ByteString.Lazy
     import Data.Maybe
     import Data.Text
+
+    {-
+        Represents an error on bad input from the client such as sending
+        invalid JSON or a malformed command.
+    -}
+    data ClientError = ClientError {reason :: Text}
+
+    instance ToJSON ClientError where
+        toJSON serverError = object ["reason" .= reason serverError]
+
+    instance ServerMessage ClientError where
+        commandName _ = "error"
 
     {-
         A server message contains a description of the command to the client
