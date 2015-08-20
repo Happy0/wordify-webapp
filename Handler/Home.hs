@@ -48,9 +48,7 @@ getHomeR = do
                                     <select #num-players>
                                         $forall i <- numPlayerOptions
                                             <option value="#{show i}"> #{show i}
-                                    <p> Your Nickname
-                                        <div>
-                                            <input #nickname>
+
                             <div .modal-footer>
                                 <button .btn .btn-default .create-game-button type="button">Create</button>
 
@@ -60,8 +58,7 @@ getHomeR = do
                 var createGameRequest = {
                     "command" : "createGame",
                     "payload" : {
-                        "players" : null,
-                        "nickname" : null
+                        "players" : null
                     }
 
                 }
@@ -70,10 +67,6 @@ getHomeR = do
                     var optionElement = document.getElementById("num-players");
                     return optionElement.options[optionElement.selectedIndex].value;
                 };
-
-                var getNickname = function () {
-                    return document.getElementById("nickname").value;
-                }
 
                 var url = document.URL;
                 url = url.replace("http:", "ws:").replace("https:", "wss:");
@@ -111,10 +104,8 @@ getHomeR = do
 
                 var createGameClicked = function() {
                     var playersSelected = getNumPlayersSelected();
-                    var nickname = getNickname();
 
                     createGameRequest.payload.players = parseInt(playersSelected);
-                    createGameRequest.payload.nickname = getNickname();
                     var commandText = JSON.stringify(createGameRequest);
                     conn.send(commandText);
                     

@@ -11,10 +11,10 @@ module Controllers.Game.Game (performRequest) where
     import Model.ServerGame
 
     performRequest :: ClientRequest -> IO ServerResponse
-    performRequest (CreateGameRequest players nickname) = createGame players nickname
+    performRequest (CreateGameRequest players) = createGame players
 
-    createGame :: Int -> Text -> IO ServerResponse
-    createGame players nickname = 
+    createGame :: Int -> IO ServerResponse
+    createGame players = 
         do
             newGameId <- pack . fst . randomString 8 <$> getStdGen
             -- Create the game lobby here before returning the ID for the game that is being negotiated

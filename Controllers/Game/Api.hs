@@ -12,7 +12,7 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
 
     type NumberPlayers = Int
 
-    data ClientRequest = CreateGameRequest {numberPlayers :: Int, hostNick :: Text}
+    data ClientRequest = CreateGameRequest {numberPlayers :: Int}
 
     data ServerResponse = GameCreated {gameId :: GameId}
 
@@ -35,5 +35,5 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
     parseCommand "createGame" value = parseCreateGame value
 
     parseCreateGame :: Value -> Parser ClientRequest
-    parseCreateGame (Object object) = CreateGameRequest <$> object .: "players" <*> object .: "nickname"
+    parseCreateGame (Object object) = CreateGameRequest <$> object .: "players"
     parseCreateGame _ = error "Expected JSON object for payload"
