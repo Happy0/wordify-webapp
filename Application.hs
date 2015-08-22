@@ -33,6 +33,10 @@ import System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet,
 import Handler.Common
 import Handler.Home
 import Handler.Game
+import Data.List.Split
+import qualified Data.Map as M
+import Wordify.Rules.Dictionary
+import Wordify.Rules.LetterBag
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -53,6 +57,8 @@ makeFoundation appSettings = do
         (if appMutableStatic appSettings then staticDevel else static)
         (appStaticDir appSettings)
 
+    localisedGameSetups <- loadGameBundles
+
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a
     -- logging function. To get out of this loop, we initially create a
@@ -72,6 +78,36 @@ makeFoundation appSettings = do
 
     -- Return the foundation
     return $ mkFoundation pool
+
+loadGameBundles :: IO LocalisedGameSetups
+loadGameBundles =
+    do
+        localisations <- readFile "config/localisations.txt"
+        gameBundles <- mapM loadGameBundle $ splitOn "\n" localisations
+        return $ M.fromList gameBundles
+
+loadGameBundle :: String -> IO (String, LocalisedGameSetup)
+loadGameBundle locale =
+    do
+        bag <- loadBag $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "bag"
+        dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "dict"
+        return $ (locale, GameSetup dictionary bag)
+
+loadBag :: String -> IO LetterBag
+loadBag locale =
+    do
+        bag <- makeBag locale
+        case bag of
+            Left err -> error $ show err
+            Right bg -> return bg
+
+loadDictionary :: String -> IO Dictionary
+loadDictionary locale =
+    do
+        dictionary <- makeDictionary locale
+        case dictionary of
+            Left err -> error $ show err
+            Right dict -> return dict
 
 -- | Convert our foundation to a WAI Application by calling @toWaiAppPlain@ and
 -- applyng some additional middlewares.

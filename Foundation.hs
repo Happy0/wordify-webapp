@@ -8,6 +8,13 @@ import Yesod.Auth.BrowserId (authBrowserId)
 import Yesod.Default.Util   (addStaticContentExternal)
 import Yesod.Core.Types     (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
+import Wordify.Rules.Dictionary
+import Wordify.Rules.LetterBag
+
+data LocalisedGameSetup = GameSetup {dictionary :: Dictionary
+                            , letterBag :: LetterBag}
+
+type LocalisedGameSetups = Map String LocalisedGameSetup
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -19,6 +26,7 @@ data App = App
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
+    , localisedGameSetups :: LocalisedGameSetups
     }
 
 instance HasHttpManager App where

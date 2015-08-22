@@ -142,7 +142,7 @@ blah = do
         let fullGame = join $ fmap (flip (restoreGame) neMoves) $ game
 
         case fullGame of
-            Left err -> [whamlet|Hello World! #{(show err)}|]
+            Left  err -> [whamlet|Hello World! #{(show err)}|]
             Right gameTransitions ->
                 let currentGame = newGame $ NE.last gameTransitions
                 in let currentPlayers = players currentGame
