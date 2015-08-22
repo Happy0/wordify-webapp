@@ -21,6 +21,8 @@ module Controllers.Game.Game (performRequest) where
     import Data.Bifunctor
     import Control.Monad.Trans.Either
     import Control.Monad.Trans.Class
+    import Control.Concurrent.STM
+    import Controllers.Game.Model.GameLobby
 
     performRequest :: App -> ClientRequest -> IO (Either Text ServerResponse)
     performRequest app (CreateGameRequest players) = createGame app players "en"
@@ -31,7 +33,16 @@ module Controllers.Game.Game (performRequest) where
             do
                     newGameId <- lift $ T.pack . fst . randomString 8 <$> getStdGen
                     newGame <- setupGame app locale numPlayers
+                    let lobbies = gameLobbies app
+                    lift $ addGameLobby app newGameId newGame numPlayers
+
                     return $ GameCreated newGameId
+
+    addGameLobby :: App -> Text -> Game -> Int -> IO ()
+    addGameLobby app gameId game numPlayers = atomically $ do
+        let lobbies = gameLobbies app
+        gameLobby <- newTVar (GameLobby game [] numPlayers)
+        modifyTVar lobbies $ M.insert gameId gameLobby
 
     setupGame :: App -> Locale -> Int -> (EitherT Text IO Game)
     setupGame app locale numPlayers =

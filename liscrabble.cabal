@@ -106,6 +106,7 @@ library
                  , cookie
                  , errors
                  , either
+                 , stm
 
 executable         liscrabble
     if flag(library-only)
