@@ -1,22 +1,22 @@
-module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(GameCreated)) where
+module Controllers.Game.Api (ClientRequest(CreateGameRequest)
+                             , ServerResponse(GameCreated)) where
 
     import Prelude
     import Model.Api
-    import Model.ServerGame
+    import Controllers.Game.Model.ServerGame
     import Control.Monad
     import Data.Aeson
     import Data.Aeson.Types
     import Data.Maybe
     import Data.Text
     import qualified Data.HashMap.Strict as HM
+    import Controllers.Game.Model.ServerGame
 
     type NumberPlayers = Int
 
     data ClientRequest = CreateGameRequest {numberPlayers :: Int}
 
-    data ServerResponse = GameCreated {gameId :: GameId}
-
-    data SeverPlayer = ServerPlayer {playerNumber :: Int, identifier :: Text}
+    data ServerResponse = GameCreated {gameId :: GameID}
 
     instance ToJSON ServerResponse where
         toJSON (GameCreated gameId) = object ["gameId" .= gameId]

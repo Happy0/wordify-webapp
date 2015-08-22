@@ -8,6 +8,8 @@ import Yesod.Auth.BrowserId (authBrowserId)
 import Yesod.Default.Util   (addStaticContentExternal)
 import Yesod.Core.Types     (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
+import Controllers.Game.Model.GameLobby
+import Controllers.Game.Model.ServerGame
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 
@@ -27,6 +29,8 @@ data App = App
     , appHttpManager :: Manager
     , appLogger      :: Logger
     , localisedGameSetups :: LocalisedGameSetups
+    , gameLobbies :: TVar (Map Text (TVar GameLobby))
+    , games :: TVar (Map Text (TVar ServerGame))
     }
 
 instance HasHttpManager App where

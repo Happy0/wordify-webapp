@@ -9,7 +9,7 @@ module Controllers.Game.Game (performRequest) where
     import System.Random
     import Controllers.Game.Api
     import Model.Api
-    import Model.ServerGame
+    import Controllers.Game.Model.ServerGame
     import Wordify.Rules.Player
     import Wordify.Rules.Dictionary
     import Wordify.Rules.LetterBag

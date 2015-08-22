@@ -59,6 +59,8 @@ makeFoundation appSettings = do
         (appStaticDir appSettings)
 
     localisedGameSetups <- loadGameBundles
+    gameLobbes <- newTVarIO M.empty
+    games <- newTVarIO M.empty
 
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a
