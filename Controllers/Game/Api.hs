@@ -16,6 +16,8 @@ module Controllers.Game.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
 
     data ServerResponse = GameCreated {gameId :: GameId}
 
+    data SeverPlayer = ServerPlayer {playerNumber :: Int, identifier :: Text}
+
     instance ToJSON ServerResponse where
         toJSON (GameCreated gameId) = object ["gameId" .= gameId]
 

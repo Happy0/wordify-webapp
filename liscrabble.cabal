@@ -103,6 +103,8 @@ library
                  , mime-mail
                  , random
                  , cookie
+                 , errors
+                 , either
 
 executable         liscrabble
     if flag(library-only)

@@ -37,6 +37,7 @@ import Data.List.Split
 import qualified Data.Map as M
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
+import Data.FileEmbed
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -86,18 +87,19 @@ loadGameBundles =
         gameBundles <- mapM loadGameBundle $ splitOn "\n" localisations
         return $ M.fromList gameBundles
 
-loadGameBundle :: String -> IO (String, LocalisedGameSetup)
+loadGameBundle :: String -> IO (Text, LocalisedGameSetup)
 loadGameBundle locale =
     do
-        bag <- loadBag $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "bag"
-        dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "dict"
-        return $ (locale, GameSetup dictionary bag)
+        bag <- loadBag $ "config/localised_setups" ++ "/" ++ (locale) ++ "/" ++ "bag"
+        dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ (locale) ++ "/" ++ "dict"
+        return $ (pack locale, GameSetup dictionary bag)
 
 loadBag :: String -> IO LetterBag
 loadBag locale =
     do
         bag <- makeBag locale
         case bag of
+            -- Don't begin the app if we cannot load the config
             Left err -> error $ show err
             Right bg -> return bg
 
@@ -106,6 +108,7 @@ loadDictionary locale =
     do
         dictionary <- makeDictionary locale
         case dictionary of
+            -- Don't begin the app if we cannot load the config
             Left err -> error $ show err
             Right dict -> return dict
 

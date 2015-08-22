@@ -11,10 +11,10 @@ import qualified Yesod.Core.Unsafe as Unsafe
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 
-data LocalisedGameSetup = GameSetup {dictionary :: Dictionary
-                            , letterBag :: LetterBag}
+data LocalisedGameSetup = GameSetup {localisedDictionary :: Dictionary
+                            , localisedLetterBag :: LetterBag}
 
-type LocalisedGameSetups = Map String LocalisedGameSetup
+type LocalisedGameSetups = Map Text LocalisedGameSetup
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application

@@ -122,14 +122,19 @@ getHomeR = do
 
 homeWebSocketHandler :: WebSocketsT Handler ()
 homeWebSocketHandler = do
+        app <- getYesod
         requestText <- receiveData
         
         let request = eitherDecode requestText :: Either String ClientRequest
         case request of
             Right requestData -> 
                 do
-                    response <- liftIO $ performRequest requestData
-                    sendTextData $ toJSONResponse response
+                    result <- liftIO $ performRequest app requestData
+                    case result of
+                            Left clientError -> 
+                                sendTextData $ toJSONResponse $ ClientError clientError
+                            Right requestResponse ->
+                                sendTextData $ toJSONResponse requestResponse
             Left reason -> 
                 sendTextData $ toJSONResponse (ClientError $ T.pack reason)
 

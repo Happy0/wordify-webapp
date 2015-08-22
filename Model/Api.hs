@@ -1,9 +1,13 @@
-module Model.Api (ServerMessage, ClientError(ClientError), commandName, toJSONResponse) where
+module Model.Api (ServerMessage, ClientError(ClientError), Locale, GameID, commandName, toJSONResponse) where
 
     import Data.Aeson
     import Data.ByteString.Lazy
     import Data.Maybe
     import Data.Text
+
+    type Locale = Text
+
+    type GameID = Text
 
     {-
         Represents an error on bad input from the client such as sending
