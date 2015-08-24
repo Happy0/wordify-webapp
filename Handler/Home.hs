@@ -19,8 +19,8 @@ import Yesod.WebSockets
 import qualified Data.Text as T
 import Network.Mail.Mime
 import System.Random
-import Controllers.Game.Game
-import Controllers.Game.Api
+import Controllers.Home.Home
+import Controllers.Home.Api
 import Model.Api
 import Data.Aeson
 import Web.Cookie

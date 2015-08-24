@@ -33,6 +33,7 @@ import System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet,
 import Handler.Common
 import Handler.Home
 import Handler.Game
+import Handler.GameLobby
 import Data.List.Split
 import qualified Data.Map as M
 import Wordify.Rules.Dictionary

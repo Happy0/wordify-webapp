@@ -25,9 +25,12 @@ library
                      Controllers.Game.Model.ServerPlayer
                      Controllers.Game.Game
                      Controllers.Game.Api
+                     Controllers.Home.Api
+                     Controllers.Home.Home
                      Handler.Common
                      Handler.Home
                      Handler.Game
+                     Handler.GameLobby
                      Model.Api
                      Widgets.Game.Board
                      Widgets.Game.ChatBox
