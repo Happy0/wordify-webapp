@@ -31,9 +31,7 @@ module Handler.GameLobby where
             |]
 
     getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> IO (Maybe (TVar GameLobby))
-    getGameLobby gameId lobbies = atomically $ do
-                lobby <- readTVar lobbies
-                return $ M.lookup gameId lobby
+    getGameLobby gameId lobbies = atomically $ M.lookup gameId <$> readTVar lobbies
 
     lobbyWebSocketHandler :: WebSocketsT Handler ()
     lobbyWebSocketHandler = undefined
