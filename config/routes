@@ -6,4 +6,4 @@
 
 / HomeR GET
 /game/#Text/lobby GameLobbyR GET
-/game/#String GameR GET
+/game/#Text GameR GET

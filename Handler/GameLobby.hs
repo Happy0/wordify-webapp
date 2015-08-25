@@ -13,10 +13,18 @@ module Handler.GameLobby where
 
         gameLobby <- liftIO $ getGameLobby gameId lobbies
 
-        [whamlet|
-            <div .lobby>
+        case gameLobby of
+            Nothing ->
+                {- Perhaps the game has already started... Redirect the user
+                   to the game URL as a spectator. If the redirect fails,
+                   the user will be shown the appropriate error.
+                -}
+                redirect $ GameR gameId
+            Just gameLobby ->
+                [whamlet|
+                    <div .lobby>
 
-        |]
+                |]
         toWidget
             [julius|
 
@@ -33,5 +41,5 @@ module Handler.GameLobby where
     getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> IO (Maybe (TVar GameLobby))
     getGameLobby gameId lobbies = atomically $ M.lookup gameId <$> readTVar lobbies
 
-    lobbyWebSocketHandler :: WebSocketsT Handler ()
-    lobbyWebSocketHandler = undefined
+    lobbyWebSocketHandler :: TVar GameLobby -> WebSocketsT Handler ()
+    lobbyWebSocketHandler gameLobby = undefined

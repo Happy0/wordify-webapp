@@ -7,7 +7,7 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Monoid as M
 import Data.Text (Text)
 
-getGameR :: String -> Handler Html
+getGameR :: Text -> Handler Html
 getGameR string = do
     request <- getRequest
     let cookies = reqCookies request
