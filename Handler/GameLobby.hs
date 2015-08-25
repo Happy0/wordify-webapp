@@ -51,7 +51,7 @@ module Handler.GameLobby where
     lobbyWebSocketHandler :: TVar GameLobby -> ServerPlayer -> WebSocketsT Handler ()
     lobbyWebSocketHandler gameLobby player =
         do
-            comChannel <- liftIO $ atomically $ readTVar gameLobby >>= (dupTChan . channel)
+            comChannel <- liftIO $ atomically $ readTVar gameLobby >>= (cloneTChan . channel)
             race_
                 -- Read from the communication channel and update the client of any new events
                 (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan comChannel) >>= sendTextData )
