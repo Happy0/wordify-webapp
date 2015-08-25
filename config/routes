@@ -5,5 +5,5 @@
 /robots.txt RobotsR GET
 
 / HomeR GET
-/game/lobby/#Text GameLobbyR GET
+/game/#Text/lobby GameLobbyR GET
 /game/#String GameR GET
