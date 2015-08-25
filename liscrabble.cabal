@@ -24,6 +24,8 @@ library
                      Controllers.Game.Model.ServerGame
                      Controllers.Game.Model.ServerPlayer
                      Controllers.Game.Game
+                     Controllers.GameLobby.GameLobby
+                     Controllers.GameLobby.Api
                      Controllers.Game.Api
                      Controllers.Home.Api
                      Controllers.Home.Home
@@ -110,6 +112,7 @@ library
                  , errors
                  , either
                  , stm
+                 , websockets
 
 executable         liscrabble
     if flag(library-only)

@@ -41,8 +41,9 @@ module Controllers.Home.Home(performRequest) where
     addGameLobby :: App -> Text -> Game -> Int -> IO ()
     addGameLobby app gameId game numPlayers = atomically $ do
         let lobbies = gameLobbies app
-        gameLobby <- newTVar (GameLobby game [] numPlayers)
-        modifyTVar lobbies $ M.insert gameId gameLobby
+        broadcastChan <- newTChan
+        gameLobby <- newTVar (GameLobby game [] numPlayers broadcastChan)
+        modifyTVar lobbies $ M.insert gameId gameLobby 
 
     setupGame :: App -> Locale -> Int -> (EitherT Text IO Game)
     setupGame app locale numPlayers =

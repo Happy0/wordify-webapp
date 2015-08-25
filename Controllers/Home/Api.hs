@@ -32,6 +32,7 @@ module Controllers.Home.Api (ClientRequest(CreateGameRequest), ServerResponse(Ga
 
     parseCommand :: Text -> Value -> Parser ClientRequest
     parseCommand "createGame" value = parseCreateGame value
+    parseCommand _ _ = error "Unrecognised command"
 
     parseCreateGame :: Value -> Parser ClientRequest
     parseCreateGame (Object object) = CreateGameRequest <$> object .: "players"
