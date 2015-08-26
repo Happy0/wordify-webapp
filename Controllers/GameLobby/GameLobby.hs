@@ -21,6 +21,8 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
 	handleClientMessage app gameId (Join Nothing) = undefined
 	handleClientMessage app gameId (Join (Just textId)) = undefined
 
+	-- TODO: Do the join when the player loads the web page rather than
+	-- negotiating it over the websocket.
 	handleJoinNewPlayer :: App -> T.Text -> TVar GameLobby -> IO LobbyResponse
 	handleJoinNewPlayer app gameId gameLobby =
 		do
