@@ -1,6 +1,7 @@
 module Handler.GameLobby where
 
     import Import
+    import Foundation
     import Yesod.Core
     import Yesod.WebSockets
     import qualified Data.Map as M
@@ -14,42 +15,46 @@ module Handler.GameLobby where
     import Model.Api
 
     getGameLobbyR :: Text -> Handler Html
-    getGameLobbyR gameId = defaultLayout $ do
-        app <- getYesod
-        let lobbies = gameLobbies app
+    getGameLobbyR gameId =
+        do
+            app <- getYesod
+            let lobbies = gameLobbies app
 
-        gameLobby <- liftIO $ getGameLobby gameId lobbies
+            gameLobby <- liftIO $ getGameLobby gameId lobbies
 
-        case gameLobby of
-            Nothing ->
-                {- Perhaps the game has already started... Redirect the user
-                   to the game URL as a spectator. If the redirect fails,
-                   the user will be shown the appropriate error.
-                -}
-                redirect $ GameR gameId
-            Just gameLobby ->
-                [whamlet|
-                    <div .lobby>
+            case gameLobby of
+                Nothing ->
+                    {- Perhaps the game has already started... Redirect the user
+                       to the game URL as a spectator. If the redirect fails,
+                       the user will be shown the appropriate error.
+                    -}
+                    redirect $ GameR gameId
+                Just gameLobby ->
+                    do
+                        webSockets $ lobbyWebSocketHandler app gameId gameLobby
+                        defaultLayout $ do
+                            [whamlet|
+                                <div .lobby>
 
-                |]
-        toWidget
-            [julius|
+                            |]
+                            toWidget
+                                [julius|
 
-                var url = document.URL;
-                url = url.replace("http:", "ws:").replace("https:", "wss:");
-                var conn = new WebSocket(url);
+                                    var url = document.URL;
+                                    url = url.replace("http:", "ws:").replace("https:", "wss:");
+                                    var conn = new WebSocket(url);
 
-                conn.onmessage = function(e) {
-                    alert("New connection~~");
-                };
+                                    conn.onmessage = function(e) {
+                                        alert("New connection~~");
+                                    };
 
-            |]
+                                |]
 
     getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> IO (Maybe (TVar GameLobby))
     getGameLobby gameId lobbies = atomically $ M.lookup gameId <$> readTVar lobbies
 
-    lobbyWebSocketHandler :: TVar GameLobby -> ServerPlayer -> WebSocketsT Handler ()
-    lobbyWebSocketHandler gameLobby player =
+    lobbyWebSocketHandler :: App -> Text -> TVar GameLobby -> WebSocketsT Handler ()
+    lobbyWebSocketHandler app gameId gameLobby =
         do
             comChannel <- liftIO $ atomically $ readTVar gameLobby >>= (cloneTChan . channel)
             race_
@@ -65,7 +70,7 @@ module Handler.GameLobby where
                             case request of
                                 Right requestData -> 
                                     do
-                                        result <- liftIO $ handleClientMessage gameLobby requestData
+                                        result <- liftIO $ handleClientMessage app gameId requestData
                                         case result of
                                                 Left clientError -> 
                                                     sendTextData $ toJSONResponse $ ClientError clientError

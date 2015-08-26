@@ -1,4 +1,4 @@
-module Controllers.Game.Model.GameLobby (GameLobby(GameLobby), game, lobbyPlayers, awaiting, channel) where
+module Controllers.Game.Model.GameLobby (GameLobby(GameLobby), updatePlayers, game, lobbyPlayers, awaiting, channel) where
 
     import Prelude
     import Wordify.Rules.Game
@@ -9,3 +9,6 @@ module Controllers.Game.Model.GameLobby (GameLobby(GameLobby), game, lobbyPlayer
 
     -- TODO: Move this module to the GameLobby folder
     data GameLobby = GameLobby {game :: Game, lobbyPlayers :: [ServerPlayer], awaiting :: Int, channel :: TChan LobbyMessage}
+
+    updatePlayers :: [ServerPlayer] -> GameLobby -> GameLobby
+    updatePlayers players lobby = lobby {lobbyPlayers = players}
