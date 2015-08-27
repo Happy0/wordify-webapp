@@ -98,7 +98,7 @@ getHomeR = do
 
                     var gameId = payload.gameId;
 
-                    window.location = "game" + "/" + gameId;
+                    window.location = "game" + "/" + gameId + "/lobby";
                 };
 
 

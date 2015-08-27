@@ -11,5 +11,7 @@ module Controllers.Game.Model.ServerPlayer (ServerPlayer(ServerPlayer), name, ma
 	makeNewPlayer :: Text -> Text -> ServerPlayer
 	makeNewPlayer playerName gameId = ServerPlayer playerName gameId
 
-	makeNewPlayerId :: IO Text
-	makeNewPlayerId = pack . fst . randomString 8 <$> getStdGen
+	makeNewPlayerId :: StdGen -> (Text, StdGen)
+	makeNewPlayerId generator = 
+		let (result, newGen) = randomString 8 generator
+		in (pack result, newGen)

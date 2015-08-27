@@ -1,58 +1,59 @@
-module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessage) where
+module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessage, handleJoinNewPlayer, handleLobbyFull) where
 
-	import Prelude
-	import Foundation
-	import Control.Concurrent.STM.TVar
-	import Controllers.GameLobby.Api
-	import Controllers.Game.Model.ServerPlayer
-	import Controllers.GameLobby.Api
-	import Model.Api
-	import Controllers.Game.Model.GameLobby
-	import qualified Data.Text as T
-	import Control.Concurrent.STM.TChan
-	import Control.Monad
-	import Control.Monad.STM
-	import Control.Concurrent.STM.TVar
+    import Prelude
+    import Foundation
+    import Control.Concurrent.STM.TVar
+    import Controllers.GameLobby.Api
+    import Controllers.Game.Model.ServerPlayer
+    import Controllers.GameLobby.Api
+    import Model.Api
+    import Controllers.Game.Model.GameLobby
+    import qualified Data.Text as T
+    import Control.Concurrent.STM.TChan
+    import Control.Monad
+    import Control.Monad.STM
+    import Control.Concurrent.STM.TVar
 
-	handleChannelMessage :: LobbyMessage -> LobbyResponse
-	handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
+    handleChannelMessage :: LobbyMessage -> LobbyResponse
+    handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
 
-	handleClientMessage :: App -> T.Text -> ClientRequest -> IO (Either T.Text LobbyResponse)
-	handleClientMessage app gameId (Join Nothing) = undefined
-	handleClientMessage app gameId (Join (Just textId)) = undefined
+    handleClientMessage :: App -> T.Text -> ClientRequest -> IO (Either T.Text LobbyResponse)
+    handleClientMessage app gameId (Join Nothing) = undefined
+    handleClientMessage app gameId (Join (Just textId)) = undefined
 
-	-- TODO: Do the join when the player loads the web page rather than
-	-- negotiating it over the websocket.
-	handleJoinNewPlayer :: App -> T.Text -> TVar GameLobby -> IO LobbyResponse
-	handleJoinNewPlayer app gameId gameLobby =
-		do
-			playerId <- makeNewPlayerId
-			atomically $
-				do
-					lobby <- readTVar gameLobby
-					let players = lobbyPlayers lobby
-					let newPlayerName =  T.concat ["player", T.pack . show $ length players]
-					let newPlayer = makeNewPlayer newPlayerName playerId
-					let newPlayers = players ++ [newPlayer]
+    {-
+        Creates a new player, adds them to the lobby, and returns the new player.
+    -}
+    handleJoinNewPlayer :: TVar GameLobby -> STM ServerPlayer
+    handleJoinNewPlayer gameLobby =
+        do
+            lobby <- readTVar gameLobby
+            newPlayerIdGenerator <- readTVar $ playerIdGenerator lobby
+            let (playerId, newGen) = makeNewPlayerId newPlayerIdGenerator
 
-					modifyTVar gameLobby $ updatePlayers newPlayers
-					
-					when (length newPlayers == (awaiting lobby)) $
-						do
-							removeGameLobby app gameId
-							createGame app gameId lobby
+            let players = lobbyPlayers lobby
+            let newPlayerName =  T.concat ["player", T.pack . show $ length players]
+            let newPlayer = makeNewPlayer newPlayerName playerId
+            let newPlayers = players ++ [newPlayer]
+            
+            modifyTVar gameLobby $ updatePlayers newPlayers
+            return newPlayer
 
-							-- Broadcast that the game is ready to begin
-							let broadcastChannel = channel lobby
-							writeTChan broadcastChannel (PlayerJoined newPlayer)
-							writeTChan broadcastChannel LobbyFull
+    handleLobbyFull :: App -> GameLobby -> T.Text -> STM ()
+    handleLobbyFull app lobby gameId =
+        when (length (lobbyPlayers lobby) == (awaiting lobby)) $
+            do
+                -- Broadcast that the game is ready to begin
+                let broadcastChannel = channel lobby
+                writeTChan broadcastChannel LobbyFull
 
-					return JoinSuccess
+                removeGameLobby app gameId
+                createGame app gameId lobby
 
-	removeGameLobby :: App -> T.Text -> STM ()
-	removeGameLobby app gameId = undefined
 
-	createGame :: App -> T.Text -> GameLobby -> STM ()
-	createGame app gameId lobby = undefined
+    removeGameLobby :: App -> T.Text -> STM ()
+    removeGameLobby app gameId = undefined
 
-	
+    createGame :: App -> T.Text -> GameLobby -> STM ()
+    createGame app gameId lobby = undefined
+

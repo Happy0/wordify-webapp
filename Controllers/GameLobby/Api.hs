@@ -1,4 +1,4 @@
-module Controllers.GameLobby.Api(LobbyMessage(PlayerJoined, LobbyFull), LobbyResponse(Joined, JoinSuccess, StartGame), ClientRequest(Join)) where
+module Controllers.GameLobby.Api(LobbyMessage(PlayerJoined, LobbyFull), LobbyResponse(Joined, JoinSuccess, StartGame, GameAlreadyStarted, GameDoesNotExist), ClientRequest(Join)) where
 
     import Controllers.Game.Model.ServerPlayer
     import Model.Api
@@ -38,14 +38,18 @@ module Controllers.GameLobby.Api(LobbyMessage(PlayerJoined, LobbyFull), LobbyRes
     {-
         Messages sent to clients via their websocket connection.
     -}
-    data LobbyResponse = Joined ServerPlayer | JoinSuccess | StartGame
+    data LobbyResponse = Joined ServerPlayer | JoinSuccess | StartGame | GameAlreadyStarted | GameDoesNotExist
 
     instance ToJSON LobbyResponse where
         toJSON (Joined player) = object ["name" .= name player]
         toJSON StartGame = object []
         toJSON JoinSuccess = object []
+        toJSON GameAlreadyStarted = object []
+        toJSON GameDoesNotExist = object []
 
     instance ServerMessage LobbyResponse where
         commandName (Joined _) = "joined"
         commandName JoinSuccess = "joinSuccess"
         commandName StartGame = "startGame"
+        commandName GameAlreadyStarted = "alreadyStarted"
+        commandName GameDoesNotExist = "invalidGameId"

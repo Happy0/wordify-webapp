@@ -13,71 +13,58 @@ module Handler.GameLobby where
     import Controllers.GameLobby.Api
     import Data.Aeson
     import Model.Api
+    import Control.Monad
+    import Control.Monad.Trans.Maybe
 
     getGameLobbyR :: Text -> Handler Html
     getGameLobbyR gameId =
         do
             app <- getYesod
-            let lobbies = gameLobbies app
 
-            gameLobby <- liftIO $ getGameLobby gameId lobbies
+            webSockets $ lobbyWebSocketHandler app gameId
+            defaultLayout $ do
+                [whamlet|
+                    <div .lobby>
 
-            case gameLobby of
-                Nothing ->
-                    {- Perhaps the game has already started... Redirect the user
-                       to the game URL as a spectator. If the redirect fails,
-                       the user will be shown the appropriate error.
-                    -}
-                    redirect $ GameR gameId
-                Just gameLobby ->
-                    do
-                        webSockets $ lobbyWebSocketHandler app gameId gameLobby
-                        defaultLayout $ do
-                            [whamlet|
-                                <div .lobby>
+                |]
+                toWidget
+                    [julius|
 
-                            |]
-                            toWidget
-                                [julius|
+                        var url = document.URL;
+                        url = url.replace("http:", "ws:").replace("https:", "wss:");
+                        var conn = new WebSocket(url);
 
-                                    var url = document.URL;
-                                    url = url.replace("http:", "ws:").replace("https:", "wss:");
-                                    var conn = new WebSocket(url);
+                        conn.onmessage = function(e) {
+                            alert(e.data);
+                        };
 
-                                    conn.onmessage = function(e) {
-                                        alert("New connection~~");
-                                    };
+                    |]
 
-                                |]
+    getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> MaybeT STM (TVar GameLobby)
+    getGameLobby gameId lobbies = MaybeT (M.lookup gameId <$> readTVar lobbies)
 
-    getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> IO (Maybe (TVar GameLobby))
-    getGameLobby gameId lobbies = atomically $ M.lookup gameId <$> readTVar lobbies
-
-    lobbyWebSocketHandler :: App -> Text -> TVar GameLobby -> WebSocketsT Handler ()
-    lobbyWebSocketHandler app gameId gameLobby =
+    setupPrequisets :: App -> Text -> STM (Maybe (ServerPlayer, TChan LobbyMessage))
+    setupPrequisets app gameId =
         do
-            comChannel <- liftIO $ atomically $ readTVar gameLobby >>= (cloneTChan . channel)
-            race_
-                -- Read from the communication channel and update the client of any new events
-                (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan comChannel) >>= sendTextData )
+            runMaybeT $
+                do
+                    lobby <- getGameLobby gameId (gameLobbies app)
+                    newPlayer <- lift $ handleJoinNewPlayer lobby
+                    updatedLobby <- lift $ readTVar lobby
+                    broadcastChan <- lift $ dupTChan (channel updatedLobby)
+                    
+                    lift $ writeTChan broadcastChan $ PlayerJoined newPlayer
+                    lift $ handleLobbyFull app updatedLobby gameId
 
-                -- Read from the client's websocket connection
-                (forever $
-                        -- TODO: Abstract this in some way... It's pretty much a repeat of the home websocket handler
-                        do
-                            requestText <- receiveData
-                            let request = eitherDecode requestText :: Either String ClientRequest
-                            case request of
-                                Right requestData -> 
-                                    do
-                                        result <- liftIO $ handleClientMessage app gameId requestData
-                                        case result of
-                                                Left clientError -> 
-                                                    sendTextData $ toJSONResponse $ ClientError clientError
-                                                Right requestResponse ->
-                                                    sendTextData $ toJSONResponse requestResponse
-                                Left reason -> 
-                                    sendTextData $ toJSONResponse (ClientError $ T.pack reason)
+                    return (newPlayer, broadcastChan)
 
-                )
+    lobbyWebSocketHandler :: App -> Text -> WebSocketsT Handler ()
+    lobbyWebSocketHandler app gameId =
+        do
+            prequisets <- atomically $ setupPrequisets app gameId
 
+            case prequisets of
+                Nothing -> 
+                    sendTextData $ toJSONResponse GameDoesNotExist
+                Just (serverPlayer, channel) ->
+                    sendTextData ("arararara~" :: T.Text)
