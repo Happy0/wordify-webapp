@@ -30,6 +30,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
             lobby <- readTVar gameLobby
             newPlayerIdGenerator <- readTVar $ playerIdGenerator lobby
             let (playerId, newGen) = makeNewPlayerId newPlayerIdGenerator
+            writeTVar (playerIdGenerator lobby) newGen
 
             let players = lobbyPlayers lobby
             let newPlayerName =  T.concat ["player", T.pack . show $ length players]
