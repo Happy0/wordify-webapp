@@ -14,7 +14,8 @@ module Handler.GameLobby where
     import Data.Aeson
     import Model.Api
     import Control.Monad
-    import Control.Monad.Trans.Maybe
+    import Control.Monad.Trans.Either
+    import Control.Error.Util
 
     getGameLobbyR :: Text -> Handler Html
     getGameLobbyR gameId =
@@ -40,13 +41,13 @@ module Handler.GameLobby where
 
                     |]
 
-    getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> MaybeT STM (TVar GameLobby)
-    getGameLobby gameId lobbies = MaybeT (M.lookup gameId <$> readTVar lobbies)
+    getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> EitherT LobbyResponse STM (TVar GameLobby)
+    getGameLobby gameId lobbies = EitherT (note GameDoesNotExist . M.lookup gameId <$> readTVar lobbies)
 
-    setupPrequisets :: App -> Text -> STM (Maybe (ServerPlayer, TChan LobbyMessage))
+    setupPrequisets :: App -> Text -> STM (Either LobbyResponse (ServerPlayer, TChan LobbyMessage))
     setupPrequisets app gameId =
         do
-            runMaybeT $
+            runEitherT $
                 do
                     lobby <- getGameLobby gameId (gameLobbies app)
                     newPlayer <- lift $ handleJoinNewPlayer lobby
@@ -64,7 +65,7 @@ module Handler.GameLobby where
             prequisets <- atomically $ setupPrequisets app gameId
 
             case prequisets of
-                Nothing -> 
-                    sendTextData $ toJSONResponse GameDoesNotExist
-                Just (serverPlayer, channel) ->
+                Left err -> 
+                    sendTextData $ toJSONResponse err
+                Right (serverPlayer, channel) ->
                     sendTextData ("arararara~" :: T.Text)
