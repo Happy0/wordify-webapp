@@ -51,22 +51,21 @@ module Handler.GameLobby where
 
     setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (ServerPlayer, TChan LobbyMessage))
     setupPrequisets app gameId maybePlayerId =
-        do
-            runEitherT $
-                do
-                    lobby <- getGameLobby gameId (gameLobbies app)
-                    oldLobby <- lift $ readTVar lobby
-                    broadcastChan <- lift . dupTChan . channel $ oldLobby
-                    case maybePlayerId of
-                        Nothing ->
-                            do
-                                newPlayer <- lift $ handleJoinNewPlayer lobby
-                                updatedLobby <- lift $ readTVar lobby
-                                lift $ writeTChan broadcastChan $ PlayerJoined newPlayer
-                                lift $ handleLobbyFull app updatedLobby gameId
-                                return (newPlayer, broadcastChan)
-                        Just playerId ->
-                            hoistEither $ (\player -> (player, broadcastChan)) <$> getExistingPlayer oldLobby playerId
+        runEitherT $
+            do
+                lobby <- getGameLobby gameId (gameLobbies app)
+                oldLobby <- lift $ readTVar lobby
+                broadcastChan <- lift . dupTChan . channel $ oldLobby
+                case maybePlayerId of
+                    Nothing ->
+                        do
+                            newPlayer <- lift $ handleJoinNewPlayer lobby
+                            updatedLobby <- lift $ readTVar lobby
+                            lift $ writeTChan broadcastChan $ PlayerJoined newPlayer
+                            lift $ handleLobbyFull app updatedLobby gameId
+                            return (newPlayer, broadcastChan)
+                    Just playerId ->
+                        hoistEither $ (\player -> (player, broadcastChan)) <$> getExistingPlayer oldLobby playerId
 
     lobbyWebSocketHandler :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
     lobbyWebSocketHandler app gameId maybePlayerId =
