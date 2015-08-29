@@ -13,6 +13,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
     import Control.Monad
     import Control.Monad.STM
     import Control.Concurrent.STM.TVar
+    import qualified Data.Map as M
 
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
@@ -53,7 +54,10 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
 
 
     removeGameLobby :: App -> T.Text -> STM ()
-    removeGameLobby app gameId = undefined
+    removeGameLobby app gameId =
+        let lobbies = gameLobbies app
+        in modifyTVar lobbies $ M.delete gameId
+
 
     createGame :: App -> T.Text -> GameLobby -> STM ()
     createGame app gameId lobby = undefined

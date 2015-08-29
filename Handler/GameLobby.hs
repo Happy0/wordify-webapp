@@ -71,9 +71,8 @@ module Handler.GameLobby where
     lobbyWebSocketHandler app gameId maybePlayerId =
         do
             prequisets <- atomically $ setupPrequisets app gameId maybePlayerId
-
             case prequisets of
                 Left err -> 
                     sendTextData $ toJSONResponse err
                 Right (serverPlayer, channel) ->
-                    sendTextData ("arararara~" :: T.Text)
+                    sendTextData $ toJSONResponse JoinSuccess
