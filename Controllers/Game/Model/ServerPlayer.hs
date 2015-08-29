@@ -1,4 +1,4 @@
-module Controllers.Game.Model.ServerPlayer (ServerPlayer(ServerPlayer), name, makeNewPlayer, makeNewPlayerId) where
+module Controllers.Game.Model.ServerPlayer (ServerPlayer(ServerPlayer), name, identifier, makeNewPlayer, makeNewPlayerId) where
 
 	import Data.Text
 	import Prelude

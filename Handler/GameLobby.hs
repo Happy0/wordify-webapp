@@ -22,7 +22,7 @@ module Handler.GameLobby where
         do
             app <- getYesod
 
-            webSockets $ lobbyWebSocketHandler app gameId
+            webSockets $ lobbyWebSocketHandler app gameId Nothing
             defaultLayout $ do
                 [whamlet|
                     <div .lobby>
@@ -44,25 +44,34 @@ module Handler.GameLobby where
     getGameLobby :: Text -> TVar (Map Text (TVar GameLobby)) -> EitherT LobbyResponse STM (TVar GameLobby)
     getGameLobby gameId lobbies = EitherT (note GameDoesNotExist . M.lookup gameId <$> readTVar lobbies)
 
-    setupPrequisets :: App -> Text -> STM (Either LobbyResponse (ServerPlayer, TChan LobbyMessage))
-    setupPrequisets app gameId =
+    getExistingPlayer :: GameLobby -> Text -> Either LobbyResponse ServerPlayer
+    getExistingPlayer lobby playerId = note InvalidPlayerID $ find (\player -> identifier player == playerId) players
+        where
+            players = lobbyPlayers lobby
+
+    setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (ServerPlayer, TChan LobbyMessage))
+    setupPrequisets app gameId maybePlayerId =
         do
             runEitherT $
                 do
                     lobby <- getGameLobby gameId (gameLobbies app)
-                    newPlayer <- lift $ handleJoinNewPlayer lobby
-                    updatedLobby <- lift $ readTVar lobby
-                    broadcastChan <- lift $ dupTChan (channel updatedLobby)
-                    
-                    lift $ writeTChan broadcastChan $ PlayerJoined newPlayer
-                    lift $ handleLobbyFull app updatedLobby gameId
+                    oldLobby <- lift $ readTVar lobby
+                    broadcastChan <- lift . dupTChan . channel $ oldLobby
+                    case maybePlayerId of
+                        Nothing ->
+                            do
+                                newPlayer <- lift $ handleJoinNewPlayer lobby
+                                updatedLobby <- lift $ readTVar lobby
+                                lift $ writeTChan broadcastChan $ PlayerJoined newPlayer
+                                lift $ handleLobbyFull app updatedLobby gameId
+                                return (newPlayer, broadcastChan)
+                        Just playerId ->
+                            hoistEither $ (\player -> (player, broadcastChan)) <$> getExistingPlayer oldLobby playerId
 
-                    return (newPlayer, broadcastChan)
-
-    lobbyWebSocketHandler :: App -> Text -> WebSocketsT Handler ()
-    lobbyWebSocketHandler app gameId =
+    lobbyWebSocketHandler :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
+    lobbyWebSocketHandler app gameId maybePlayerId =
         do
-            prequisets <- atomically $ setupPrequisets app gameId
+            prequisets <- atomically $ setupPrequisets app gameId maybePlayerId
 
             case prequisets of
                 Left err -> 
