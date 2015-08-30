@@ -1,1 +1,3 @@
-module Controllers.Game.Api where
+module Controllers.Game.Api (GameMessage) where
+
+	data GameMessage

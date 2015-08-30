@@ -14,6 +14,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
     import Control.Monad.STM
     import Control.Concurrent.STM.TVar
     import qualified Data.Map as M
+    import Controllers.Game.Model.ServerGame
 
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
@@ -60,5 +61,14 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
 
 
     createGame :: App -> T.Text -> GameLobby -> STM ()
-    createGame app gameId lobby = undefined
+    createGame app gameId lobby =
+        do
+            let gamesInProgress = games app
+            newChannel <- newBroadcastTChan
+            gameRef <- newTVar $ ServerGame newGame players newChannel
+            modifyTVar gamesInProgress $ M.insert gameId gameRef
+        where
+            players = lobbyPlayers lobby
+            newGame = pendingGame lobby
+
 
