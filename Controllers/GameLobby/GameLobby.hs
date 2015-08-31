@@ -18,6 +18,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
 
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
+    handleChannelMessage LobbyFull = StartGame
 
     {-
         Creates a new player, adds them to the lobby, notifying the players
@@ -32,7 +33,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
             writeTVar (playerIdGenerator lobby) newGen
 
             let players = lobbyPlayers lobby
-            let newPlayerName =  T.concat ["player", T.pack . show $ length players]
+            let newPlayerName =  T.concat ["player", T.pack . show $ (length players + 1)]
             let newPlayer = makeNewPlayer newPlayerName playerId
             let newPlayers = players ++ [newPlayer]
             let newLobby = updatePlayers newPlayers lobby
