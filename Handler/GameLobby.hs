@@ -73,7 +73,7 @@ module Handler.GameLobby where
                             if (playerId && gameId)
                             {
                                  var playerCookie = "id=".concat(playerId).concat(";");
-                                 var path = "path=/game/".concat(gameId).concat("/");
+                                 var path = "path=/game/".concat(gameId);
 
                                  var cookie = playerCookie.concat(path);
                                  console.info("cookie: " + cookie);
