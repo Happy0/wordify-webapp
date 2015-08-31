@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessage, handleJoinNewPlayer, handleLobbyFull) where
+module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlayer, handleLobbyFull) where
 
     import Prelude
     import Foundation
@@ -19,15 +19,12 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
 
-    handleClientMessage :: App -> T.Text -> ClientRequest -> IO (Either T.Text LobbyResponse)
-    handleClientMessage app gameId (Join Nothing) = undefined
-    handleClientMessage app gameId (Join (Just textId)) = undefined
-
     {-
-        Creates a new player, adds them to the lobby, and returns the new player.
+        Creates a new player, adds them to the lobby, notifying the players
+        of the new arrival via the broadcast channel and returns the new player.
     -}
-    handleJoinNewPlayer :: TVar GameLobby -> STM ServerPlayer
-    handleJoinNewPlayer gameLobby =
+    handleJoinNewPlayer :: App -> T.Text -> TVar GameLobby -> STM ServerPlayer
+    handleJoinNewPlayer app gameId gameLobby =
         do
             lobby <- readTVar gameLobby
             newPlayerIdGenerator <- readTVar $ playerIdGenerator lobby
@@ -38,8 +35,13 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleClientMessag
             let newPlayerName =  T.concat ["player", T.pack . show $ length players]
             let newPlayer = makeNewPlayer newPlayerName playerId
             let newPlayers = players ++ [newPlayer]
-            
-            modifyTVar gameLobby $ updatePlayers newPlayers
+            let newLobby = updatePlayers newPlayers lobby
+
+            writeTVar gameLobby newLobby
+
+            writeTChan (channel lobby) $ PlayerJoined newPlayer
+            handleLobbyFull app newLobby gameId
+
             return newPlayer
 
     handleLobbyFull :: App -> GameLobby -> T.Text -> STM ()

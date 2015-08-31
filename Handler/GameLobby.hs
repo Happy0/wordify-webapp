@@ -49,9 +49,14 @@ module Handler.GameLobby where
         where
             players = lobbyPlayers lobby
 
-    setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (ServerPlayer, TChan LobbyMessage))
+    {-
+        Sets up the broadcast channel for servicing the websocket, returning an ID for the new player
+        if they have not joined the lobby before and received a cookie.
+    -}
+    setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (Maybe Text, TChan LobbyMessage))
     setupPrequisets app gameId maybePlayerId =
         runEitherT $
+            -- TODO: This function probably takes on too many responsibilities
             do
                 lobby <- getGameLobby gameId (gameLobbies app)
                 oldLobby <- lift $ readTVar lobby
@@ -59,13 +64,10 @@ module Handler.GameLobby where
                 case maybePlayerId of
                     Nothing ->
                         do
-                            newPlayer <- lift $ handleJoinNewPlayer lobby
-                            updatedLobby <- lift $ readTVar lobby
-                            lift $ writeTChan broadcastChan $ PlayerJoined newPlayer
-                            lift $ handleLobbyFull app updatedLobby gameId
-                            return (newPlayer, broadcastChan)
+                            newPlayer <- lift $ handleJoinNewPlayer app gameId lobby
+                            return (Just $ identifier newPlayer, broadcastChan)
                     Just playerId ->
-                        hoistEither $ (\player -> (player, broadcastChan)) <$> getExistingPlayer oldLobby playerId
+                        hoistEither $ (\_ -> (Nothing, broadcastChan)) <$> getExistingPlayer oldLobby playerId
 
     lobbyWebSocketHandler :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
     lobbyWebSocketHandler app gameId maybePlayerId =
@@ -74,5 +76,7 @@ module Handler.GameLobby where
             case prequisets of
                 Left err -> 
                     sendTextData $ toJSONResponse err
-                Right (serverPlayer, channel) ->
-                    sendTextData $ toJSONResponse JoinSuccess
+                Right (maybeNewId, channel) ->
+                    do
+                        sendTextData $ toJSONResponse $ (JoinSuccess maybeNewId)
+                        forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData
