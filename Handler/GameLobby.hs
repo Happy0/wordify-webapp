@@ -21,8 +21,9 @@ module Handler.GameLobby where
     getGameLobbyR gameId =
         do
             app <- getYesod
+            maybePlayerId <- lookupCookie "id"
 
-            webSockets $ lobbyWebSocketHandler app gameId Nothing
+            webSockets $ lobbyWebSocketHandler app gameId maybePlayerId
             defaultLayout $ do
                 [whamlet|
                     <div .lobby>
@@ -36,7 +37,48 @@ module Handler.GameLobby where
                         var conn = new WebSocket(url);
 
                         conn.onmessage = function(e) {
-                            alert(e.data);
+                            var data = JSON.parse(e.data);
+                            parseServerMessage(data);
+                        };
+
+                        var parseServerMessage = function(serverMessage)
+                        {
+                            console.dir(serverMessage);
+
+                            if (serverMessage && serverMessage.command)
+                            {
+
+                                if (serverMessage.command === "startGame")
+                                {
+                                    handleGameStarted(serverMessage.payload.gameId);
+                                }
+                                else if (serverMessage.command == "joinSuccess")
+                                {
+                                    var playerId = serverMessage.payload.id;
+                                    var gameId = serverMessage.payload.gameId;
+                                    handleJoinSuccess(playerId, gameId);
+                                }
+
+                            }
+                        };
+
+                        var handleGameStarted = function(gameId)
+                        {
+                            console.info("Game started");
+                            window.location = "/game" + "/" + gameId;
+                        };
+
+                        var handleJoinSuccess = function(playerId, gameId)
+                        {
+                            if (playerId && gameId)
+                            {
+                                 var playerCookie = "id=".concat(playerId).concat(";");
+                                 var path = "path=/game/".concat(gameId).concat("/");
+
+                                 var cookie = playerCookie.concat(path);
+                                 console.info("cookie: " + cookie);
+                                 document.cookie = cookie;
+                            }
                         };
 
                     |]
@@ -78,5 +120,5 @@ module Handler.GameLobby where
                     sendTextData $ toJSONResponse err
                 Right (maybeNewId, channel) ->
                     do
-                        sendTextData $ toJSONResponse $ (JoinSuccess maybeNewId)
+                        sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)
                         forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData

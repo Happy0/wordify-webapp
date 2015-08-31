@@ -18,7 +18,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
 
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
-    handleChannelMessage LobbyFull = StartGame
+    handleChannelMessage (LobbyFull gameId) = StartGame gameId
 
     {-
         Creates a new player, adds them to the lobby, notifying the players
@@ -51,7 +51,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
             do
                 -- Broadcast that the game is ready to begin
                 let broadcastChannel = channel lobby
-                writeTChan broadcastChannel LobbyFull
+                writeTChan broadcastChannel (LobbyFull gameId)
 
                 removeGameLobby app gameId
                 createGame app gameId lobby

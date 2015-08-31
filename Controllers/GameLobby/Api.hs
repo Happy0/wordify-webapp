@@ -14,25 +14,25 @@ module Controllers.GameLobby.Api(LobbyMessage(PlayerJoined, LobbyFull), LobbyRes
     {-
         Messages sent over the lobby's broadcast channel.
     -}
-    data LobbyMessage = PlayerJoined ServerPlayer | LobbyFull
+    data LobbyMessage = PlayerJoined ServerPlayer | LobbyFull Text
 
     {-
         Messages sent to clients via their websocket connection.
     -}
-    data LobbyResponse = Joined ServerPlayer | JoinSuccess (Maybe Text) | StartGame | GameAlreadyStarted | GameDoesNotExist | InvalidPlayerID
+    data LobbyResponse = Joined ServerPlayer | JoinSuccess Text (Maybe Text) | StartGame Text | GameAlreadyStarted | GameDoesNotExist | InvalidPlayerID
 
     instance ToJSON LobbyResponse where
         toJSON (Joined player) = object ["name" .= name player]
-        toJSON StartGame = object []
-        toJSON (JoinSuccess newId) = object $ maybe [] (\playerId -> ["id" .= newId]) newId
+        toJSON (StartGame gameId) = object ["gameId" .= gameId]
+        toJSON (JoinSuccess gameId newId) = object $ maybe [] (\playerId -> ["id" .= newId, "gameId" .= gameId]) newId
         toJSON GameAlreadyStarted = object []
         toJSON GameDoesNotExist = object []
         toJSON InvalidPlayerID = object []
 
     instance ServerMessage LobbyResponse where
         commandName (Joined _) = "joined"
-        commandName (JoinSuccess _) = "joinSuccess"
-        commandName StartGame = "startGame"
+        commandName (JoinSuccess _ _) = "joinSuccess"
+        commandName (StartGame _) = "startGame"
         commandName GameAlreadyStarted = "alreadyStarted"
         commandName GameDoesNotExist = "invalidGameId"
         commandName InvalidPlayerID = "InvalidPlayerId"
