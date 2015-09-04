@@ -16,6 +16,8 @@ module Handler.GameLobby where
     import Control.Monad
     import Control.Monad.Trans.Either
     import Control.Error.Util
+    import Control.Concurrent
+    import Control.Monad.Loops
 
     getGameLobbyR :: Text -> Handler Html
     getGameLobbyR gameId =
@@ -121,4 +123,10 @@ module Handler.GameLobby where
                 Right (maybeNewId, channel) ->
                     do
                         sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)
-                        forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData
+                        {-
+                            We race a thread that sends pings to the client so that when the client closes its connection,
+                            our loop which reads from the message channel is closed.
+                        -}
+                        race_
+                            (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData)
+                            (whileM_ (isRight <$> sendPingE ("hello~" :: Text)) $ liftIO $ threadDelay 60000000)

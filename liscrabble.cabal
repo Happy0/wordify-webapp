@@ -113,6 +113,7 @@ library
                  , either
                  , stm
                  , websockets
+                 , monad-loops
 
 executable         liscrabble
     if flag(library-only)
