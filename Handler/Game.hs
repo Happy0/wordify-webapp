@@ -6,29 +6,44 @@ import Yesod.WebSockets
 import qualified Data.Text.Lazy as TL
 import qualified Data.Monoid as M
 import Data.Text (Text)
+import Controllers.Game.Model.ServerGame
+import Widgets.Game.Game
 
 getGameR :: Text -> Handler Html
-getGameR string = do
+getGameR gameId = do
     request <- getRequest
+    app <- getYesod
     let cookies = reqCookies request
-    -- webSockets testApp
-    defaultLayout $ do
-        [whamlet|
-            $forall cookie <- cookies
-                <p> #{show cookie}
-        |]
-        toWidget
-            [julius|
-                var url = document.URL,
+    let maybePlayerId = lookup "id" cookies
+    let gamesInProgress = games app
+    maybeGame <- atomically $ lookup gameId <$> readTVar gamesInProgress
 
-                url = url.replace("http:", "ws:").replace("https:", "wss:");
-                var conn = new WebSocket(url);
+    case maybeGame of
+        Nothing -> notFound
+        Just game ->
+            do
+                webSockets $ gameApp game maybePlayerId
+                defaultLayout $ do
+                    [whamlet|
+                        ^{emptyGame}
+                    |]
+                    toWidget
+                        [julius|
+                            var url = document.URL,
 
-                conn.onmessage = function(e) {
-                    console.dir(e);
-                };
+                            url = url.replace("http:", "ws:").replace("https:", "wss:");
+                            var conn = new WebSocket(url);
 
-            |]
+                            conn.onmessage = function(e) {
+                                console.dir(e);
+                            };
+
+                        |]
+
+gameApp :: TVar ServerGame -> Maybe Text -> WebSocketsT Handler ()
+gameApp game maybePlayerId =
+    do
+        sendPing ("testarooni" :: Text)
 
 
 {-testApp :: WebSocketsT Handler ()

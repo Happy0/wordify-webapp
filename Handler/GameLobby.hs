@@ -125,7 +125,7 @@ module Handler.GameLobby where
                         sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)
                         {-
                             We race a thread that sends pings to the client so that when the client closes its connection,
-                            our loop which reads from the message channel is closed.
+                            our loop which reads from the message channel is closed due to the thread being cancelled.
                         -}
                         race_
                             (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData)
