@@ -24,5 +24,5 @@ module Widgets.Game.Game (emptyGame) where
             gameInProgress = game serverGame
             currentBoard = board gameInProgress
             currentPlayers = players gameInProgress
-            movesPlayed = moveSummaries serverGame
+            movesPlayed = reverse $ moveSummaries serverGame
             tiles = []
