@@ -24,6 +24,7 @@ import Controllers.Home.Api
 import Model.Api
 import Data.Aeson
 import Web.Cookie
+import Controllers.Game.Model.MoveSummary
 
 getHomeR :: Handler Html
 getHomeR = do
@@ -119,7 +120,6 @@ getHomeR = do
         movesPlayed = []
         numPlayerOptions = [2..4]
 
-
 homeWebSocketHandler :: WebSocketsT Handler ()
 homeWebSocketHandler = do
         app <- getYesod
@@ -151,7 +151,7 @@ blah = do
             Right gameTransitions ->
                 let currentGame = newGame $ NE.last gameTransitions
                 in let currentPlayers = players currentGame
-                in let movesPlayed = NE.toList gameTransitions
+                in let movesPlayed = map toSummary $ NE.toList gameTransitions
                 in let currentBoard = (board currentGame)
                 in let tiles = []
                 in $(widgetFile "game")

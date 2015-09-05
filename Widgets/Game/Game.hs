@@ -7,6 +7,7 @@ module Widgets.Game.Game (emptyGame) where
     import Widgets.Game.ChatBox
     import Widgets.Game.Rack
     import Widgets.Game.ScoreBoard
+    import Controllers.Game.Model.ServerGame
 
     emptyGame :: Widget
     emptyGame = $(widgetFile "game")
@@ -17,10 +18,11 @@ module Widgets.Game.Game (emptyGame) where
             movesPlayed = []
             tiles = []
 
-    gameInPlay :: Game -> Widget
-    gameInPlay game = $(widgetFile "game")
+    gameInPlay :: ServerGame -> Widget
+    gameInPlay serverGame = $(widgetFile "game")
         where
-            currentBoard = board game
-            currentPlayers = players game
-            movesPlayed = []
+            gameInProgress = game serverGame
+            currentBoard = board gameInProgress
+            currentPlayers = players gameInProgress
+            movesPlayed = moveSummaries serverGame
             tiles = []

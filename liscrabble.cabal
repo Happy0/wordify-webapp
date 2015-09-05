@@ -21,6 +21,7 @@ library
                      Settings
                      Settings.StaticFiles
                      Controllers.Game.Model.GameLobby
+                     Controllers.Game.Model.MoveSummary
                      Controllers.Game.Model.ServerGame
                      Controllers.Game.Model.ServerPlayer
                      Controllers.Game.Game

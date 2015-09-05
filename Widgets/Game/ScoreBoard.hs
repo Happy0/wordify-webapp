@@ -1,17 +1,16 @@
-module Widgets.Game.ScoreBoard (MoveSummary(Passed, Exchanged, Scored), scoreWidget) where
+module Widgets.Game.ScoreBoard (scoreWidget) where
 
     import Wordify.Rules.FormedWord
     import Import
     import Wordify.Rules.Move
     import Wordify.Rules.Player
+    import Controllers.Game.Model.MoveSummary
 
-    data MoveSummary = Passed String | Exchanged String | Scored String FormedWords | Finished
-
-    scoreWidget :: [Player] -> [GameTransition] -> Widget
+    scoreWidget :: [Player] -> [MoveSummary] -> Widget
     scoreWidget players moves = 
         do
             createOverallScoreList players
-            createMoveList $ map toSummary moves
+            createMoveList moves
             toWidget
                 [cassius|
                     .move-list
@@ -39,13 +38,6 @@ module Widgets.Game.ScoreBoard (MoveSummary(Passed, Exchanged, Scored), scoreWid
                         background-color: #C8A684
                         height: 20px
                 |]
-        where
-            toSummary move =
-                case move of
-                    ExchangeTransition _ player _ -> Exchanged $ name player
-                    PassTransition _ -> Passed "_"
-                    GameFinished _ _ _ -> Finished
-                    MoveTransition player _ formed -> Scored (name player) formed
 
     createOverallScoreList :: [Player] -> Widget
     createOverallScoreList players = 
