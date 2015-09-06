@@ -1,4 +1,4 @@
-module Widgets.Game.Game (emptyGame) where
+module Widgets.Game.Game (emptyGame, gameInPlay) where
 
     import Import
     import Wordify.Rules.Game

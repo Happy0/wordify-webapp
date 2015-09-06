@@ -8,6 +8,7 @@ import qualified Data.Monoid as M
 import Data.Text (Text)
 import Controllers.Game.Model.ServerGame
 import Widgets.Game.Game
+import Controllers.Game.Api
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -22,10 +23,11 @@ getGameR gameId = do
         Nothing -> notFound
         Just game ->
             do
-                webSockets $ gameApp game maybePlayerId
+                (currentGame, messageChannel) <- atomically $ setupPrerequisets game
+                webSockets $ gameApp game messageChannel maybePlayerId
                 defaultLayout $ do
                     [whamlet|
-                        ^{emptyGame}
+                        ^{gameInPlay currentGame}
                     |]
                     toWidget
                         [julius|
@@ -36,12 +38,19 @@ getGameR gameId = do
 
                             conn.onmessage = function(e) {
                                 console.dir(e);
-                            };
-
+                            }
                         |]
 
-gameApp :: TVar ServerGame -> Maybe Text -> WebSocketsT Handler ()
-gameApp game maybePlayerId =
+setupPrerequisets :: TVar ServerGame -> STM (ServerGame, TChan GameMessage)
+setupPrerequisets serverGame =
+    do
+        game <- readTVar serverGame
+        channel <- cloneTChan $ broadcastChannel game
+        return (game, channel)
+
+
+gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> WebSocketsT Handler ()
+gameApp game channel maybePlayerId =
     do
         sendPing ("testarooni" :: Text)
 
