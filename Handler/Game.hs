@@ -9,13 +9,15 @@ import Data.Text (Text)
 import Controllers.Game.Model.ServerGame
 import Widgets.Game.Game
 import Controllers.Game.Api
+import qualified Data.List as L
+import Controllers.Game.Model.ServerPlayer
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
     request <- getRequest
     app <- getYesod
     let cookies = reqCookies request
-    let maybePlayerId = lookup "id" cookies
+    let maybePlayerId = L.lookup "id" cookies
     let gamesInProgress = games app
     maybeGame <- atomically $ lookup gameId <$> readTVar gamesInProgress
 
@@ -24,10 +26,11 @@ getGameR gameId = do
         Just game ->
             do
                 (currentGame, messageChannel) <- atomically $ setupPrerequisets game
-                webSockets $ gameApp game messageChannel maybePlayerId
+                let maybePlayerNumber = maybePlayerId >>= getPlayerNumber currentGame
+                webSockets $ gameApp game messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
                     [whamlet|
-                        ^{gameInPlay currentGame}
+                        ^{gameInPlay currentGame maybePlayerNumber}
                     |]
                     toWidget
                         [julius|
@@ -41,6 +44,11 @@ getGameR gameId = do
                             }
                         |]
 
+getPlayerNumber :: ServerGame -> Text -> Maybe Int
+getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerId == identifier player) $ zip [1 .. 4] players)
+    where
+        players = playing serverGame
+
 setupPrerequisets :: TVar ServerGame -> STM (ServerGame, TChan GameMessage)
 setupPrerequisets serverGame =
     do
@@ -49,8 +57,8 @@ setupPrerequisets serverGame =
         return (game, channel)
 
 
-gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> WebSocketsT Handler ()
-gameApp game channel maybePlayerId =
+gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
+gameApp game channel maybePlayerId playerNumber =
     do
         sendPing ("testarooni" :: Text)
 
