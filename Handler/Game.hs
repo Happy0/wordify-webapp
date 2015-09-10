@@ -53,7 +53,7 @@ setupPrerequisets :: TVar ServerGame -> STM (ServerGame, TChan GameMessage)
 setupPrerequisets serverGame =
     do
         game <- readTVar serverGame
-        channel <- cloneTChan $ broadcastChannel game
+        channel <- dupTChan $ broadcastChannel game
         return (game, channel)
 
 

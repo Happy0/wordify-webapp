@@ -104,7 +104,7 @@ module Handler.GameLobby where
             do
                 lobby <- getGameLobby gameId (gameLobbies app)
                 oldLobby <- lift $ readTVar lobby
-                broadcastChan <- lift . cloneTChan . channel $ oldLobby
+                broadcastChan <- lift . dupTChan . channel $ oldLobby
                 case maybePlayerId of
                     Nothing ->
                         do
