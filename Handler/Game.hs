@@ -39,6 +39,15 @@ getGameR gameId = do
                             url = url.replace("http:", "ws:").replace("https:", "wss:");
                             var conn = new WebSocket(url);
 
+                            var game = {
+                                say : sendMessage
+
+                            };
+
+                            var sendMessage = function (message) {
+                                console.info("Trying to send the following message: " + message);
+                            }
+
                             conn.onmessage = function(e) {
                                 console.dir(e);
                             }
