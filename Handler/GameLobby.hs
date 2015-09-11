@@ -116,6 +116,10 @@ module Handler.GameLobby where
     lobbyWebSocketHandler :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
     lobbyWebSocketHandler app gameId maybePlayerId =
         do
+            -- TODO: Too many transaction variables are touched in the initialisation. In particular, the
+            -- game / game lobby map at the end could maybe be moved out. Also, I should use the STM containers
+            -- map, as it scales better... not that uh, i expect many people will be connecting to this server.
+            -- anyway, i digress...
             prequisets <- atomically $ setupPrequisets app gameId maybePlayerId
             case prequisets of
                 Left err -> 

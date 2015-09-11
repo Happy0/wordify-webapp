@@ -33,9 +33,7 @@ module Controllers.Home.Home(performRequest) where
             do
                     newGameId <- lift $ T.pack . fst . randomString 8 <$> getStdGen
                     newGame <- setupGame app locale numPlayers
-                    let lobbies = gameLobbies app
                     lift $ addGameLobby app newGameId newGame numPlayers
-
                     return $ GameCreated newGameId
 
     addGameLobby :: App -> Text -> Game -> Int -> IO ()
