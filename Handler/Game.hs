@@ -46,27 +46,21 @@ controller =
                 url = url.replace("http:", "ws:").replace("https:", "wss:");
                 var conn = new WebSocket(url);
 
-                conn.onMessage = function (e) {
-                    parseServerMessage(e.data);
-                }
-
-                var parseServerMessage = function(serverMessage)
+                var parseChatMessage = function(serverMessage)
                 {
-                    console.dir(serverMessage);
-
-                    if (serverMessage && serverMessage.command)
+                    if (serverMessage.command === "said")
                     {
+                        var sender = serverMessage.payload.name;
+                        var message = serverMessage.payload.message;
 
-                        if (serverMessage.command === "said")
-                        {
-                            var sender = serverMessage.payload.name;
-                            var message = serverMessage.payload.message;
-
-                            chat.controller.messageRecieved(sender, message);
-                        }
-
+                        chat.controller.messageRecieved(sender, message);
                     }
                 };
+
+                conn.onmessage = function (e) {
+                    var data = JSON.parse(e.data);
+                    parseChatMessage(data);
+                }
 
             |]
 
@@ -86,6 +80,7 @@ setupPrerequisets serverGame =
 gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
 gameApp game channel maybePlayerId playerNumber =
     do
+        putStrLn "bleh"
         sendTextData $ toJSONResponse $ PlayerSaid "sender" "message123"
         liftIO $ threadDelay 20000000
 
