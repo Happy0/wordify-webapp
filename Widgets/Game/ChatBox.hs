@@ -28,3 +28,20 @@ module Widgets.Game.ChatBox (chatWidget) where
 
                   
                 |]
+            chatController
+
+    chatController :: Widget
+    chatController =
+        toWidget
+            [julius|
+
+                var chat = {
+                    controller : {
+                        messageRecieved : function (sender, message) {
+                            alert("Sender: " + sender + " Message: " + message);
+                        }
+                    }
+                }
+
+
+            |]

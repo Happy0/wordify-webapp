@@ -1,4 +1,4 @@
-module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage) where
+module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResponse(PlayerSaid)) where
 
     import Data.Aeson
     import Data.Aeson.Types

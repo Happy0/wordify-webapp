@@ -11,6 +11,9 @@ import Widgets.Game.Game
 import Controllers.Game.Api
 import qualified Data.List as L
 import Controllers.Game.Model.ServerPlayer
+import Controllers.Game.Api
+import Model.Api
+import Control.Concurrent
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -32,26 +35,40 @@ getGameR gameId = do
                     [whamlet|
                         ^{gameInPlay currentGame maybePlayerNumber}
                     |]
-                    toWidget
-                        [julius|
-                            var url = document.URL,
+                    controller
 
-                            url = url.replace("http:", "ws:").replace("https:", "wss:");
-                            var conn = new WebSocket(url);
+controller :: Widget
+controller =
+        toWidget
+            [julius|
+                var url = document.URL,
 
-                            var game = {
-                                say : sendMessage
+                url = url.replace("http:", "ws:").replace("https:", "wss:");
+                var conn = new WebSocket(url);
 
-                            };
+                conn.onMessage = function (e) {
+                    parseServerMessage(e.data);
+                }
 
-                            var sendMessage = function (message) {
-                                console.info("Trying to send the following message: " + message);
-                            }
+                var parseServerMessage = function(serverMessage)
+                {
+                    console.dir(serverMessage);
 
-                            conn.onmessage = function(e) {
-                                console.dir(e);
-                            }
-                        |]
+                    if (serverMessage && serverMessage.command)
+                    {
+
+                        if (serverMessage.command === "said")
+                        {
+                            var sender = serverMessage.payload.name;
+                            var message = serverMessage.payload.message;
+
+                            chat.controller.messageRecieved(sender, message);
+                        }
+
+                    }
+                };
+
+            |]
 
 getPlayerNumber :: ServerGame -> Text -> Maybe Int
 getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerId == identifier player) $ zip [1 .. 4] players)
@@ -69,7 +86,8 @@ setupPrerequisets serverGame =
 gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
 gameApp game channel maybePlayerId playerNumber =
     do
-        sendPing ("testarooni" :: Text)
+        sendTextData $ toJSONResponse $ PlayerSaid "sender" "message123"
+        liftIO $ threadDelay 20000000
 
 
 {-testApp :: WebSocketsT Handler ()
