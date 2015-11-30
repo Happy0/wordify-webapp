@@ -1,0 +1,17 @@
+{
+    "name" : "round",
+    "version" : "0.0.1",
+    "description" : "A game round in the web application.",
+    "main" : "src/main.js",
+    "devDependencies": {
+        "browserify": "~9.0.8",
+        "watchify" : "3.1.1",
+        "gulp": "~3.9.0",
+        "gulp-util": "~3.0.4",
+        "vinyl-source-stream": "~1.1.0"
+    },
+    "dependencies" : {
+        "mithril" : "0.2.0"
+    },
+    "author" : "Gordon Martin (https://github.com/happy0)"
+}
