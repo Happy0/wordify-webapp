@@ -12,6 +12,7 @@ module.exports = function(opts) {
     };
 
     return {
-        moveMade : moveMade
+        moveMade : moveMade,
+        scrabbleGroundCtrl: scrabbleGroundCtrl
     };
 };
