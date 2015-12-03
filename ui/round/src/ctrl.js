@@ -2,11 +2,16 @@ var Scrabbleground = require('scrabbleground');
 
 module.exports = function(opts) {
 
+    var scrabbleGroundOpts = {};
+
     // Our scrabbleground controller for manipulating the state of the game
-    var scrabbleGroundCtrl = Scrabbleground.ctrl;
+    var scrabbleGroundCtrl = new Scrabbleground.controller(scrabbleGroundOpts);
 
     var moveMade = function(move) {
+        scrabblegroundCtrl.move(move);
+    };
 
-    }
-
+    return {
+        moveMade : moveMade
+    };
 };
