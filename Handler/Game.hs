@@ -18,6 +18,7 @@ import Control.Concurrent
 getGameTestR :: Handler Html
 getGameTestR = 
     defaultLayout $ do
+        addStylesheet $ (StaticR css_scrabble_css)
         addScript $ (StaticR js_round_js)
         toWidget
             [julius| 

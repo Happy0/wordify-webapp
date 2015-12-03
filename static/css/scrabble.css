@@ -1,0 +1,77 @@
+.sg-board-wrap {
+    width: 100%;
+    height: 100%;
+}
+
+.sg-board {
+    background-size: cover;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.board-square {
+    position: absolute;
+    width: 6.6667%;
+    height: 6.6667%;
+    border: 1px solid #d5c3a2;
+    display: block;
+    font-size: 75%;
+}
+
+.board-square.normal {
+    background-color: #e8ddc7;
+}
+
+.board-square.double-letter {
+    background-color: #3ef;
+}
+
+.board-square.triple-letter {
+    background-color: #77f;
+}
+
+.board-square.double-word {
+    background-color: #f9b;
+}
+
+.board-square.triple-word {
+    background-color: #f55;
+}
+
+.square-text {
+    font-size: 100%;
+    text-align: center;
+}
+
+.tile {
+    position: absolute;
+    top: 0px;
+    left : 0px;
+    z-index: 100;
+    width: 100% ;
+    height: 100%;
+    background-color: #b09978;
+}
+
+.tile.letter {
+    font-weight: bold;
+}
+
+.tile.blank {
+    font-weight: bold;
+    font-color: red;
+}
+
+.lettertext {
+    top: 45%;
+    right: 50%;
+    position: absolute;
+}
+
+.value {
+    padding-left: 55%;
+    font-size: 75%;
+    position: absolute;
+    padding-top:65%;
+}
