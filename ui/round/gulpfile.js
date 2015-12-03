@@ -6,7 +6,7 @@ var browserify = require('browserify');
 var watchify = require('watchify');
 
 var sources = ['./src/main.js'];
-var destination = '../../public/javascripts/compiled';
+var destination = '../../static/js';
 
 var onError = function(error) {
   console.dir(error);

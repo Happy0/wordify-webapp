@@ -15,6 +15,21 @@ import Controllers.Game.Api
 import Model.Api
 import Control.Concurrent
 
+getGameTestR :: Handler Html
+getGameTestR = 
+    defaultLayout $ do
+        addScript $ (StaticR js_round_js)
+        toWidget
+            [julius| 
+                var opts = {element: document.getElementById("pisharooni")};
+                Round(opts);
+            |]
+        toWidget
+            [whamlet| 
+                    <p> Pish!~
+                    <div #pisharooni>
+            |]
+
 getGameR :: Text -> Handler Html
 getGameR gameId = do
     request <- getRequest
