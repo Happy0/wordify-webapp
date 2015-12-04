@@ -8,8 +8,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResp
     import qualified Data.HashMap.Strict as HM
     import Model.Api
     import Wordify.Rules.Board
+    import Wordify.Rules.Pos
     import Wordify.Rules.Tile
     import Wordify.Rules.Square
+    import qualified Data.List as L
 
     data ClientMessage = ChatMessage Text
 
@@ -39,9 +41,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResp
 
     parseChatMessage :: Value -> Parser ClientMessage
     parseChatMessage (Object object) = ChatMessage <$> object .: "message"
+    parseChatMessage _ = error "Unrecognised chat message"
 
     instance ToJSON Board where
-        toJSON board = undefined
+        toJSON = toJSON . groupSquaresByColumn . allSquares
 
     instance ToJSON Square where
         toJSON (Normal tile) = object ["tile" .= tile]
@@ -54,3 +57,12 @@ module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResp
         toJSON (Letter letter value) = object ["letter" .= letter, "value" .= value]
         toJSON (Blank (Just letter)) = object ["letter" .= letter, "value" .= (0 :: Int)]
         toJSON _ = object ["letter" .= '_', "value" .= (0 :: Int)]
+
+    groupSquaresByColumn :: [(Pos, Square)] -> [[Square]]
+    groupSquaresByColumn squares = 
+        let columns = L.groupBy sameColumn squares
+        in (Prelude.map . Prelude.map) snd columns
+        where
+            sameColumn square1 square2 = xPos (fst square1) == xPos (fst square2)
+
+
