@@ -48,10 +48,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResp
 
     instance ToJSON Square where
         toJSON (Normal tile) = object ["tile" .= tile]
-        toJSON (DoubleLetter tile) = undefined
-        toJSON (TripleLetter tile) = undefined
-        toJSON (DoubleWord tile) = undefined
-        toJSON (TripleWord tile) = undefined
+        toJSON (DoubleLetter tile) = object ["tile" .= tile, "bonus" .= ("N" :: Text)]
+        toJSON (TripleLetter tile) = object ["tile" .= tile, "bonus" .= ("TL" :: Text)]
+        toJSON (DoubleWord tile) = object ["tile" .= tile, "bonus" .= ("DW" :: Text)]
+        toJSON (TripleWord tile) = object ["tile" .= tile, "bonus" .= ("TW" :: Text)]
 
     instance ToJSON Tile where
         toJSON (Letter letter value) = object ["letter" .= letter, "value" .= value]

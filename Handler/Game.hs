@@ -14,22 +14,41 @@ import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Api
 import Model.Api
 import Control.Concurrent
+import qualified Data.List.NonEmpty as NE
+import Widgets.Game.TestGame
+import Wordify.Rules.Game
+import Wordify.Rules.Move
+import Data.Aeson
 
 getGameTestR :: Handler Html
 getGameTestR = 
     defaultLayout $ do
         addStylesheet $ (StaticR css_scrabble_css)
         addScript $ (StaticR js_round_js)
-        toWidget
-            [julius| 
-                var opts = {element: document.getElementById("pisharooni")};
-                Round(opts);
-            |]
-        toWidget
-            [whamlet| 
-                    <p> Pish!~
-                    <div #pisharooni>
-            |]
+        toWidget $
+            do
+                game <- lift $ testGame
+                let neMoves = NE.fromList moves
+                let fullGame = join $ fmap (flip (restoreGame) neMoves) $ game
+
+                case fullGame of
+                    Left  err -> [whamlet|Hello World! #{(show err)}|]
+                    Right gameTransitions ->
+                        let currentGame = newGame $ NE.last gameTransitions
+                        in let currentBoard = (board currentGame)
+                        in
+                            do
+                                toWidget $ do
+                                    [julius|
+                                        var opts = {element: document.getElementById("pisharooni")};
+                                        opts.ground = {};
+                                        opts.ground.board = #{(toJSON currentBoard) }
+                                        Round(opts);
+                                    |]
+                                toWidget $ do
+                                    [whamlet|
+                                        <div #pisharooni>
+                                    |]
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
