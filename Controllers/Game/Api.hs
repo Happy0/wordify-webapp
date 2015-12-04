@@ -47,8 +47,8 @@ module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResp
         toJSON = toJSON . groupSquaresByColumn . allSquares
 
     instance ToJSON Square where
-        toJSON (Normal tile) = object ["tile" .= tile]
-        toJSON (DoubleLetter tile) = object ["tile" .= tile, "bonus" .= ("N" :: Text)]
+        toJSON (Normal tile) = object ["tile" .= tile, "bonus" .= ("N" :: Text)]
+        toJSON (DoubleLetter tile) = object ["tile" .= tile, "bonus" .= ("DL" :: Text)]
         toJSON (TripleLetter tile) = object ["tile" .= tile, "bonus" .= ("TL" :: Text)]
         toJSON (DoubleWord tile) = object ["tile" .= tile, "bonus" .= ("DW" :: Text)]
         toJSON (TripleWord tile) = object ["tile" .= tile, "bonus" .= ("TW" :: Text)]

@@ -47,7 +47,7 @@ getGameTestR =
                                     |]
                                 toWidget $ do
                                     [whamlet|
-                                        <div #pisharooni>
+                                    <div #pisharooni style="width: 600px; height: 600px;">
                                     |]
 
 getGameR :: Text -> Handler Html
