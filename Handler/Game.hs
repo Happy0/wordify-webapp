@@ -61,43 +61,37 @@ getGameR gameId = do
 
     case maybeGame of
         Nothing -> notFound
-        Just game ->
+        Just gameInProgress ->
             do
-                (currentGame, messageChannel) <- atomically $ setupPrerequisets game
+                (currentGame, messageChannel) <- atomically $ setupPrerequisets gameInProgress
                 let maybePlayerNumber = maybePlayerId >>= getPlayerNumber currentGame
-                webSockets $ gameApp game messageChannel maybePlayerId maybePlayerNumber
+                webSockets $ gameApp gameInProgress messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
+                    addStylesheet $ (StaticR css_scrabble_css)
+                    addScript $ (StaticR js_round_js)
+            
                     [whamlet|
-                        ^{gameInPlay currentGame maybePlayerNumber}
+                        <div #scrabbleground>
                     |]
-                    controller
+                    toWidget
+                        [julius|
+                            var url = document.URL,
 
-controller :: Widget
-controller =
-        toWidget
-            [julius|
-                var url = document.URL,
+                            url = url.replace("http:", "ws:").replace("https:", "wss:");
+                            var conn = new WebSocket(url);
 
-                url = url.replace("http:", "ws:").replace("https:", "wss:");
-                var conn = new WebSocket(url);
+                            var opts = {element: document.getElementById("scrabbleground")};
+                            opts.ground = {}
+                            opts.ground.board = #{toJSON (board (game currentGame))};
+                            opts.send = conn.send;
+                            var round = Round(opts);                            
 
-                var parseChatMessage = function(serverMessage)
-                {
-                    if (serverMessage.command === "said")
-                    {
-                        var sender = serverMessage.payload.name;
-                        var message = serverMessage.payload.message;
+                            conn.onmessage = function (e) {
+                                var data = JSON.parse(e.data);
+                                round.socketReceive(data);
+                            }
 
-                        chat.controller.messageRecieved(sender, message);
-                    }
-                };
-
-                conn.onmessage = function (e) {
-                    var data = JSON.parse(e.data);
-                    parseChatMessage(data);
-                }
-
-            |]
+                        |]
 
 getPlayerNumber :: ServerGame -> Text -> Maybe Int
 getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerId == identifier player) $ zip [1 .. 4] players)

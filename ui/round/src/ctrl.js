@@ -1,6 +1,14 @@
 var Scrabbleground = require('scrabbleground');
+var s = require('./socket');
 
 module.exports = function(opts) {
+
+    var socketOpts = {
+        send : opts.send,
+        ctrl : this
+    }
+
+    var socket = s(socketOpts);
 
     var scrabbleGroundOpts = opts.ground;
 
@@ -13,6 +21,7 @@ module.exports = function(opts) {
 
     return {
         moveMade : moveMade,
-        scrabbleGroundCtrl: scrabbleGroundCtrl
+        scrabbleGroundCtrl: scrabbleGroundCtrl,
+        socket: socket
     };
 };
