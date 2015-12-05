@@ -68,6 +68,7 @@ getGameR gameId = do
                 webSockets $ gameApp gameInProgress messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
                     addStylesheet $ (StaticR css_scrabble_css)
+                    addStylesheet $ (StaticR css_round_css)
                     addScript $ (StaticR js_round_js)
             
                     [whamlet|

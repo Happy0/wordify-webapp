@@ -3,7 +3,14 @@ var m = require('mithril');
 
 module.exports = function(ctrl) {
 
-    var scrabblegroundView = scrabbleground.view(ctrl.scrabbleGroundCtrl);
+    var renderBoard = function() {
+        var attrs = {
+            class : ["liscrabble-board-wrap"]
+        }
 
-    return m('div', {}, scrabblegroundView);
+        var scrabblegroundView = scrabbleground.view(ctrl.scrabbleGroundCtrl);
+
+        return m('div', attrs, scrabblegroundView);
+    }
+    return m('div', {}, renderBoard());
 }
