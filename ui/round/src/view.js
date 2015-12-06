@@ -3,6 +3,11 @@ var m = require('mithril');
 
 module.exports = function(ctrl) {
 
+    var renderTileRack = function() {
+
+    
+    }
+
     var renderBoard = function() {
         var attrs = {
             class : ["liscrabble-board-wrap"]
