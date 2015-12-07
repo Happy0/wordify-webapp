@@ -8,12 +8,12 @@ module.exports = function(ctrl) {
 
         var putTileOnRack = function(tile) {
             return m("span", {},
-                        "square", {},
+                        m("square", {},
                             (function () {
                                 if (tile != null ) {
                                     ctrl.scrabbleGroundCtrl.renderTile(tile);
                                 }
-                            })()
+                            })())
                     );
         };
 
@@ -29,7 +29,8 @@ module.exports = function(ctrl) {
 
         var scrabblegroundView = scrabbleground.view(ctrl.scrabbleGroundCtrl);
 
-        return m('div', attrs, [scrabblegroundView, renderTileRack]);
+        return m('div', attrs, scrabblegroundView);
     }
-    return m('div', {}, renderBoard());
+
+    return m('div', {}, [renderBoard(), renderTileRack()]);
 }
