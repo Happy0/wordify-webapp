@@ -27,9 +27,5 @@ module Widgets.Game.Game (emptyGame, gameInPlay) where
             currentBoard = board gameInProgress
             currentPlayers = players gameInProgress
             movesPlayed = L.reverse $ moveSummaries serverGame
-            tiles = maybe [] id $ tilesOnRack <$> (playerNumber >>= getPlayer currentPlayers)
+            tiles = maybe [] id $ tilesOnRack <$> (playerNumber >>= getPlayer gameInProgress)
 
-    getPlayer :: [Player] -> Int -> Maybe Player
-    getPlayer players playerNumber
-        | (playerNumber >= 1) && (playerNumber <= L.length players) = Just $ players L.!! (playerNumber - 1)
-        | otherwise = Nothing

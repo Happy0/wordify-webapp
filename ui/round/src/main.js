@@ -17,7 +17,8 @@ module.exports = function(opts) {
     m.mount(opts.element, Round);
 
     return {
-        socketReceive : controller.socket.parseAndIssueCommand
+        socketReceive : controller.socket.parseAndIssueCommand,
+        controller : controller
     };
 }
 

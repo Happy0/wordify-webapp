@@ -19,6 +19,7 @@ import Widgets.Game.TestGame
 import Wordify.Rules.Game
 import Wordify.Rules.Move
 import Data.Aeson
+import Wordify.Rules.Player
 
 getGameTestR :: Handler Html
 getGameTestR = 
@@ -43,7 +44,7 @@ getGameTestR =
                                         var opts = {element: document.getElementById("pisharooni")};
                                         opts.ground = {};
                                         opts.ground.board = #{(toJSON currentBoard) }
-                                        Round(opts);
+                                        var round = Round(opts);
                                     |]
                                 toWidget $ do
                                     [whamlet|
@@ -63,8 +64,13 @@ getGameR gameId = do
         Nothing -> notFound
         Just gameInProgress ->
             do
-                (currentGame, messageChannel) <- atomically $ setupPrerequisets gameInProgress
-                let maybePlayerNumber = maybePlayerId >>= getPlayerNumber currentGame
+                (serverGame, messageChannel) <- atomically $ setupPrerequisets gameInProgress
+                let currentGame = game serverGame
+
+                --TODO: Fix this out by one in haskellscrabble
+                let maybePlayerNumber = subtract 1 <$> (maybePlayerId >>= getPlayerNumber serverGame)
+                let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= getPlayer currentGame)
+            
                 webSockets $ gameApp gameInProgress messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
                     addStylesheet $ (StaticR css_scrabble_css)
@@ -83,9 +89,10 @@ getGameR gameId = do
 
                             var opts = {element: document.getElementById("scrabbleground")};
                             opts.ground = {}
-                            opts.ground.board = #{toJSON (board (game currentGame))};
+                            opts.ground.board = #{toJSON (board currentGame)};
                             opts.send = conn.send;
-                            var round = Round(opts);                            
+                            var round = Round(opts);
+                            round.controller.setRackTiles(#{toJSON (maybePlayerRack)})  
 
                             conn.onmessage = function (e) {
                                 var data = JSON.parse(e.data);

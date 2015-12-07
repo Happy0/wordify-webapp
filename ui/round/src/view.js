@@ -7,11 +7,11 @@ module.exports = function(ctrl) {
         var rack = ctrl.data.rack;
 
         var putTileOnRack = function(tile) {
-            return m("span", {},
-                        m("square", {},
+            return m("span", {class : "rack-slot"},
+                     m("square", {},
                             (function () {
                                 if (tile != null ) {
-                                    ctrl.scrabbleGroundCtrl.renderTile(tile);
+                                    return ctrl.scrabbleGroundCtrl.makeMithrilTile(tile);
                                 }
                             })())
                     );
@@ -19,7 +19,7 @@ module.exports = function(ctrl) {
 
         var renderedSlots = rack.map(putTileOnRack);
 
-        return m("div", {id : "rack" }, renderedSlots);
+        return m("div", {class : "rack", id : "rack" }, renderedSlots);
     }
 
     var renderBoard = function() {

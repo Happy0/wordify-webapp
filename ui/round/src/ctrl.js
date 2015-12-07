@@ -1,6 +1,7 @@
 var Scrabbleground = require('scrabbleground');
 var s = require('./socket');
 var d = require('./data');
+var m = require('mithril');
 
 module.exports = function(opts) {
 
@@ -22,8 +23,22 @@ module.exports = function(opts) {
         scrabblegroundCtrl.move(move);
     };
 
-    var setRack = function(rack) {
-        data.rack = rack;
+    var emptySlotArray = [null, null, null, null, null, null, null];
+
+    var setRackTiles = function(rack) {
+        var numTiles = rack.length;
+        var emptySlots = 7 - numTiles;
+
+        var remainingSlots = emptySlotArray.slice(emptySlots - 1);
+
+        //TODO: Expose controller method in scrabbleground to make tiles movable instead
+        rack.forEach(function(tile) {
+            tile.isCandidate = true;
+        });
+
+        data.rack = rack.concat(remainingSlots);
+
+        m.redraw();
     };
 
     /**
@@ -38,7 +53,7 @@ module.exports = function(opts) {
     return {
         data: data,
         moveMade : moveMade,
-        setRack : setRack,
+        setRackTiles : setRackTiles,
         updateRack : updateRack,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
