@@ -8,7 +8,9 @@
 }
 
 .rack-slot {
-    position: absolute;
+    position: relative;
+    float: left;
+    margin-left: 2px;
     height: 40px;
     width: 40px;
 }
