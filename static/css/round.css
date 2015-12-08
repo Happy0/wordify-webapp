@@ -4,13 +4,17 @@
 }
 
 .rack {
+    margin-left: 150px;
+    margin-top: 20px;
     height: 40px;
+    width: 310px;
 }
 
 .rack-slot {
     position: relative;
     float: left;
     margin-left: 2px;
+    margin-right: 2px;
     height: 40px;
     width: 40px;
 }
