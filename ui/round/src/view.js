@@ -6,17 +6,19 @@ module.exports = function(ctrl) {
     var renderTileRack = function() {
         var rack = ctrl.data.rack;
 
+        var renderTile = function (tile, slot) {
+                            if (tile != null ) {
+                                // We mark the slot that the tile is from so that we can later empty those slots in the
+                                // internal model
+                                tile.rackSlot = slot;
+                                return ctrl.scrabbleGroundCtrl.makeMithrilTile(tile);
+                            }
+                        };
+
         var putTileOnRack = function(tile, slot) {
             return m("span", {class : "rack-slot"},
                      m("square", {},
-                            (function () {
-                                if (tile != null ) {
-                                    // We mark the slot that the tile is from so that we can later empty those slots in the
-                                    // internal model
-                                    tile.rackSlot = slot;
-                                    return ctrl.scrabbleGroundCtrl.makeMithrilTile(tile);
-                                }
-                            })())
+                           renderTile(tile, slot))
                     );
         };
 
