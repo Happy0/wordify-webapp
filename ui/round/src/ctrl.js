@@ -53,7 +53,7 @@ module.exports = function(opts) {
     };
 
     var putTileOnFirstEmptySlot = function (tile) {
-
+        //TODO: This won't work. Fix later.
         data.rack.forEach(function (rackSlot, i) {
             if (!rackSlot.tile) {
                 data.rack[i].tile = tile;
