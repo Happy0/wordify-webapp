@@ -119,8 +119,6 @@ gameApp game channel maybePlayerId playerNumber =
     do
         putStrLn "bleh"
         sendTextData $ toJSONResponse $ PlayerSaid "sender" "message123"
-        liftIO $ threadDelay 20000000
-
 
 {-testApp :: WebSocketsT Handler ()
 testApp = do

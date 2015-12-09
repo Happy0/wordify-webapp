@@ -15,10 +15,17 @@ module.exports = function(ctrl) {
                             }
                         };
 
-        var putTileOnRack = function(tile, slot) {
+        var putTileOnRack = function(slot, slotNumber) {
+        
+            var updateSlotWithElement = function(element, initialised, context) {
+                if (initialised) return;
+                
+                rack[slotNumber].element = element;
+            }
+
             return m("span", {class : "rack-slot"},
-                     m("square", {},
-                           renderTile(tile, slot))
+                     m("square", {config: updateSlotWithElement},
+                           renderTile(slot.tile, slotNumber))
                     );
         };
 

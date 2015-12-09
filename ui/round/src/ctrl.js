@@ -2,6 +2,7 @@ var Scrabbleground = require('scrabbleground');
 var s = require('./socket');
 var d = require('./data');
 var m = require('mithril');
+var $ = require('jquery');
 
 module.exports = function(opts) {
 
@@ -23,21 +24,21 @@ module.exports = function(opts) {
         scrabblegroundCtrl.move(move);
     };
 
-    var emptySlotArray = [null, null, null, null, null, null, null];
-
-    var setRackTiles = function(rack) {
+    var setRackTiles = function(rackTiles) {
+        
+        var emptySlotArray = [{}, {}, {}, {}, {}, {}, {}];
         var numTiles = rack.length;
         var emptySlots = 7 - numTiles;
 
-        var remainingSlots = emptySlotArray.slice(emptySlots - 1);
+        var remainingSlots = emptySlotArray.slice(0, emptySlots - 1);
 
-        // Mark the tile as movable and keep a note of the slot that it came from
-        rack.forEach(function(tile, slotNumber) {
+        var allTiles = rackTiles.concat(remainingSlots);
+
+        allTiles.forEach(function(tile, slotNumber) {
             tile.isCandidate = true;
             tile.slotNumber = slotNumber;
-        });
-
-        data.rack = rack.concat(remainingSlots);
+            data.rack[slotNumber].tile = tile;
+        })
 
         m.redraw();
     };
@@ -54,26 +55,31 @@ module.exports = function(opts) {
     var putTileOnFirstEmptySlot = function (tile) {
 
         data.rack.forEach(function (rackSlot, i) {
-            if (!rackSlot) {
-                data.rack[i] = tile;
+            if (!rackSlot.tile) {
+                data.rack[i].tile = tile;
             }
         });
     };
 
     scrabbleGroundCtrl.setTileDroppedOnSquareListener(function (tile) {
         var fromSlot = tile.slotNumber;
-
-        if (fromSlot) {
-            data.rack[fromSlot] = null;
-        }
-
+        data.rack[fromSlot].tile = null;
     });
 
-    var tileDroppedOffBoardFunction = function(tile) {
+    var tileDroppedOffBoardFunction = function(tile, tileElement) {
         var fromSlot = tile.slotNumber;
 
-        if (!data.rack[fromSlot]) {
-            data.rack[fromSlot] = tile;
+        if (data.rack[fromSlot].tile == tile)
+        {
+            // Revert to the previous position
+            return true;
+        }
+
+        if (!data.rack[fromSlot].tile) {
+            data.rack[fromSlot].tile = tile;
+            $(tileElement).detach();
+            $(data.rack[fromSlot].element).append(tileElement);
+            $(tileElement).attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
         }
         else
         {
