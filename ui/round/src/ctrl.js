@@ -25,12 +25,12 @@ module.exports = function(opts) {
     };
 
     var setRackTiles = function(rackTiles) {
-        
+
         var emptySlotArray = [{}, {}, {}, {}, {}, {}, {}];
-        var numTiles = rack.length;
+        var numTiles = rackTiles.length;
         var emptySlots = 7 - numTiles;
 
-        var remainingSlots = emptySlotArray.slice(0, emptySlots - 1);
+        var remainingSlots = emptySlots == 0 ? [] : emptySlotArray.slice(0, emptySlots - 1);
 
         var allTiles = rackTiles.concat(remainingSlots);
 

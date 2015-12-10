@@ -18,3 +18,12 @@
     height: 40px;
     width: 40px;
 }
+
+.action-buttons {
+    margin-left: 188px;
+    margin-top: 10px;
+}
+
+.submit-move-button {
+    margin-right: 10px;
+}

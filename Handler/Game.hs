@@ -22,7 +22,7 @@ import Data.Aeson
 import Wordify.Rules.Player
 
 getGameTestR :: Handler Html
-getGameTestR = 
+getGameTestR =
     defaultLayout $ do
         addStylesheet $ (StaticR css_scrabble_css)
         addScript $ (StaticR js_round_js)
@@ -70,13 +70,14 @@ getGameR gameId = do
                 --TODO: Fix this out by one in haskellscrabble
                 let maybePlayerNumber = subtract 1 <$> (maybePlayerId >>= getPlayerNumber serverGame)
                 let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= getPlayer currentGame)
-            
+
                 webSockets $ gameApp gameInProgress messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
                     addStylesheet $ (StaticR css_scrabble_css)
                     addStylesheet $ (StaticR css_round_css)
+                    addStylesheet $ (StaticR css_bootstrap_css)
                     addScript $ (StaticR js_round_js)
-            
+
                     [whamlet|
                         <div #scrabbleground>
                     |]
@@ -92,7 +93,7 @@ getGameR gameId = do
                             opts.ground.board = #{toJSON (board currentGame)};
                             opts.send = conn.send;
                             var round = Round(opts);
-                            round.controller.setRackTiles(#{toJSON (maybePlayerRack)})  
+                            round.controller.setRackTiles(#{toJSON (maybePlayerRack)})
 
                             conn.onmessage = function (e) {
                                 var data = JSON.parse(e.data);
