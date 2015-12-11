@@ -31,9 +31,15 @@ module.exports = function(opts) {
      * The user has made a move
      */
     var makeBoardMove = function(move) {
-        alert("dsfdsf");
+        var tilesPlaced = scrabbleGroundCtrl.getCandidateTiles();
+        console.dir(tilesPlaced);
 
+        var data = {
+            command : "boardMove",
+            payload : tilesPlaced
+        };
 
+        socketOpts.send(data);
     };
 
     var setRackTiles = function(rackTiles) {

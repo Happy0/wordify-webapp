@@ -88,10 +88,15 @@ getGameR gameId = do
                             url = url.replace("http:", "ws:").replace("https:", "wss:");
                             var conn = new WebSocket(url);
 
+                            var send = function(objectPayload) {
+                                var json = JSON.stringify(objectPayload);
+                                conn.send(json);
+                            }
+
                             var opts = {element: document.getElementById("scrabbleground")};
                             opts.ground = {}
                             opts.ground.board = #{toJSON (board currentGame)};
-                            opts.send = conn.send;
+                            opts.send = send;
                             var round = Round(opts);
                             round.controller.setRackTiles(#{toJSON (maybePlayerRack)})
 
