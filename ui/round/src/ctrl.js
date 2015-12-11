@@ -31,7 +31,20 @@ module.exports = function(opts) {
      * The user has made a move
      */
     var makeBoardMove = function(move) {
-        var tilesPlaced = scrabbleGroundCtrl.getCandidateTiles();
+        var tilesPlaced = scrabbleGroundCtrl.getCandidateTiles().map(function(placed) {
+            var x = placed.x;
+            var y = placed.y;
+            var tile = {
+                letter: placed.tile.letter,
+                value: placed.tile.value
+            };
+
+            return {
+                x: x,
+                y: y,
+                tile: tile
+            };
+        });
         console.dir(tilesPlaced);
 
         var data = {

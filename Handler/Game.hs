@@ -20,6 +20,7 @@ import Wordify.Rules.Game
 import Wordify.Rules.Move
 import Data.Aeson
 import Wordify.Rules.Player
+import Controllers.Game.Game
 
 getGameTestR :: Handler Html
 getGameTestR =
@@ -122,13 +123,12 @@ setupPrerequisets serverGame =
 
 gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
 gameApp game channel maybePlayerId playerNumber =
-    do
-        putStrLn "bleh"
-        sendTextData $ toJSONResponse $ PlayerSaid "sender" "message123"
-
-{-testApp :: WebSocketsT Handler ()
-testApp = do
-    sendTextData ("blah blah message 1" :: Text)
-    sendTextData $ (("blah blah message 2") :: Text)
-    redirect HomeR
--}
+        race_
+            (forever $ atomically (toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData)
+            (forever $ 
+                do
+                    msg <- receiveData
+                    let parsedCommand = maybe InvalidCommand id (decode msg :: Maybe ClientMessage)
+                    response <- liftIO $ performRequest parsedCommand
+                    sendTextData . toJSONResponse $ response
+            )

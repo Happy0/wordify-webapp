@@ -1,4 +1,4 @@
-module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResponse(PlayerSaid)) where
+module Controllers.Game.Api (ClientMessage(ChatMessage, InvalidCommand), GameMessage, ServerResponse(PlayerSaid)) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -13,7 +13,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage), GameMessage, ServerResp
     import Wordify.Rules.Square
     import qualified Data.List as L
 
-    data ClientMessage = ChatMessage Text
+    data ClientMessage = ChatMessage Text | InvalidCommand
 
     data ServerResponse = PlayerSaid Text Text
 
