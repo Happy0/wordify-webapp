@@ -20,8 +20,20 @@ module.exports = function(opts) {
     // Our scrabbleground controller for manipulating the state of the game
     var scrabbleGroundCtrl = new Scrabbleground.controller(scrabbleGroundOpts);
 
-    var moveMade = function(move) {
-        scrabblegroundCtrl.move(move);
+    /**
+     * A player has made a board move
+     */
+    var boardMoveMade = function(move) {
+
+    }
+
+    /**
+     * The user has made a move
+     */
+    var makeBoardMove = function(move) {
+        alert("dsfdsf");
+
+
     };
 
     var setRackTiles = function(rackTiles) {
@@ -92,7 +104,8 @@ module.exports = function(opts) {
 
     return {
         data: data,
-        moveMade : moveMade,
+        boardMoveMade : boardMoveMade,
+        makeBoardMove : makeBoardMove,
         setRackTiles : setRackTiles,
         updateRack : updateRack,
         scrabbleGroundCtrl: scrabbleGroundCtrl,

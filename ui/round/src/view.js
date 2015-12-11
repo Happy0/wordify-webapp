@@ -3,8 +3,10 @@ var m = require('mithril');
 
 module.exports = function(ctrl) {
 
-    var renderButton = function (text, handler) {
+    var renderButton = function (text, buttonClickHandler) {
+
         var buttonAttrs = {
+            onclick: buttonClickHandler,
             type: "button",
             class: "btn btn-success"
         };
@@ -15,7 +17,7 @@ module.exports = function(ctrl) {
 
     var renderActionButtons = function () {
         return m('div', {class: 'action-buttons'}, [
-                     renderButton("Submit"),
+                     renderButton("Submit", ctrl.makeBoardMove),
                      renderButton("Exchange"),
                      renderButton("Pass")]);
    };
