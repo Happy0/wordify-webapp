@@ -128,7 +128,9 @@ gameApp game channel maybePlayerId playerNumber =
             (forever $ 
                 do
                     msg <- receiveData
-                    let parsedCommand = maybe InvalidCommand id (decode msg :: Maybe ClientMessage)
-                    response <- liftIO $ performRequest parsedCommand
-                    sendTextData . toJSONResponse $ response
+                    case (eitherDecode msg :: Either String ClientMessage) of
+                        Left err -> sendTextData $ toJSONResponse (InvalidCommand (pack err))
+                        Right parsedCommand -> do
+                            response <- liftIO $ performRequest parsedCommand
+                            sendTextData . toJSONResponse $ response
             )
