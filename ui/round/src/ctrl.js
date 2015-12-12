@@ -41,8 +41,8 @@ module.exports = function(opts) {
 
             return {
                 pos : {
-                  x: x,
-                  y: y,
+                  x: x + 1,
+                  y: y + 1,
                 },
                 tile: tile
             };
