@@ -5,10 +5,12 @@ module Controllers.Game.Game(
 
     import Prelude
     import Controllers.Game.Api
+    import Controllers.Game.Model.ServerGame
+    import Control.Concurrent.STM.TVar
 
     handleChannelMessage :: GameMessage -> ServerResponse
     handleChannelMessage bleh = undefined
 
-    performRequest :: ClientMessage -> IO ServerResponse
-    performRequest (BoardMove placed) = return BoardMoveSuccess
-    performRequest (ChatMessage msg) = error "Not implemented yet."
+    performRequest :: TVar ServerGame -> ClientMessage -> IO ServerResponse
+    performRequest serverGame (BoardMove placed) = return BoardMoveSuccess
+    performRequest serverGame (ChatMessage msg) = error "Not implemented yet."
