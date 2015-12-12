@@ -4,6 +4,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
 
     import Data.Aeson
     import Data.Aeson.Types
+    import qualified Data.Vector as V
     import Control.Applicative
     import Data.Text
     import Prelude
@@ -15,7 +16,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
     import Wordify.Rules.Square
     import qualified Data.List as L
 
-    data ClientMessage = ChatMessage Text
+    data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)]
 
     data ServerResponse = PlayerSaid Text Text | InvalidCommand Text
 
@@ -48,8 +49,15 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
     parseChatMessage _ = error "Unrecognised chat message"
 
     parseBoardMove :: Value -> Parser ClientMessage
-    parseBoardMove (Array a) = undefined
+    parseBoardMove (Array a) = BoardMove <$> (sequence . V.toList $ fmap getPosAndTile a)
     parseBoardMove _ = error "A board move should have an array as its payload"
+
+    getPosAndTile :: Value -> Parser (Pos, Tile)
+    getPosAndTile (Object val) = 
+        do
+            pos <-  val .: "pos" >>= parseJSON
+            tile <-  val .: "tile" >>= parseJSON
+            return (pos, tile)
 
     instance ToJSON Board where
         toJSON = toJSON . groupSquaresByColumn . allSquares
@@ -67,10 +75,26 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
         toJSON _ = object ["letter" .= '_', "value" .= (0 :: Int)]
 
     instance FromJSON Pos where
-        parseJSON value = undefined
+        parseJSON (Object value) = do
+            x <- value .: "x"
+            y <- value .:"y"
+            let pos = posAt(x,y)
+            case pos of
+                Nothing -> error "Position is not in valid board coordinate boundaries"
+                Just p -> return p
+        parseJSON _ = error "Position must be a JSON object value, rather than an array, etc"
 
     instance FromJSON Tile where
-        parseJSON value = undefined
+        parseJSON (Object value) = do
+            letter <- value .: "letter"
+            tileValue <- value .: "value"
+
+            return $
+                 case tileValue of
+                        0 -> case letter of
+                                '_' -> Blank Nothing
+                                chr -> Blank (Just chr)
+                        x -> Letter letter tileValue
 
     groupSquaresByColumn :: [(Pos, Square)] -> [[Square]]
     groupSquaresByColumn squares = 
