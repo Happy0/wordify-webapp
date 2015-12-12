@@ -6,10 +6,12 @@ module Controllers.Game.Game(
     import Prelude
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
+    import Control.Monad
     import Control.Monad.STM
     import Control.Concurrent.STM.TVar
     import qualified Data.Map as M
     import Data.Text
+    import Wordify.Rules.Game
     import Wordify.Rules.Pos
     import Wordify.Rules.Move
     import Wordify.Rules.Tile
@@ -17,25 +19,30 @@ module Controllers.Game.Game(
     handleChannelMessage :: GameMessage -> ServerResponse
     handleChannelMessage bleh = undefined
 
-    performRequest :: TVar ServerGame -> ClientMessage -> IO ServerResponse
-    performRequest serverGame (BoardMove placed) = handleBoardMove serverGame placed
-    performRequest serverGame (ChatMessage msg) = error "Not implemented yet."
+    performRequest :: TVar ServerGame -> Maybe Int -> ClientMessage -> IO ServerResponse
+    performRequest serverGame player (BoardMove placed) = handleBoardMove serverGame player placed
+    performRequest serverGame player (ChatMessage msg) = error "Not implemented yet."
 
-    handleBoardMove :: TVar ServerGame -> [(Pos, Tile)] -> IO ServerResponse
-    handleBoardMove sharedServerGame placed =
+    handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
+    handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
+    handleBoardMove sharedServerGame (Just playerNo) placed =
         do
             serverGame <- readTVarIO sharedServerGame
             let gameState = game serverGame
-            let move = PlaceTiles (M.fromList placed)
-            let moveOutcome = makeMove gameState move
-
-            case moveOutcome of
-                Right (MoveTransition player newGame wordsFormed) ->
-                    do
-                        let updatedServerGame = serverGame {game = newGame}
-                        atomically $ writeTVar sharedServerGame updatedServerGame
-                        return BoardMoveSuccess
-
-                Left err -> return $ InvalidCommand $ (pack . show) err
-                    
             
+            if (playerNumber gameState) /= playerNo 
+                then return $ InvalidCommand "Not your move"
+                else do
+
+                    let moveOutcome = makeMove gameState (PlaceTiles (M.fromList placed))
+
+                    case moveOutcome of
+                        Right (MoveTransition player newGame wordsFormed) ->
+                            do
+                                let updatedServerGame = serverGame {game = newGame}
+                                atomically $ writeTVar sharedServerGame updatedServerGame
+                                return BoardMoveSuccess
+
+                        Left err -> return $ InvalidCommand $ (pack . show) err
+                        _ -> return $ InvalidCommand "Internal server error. Expected board move"
+ 
