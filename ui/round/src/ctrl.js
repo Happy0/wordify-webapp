@@ -40,8 +40,10 @@ module.exports = function(opts) {
             };
 
             return {
-                x: x,
-                y: y,
+                pos : {
+                  x: x,
+                  y: y,
+                },
                 tile: tile
             };
         });

@@ -32,18 +32,24 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
 
     instance ToJSON ServerResponse where
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
+        toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where
         commandName (PlayerSaid _ _) = "said"
-
+        commandName (InvalidCommand _) = "error"
 
     parseCommand :: Text -> Value -> Parser ClientMessage
     parseCommand "say" value = parseChatMessage value
+    parseCommand "boardMove" value = parseBoardMove value
     parseCommand _ _ = error "Unrecognised command"
 
     parseChatMessage :: Value -> Parser ClientMessage
     parseChatMessage (Object object) = ChatMessage <$> object .: "message"
     parseChatMessage _ = error "Unrecognised chat message"
+
+    parseBoardMove :: Value -> Parser ClientMessage
+    parseBoardMove (Array a) = undefined
+    parseBoardMove _ = error "A board move should have an array as its payload"
 
     instance ToJSON Board where
         toJSON = toJSON . groupSquaresByColumn . allSquares
@@ -59,6 +65,12 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
         toJSON (Letter letter value) = object ["letter" .= letter, "value" .= value]
         toJSON (Blank (Just letter)) = object ["letter" .= letter, "value" .= (0 :: Int)]
         toJSON _ = object ["letter" .= '_', "value" .= (0 :: Int)]
+
+    instance FromJSON Pos where
+        parseJSON value = undefined
+
+    instance FromJSON Tile where
+        parseJSON value = undefined
 
     groupSquaresByColumn :: [(Pos, Square)] -> [[Square]]
     groupSquaresByColumn squares = 
