@@ -58,6 +58,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
             pos <-  val .: "pos" >>= parseJSON
             tile <-  val .: "tile" >>= parseJSON
             return (pos, tile)
+    getPosAndTile _ = error "expected payload with pos and tile"
 
     instance ToJSON Board where
         toJSON = toJSON . groupSquaresByColumn . allSquares
@@ -95,6 +96,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
                                 '_' -> Blank Nothing
                                 chr -> Blank (Just chr)
                         x -> Letter letter tileValue
+        parseJSON _ = error "Tile must be a JSON object value, rather than an array, etc"
 
     groupSquaresByColumn :: [(Pos, Square)] -> [[Square]]
     groupSquaresByColumn squares = 
