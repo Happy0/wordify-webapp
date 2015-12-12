@@ -1,6 +1,6 @@
-module Controllers.Game.Api (ClientMessage(ChatMessage),
+module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
                              GameMessage,
-                             ServerResponse(PlayerSaid, InvalidCommand)) where
+                             ServerResponse(PlayerSaid, BoardMoveSuccess, InvalidCommand)) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -18,7 +18,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
 
     data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)]
 
-    data ServerResponse = PlayerSaid Text Text | InvalidCommand Text
+    data ServerResponse = PlayerSaid Text Text | InvalidCommand Text | BoardMoveSuccess
 
     data GameMessage
 
@@ -33,10 +33,12 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
 
     instance ToJSON ServerResponse where
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
+        toJSON (BoardMoveSuccess) = object []
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where
         commandName (PlayerSaid _ _) = "said"
+        commandName (BoardMoveSuccess) = "boardMoveSuccess"
         commandName (InvalidCommand _) = "error"
 
     parseCommand :: Text -> Value -> Parser ClientMessage
@@ -58,7 +60,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage),
             pos <-  val .: "pos" >>= parseJSON
             tile <-  val .: "tile" >>= parseJSON
             return (pos, tile)
-    getPosAndTile _ = error "expected payload with pos and tile"
+    getPosAndTile _ = error "expected object payload with pos and tile"
 
     instance ToJSON Board where
         toJSON = toJSON . groupSquaresByColumn . allSquares

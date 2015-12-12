@@ -10,4 +10,5 @@ module Controllers.Game.Game(
     handleChannelMessage bleh = undefined
 
     performRequest :: ClientMessage -> IO ServerResponse
-    performRequest clientMessage = undefined
+    performRequest (BoardMove placed) = return BoardMoveSuccess
+    performRequest (ChatMessage msg) = error "Not implemented yet."
