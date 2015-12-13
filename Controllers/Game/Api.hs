@@ -18,10 +18,13 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
 
     data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)]
 
+    -- Response messages to a client request over the websocket
     data ServerResponse = PlayerSaid Text Text |
                           BoardMoveSuccess [Tile] |
                           InvalidCommand Text
 
+    -- Messages sent over the server game channel to notify clients of changes
+    -- such as a player making a move successfully
     data GameMessage = PlayerBoardMove [Tile]
 
     instance ServerMessage GameMessage where
