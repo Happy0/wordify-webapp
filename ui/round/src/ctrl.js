@@ -27,7 +27,7 @@ module.exports = function(opts) {
      * A player has made a board move
      */
     var boardMoveMade = function(move) {
-        alert("board move made controller");
+        scrabbleGroundCtrl.move(move.placed);
     }
 
     /**
