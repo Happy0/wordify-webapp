@@ -1,5 +1,5 @@
 module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
-                             GameMessage,
+                             GameMessage(PlayerBoardMove),
                              ServerResponse(PlayerSaid, BoardMoveSuccess, InvalidCommand)) where
 
     import Data.Aeson
@@ -25,7 +25,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove [Tile]
+    data GameMessage = PlayerBoardMove [(Pos, Tile)]
 
     instance ServerMessage GameMessage where
         commandName (PlayerBoardMove _) = "playerBoardMove"
@@ -97,6 +97,9 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
                 Nothing -> error "Position is not in valid board coordinate boundaries"
                 Just p -> return p
         parseJSON _ = error "Position must be a JSON object value, rather than an array, etc"
+
+    instance ToJSON Pos where
+        toJSON pos = object ["x" .= xPos pos, "y" .= yPos pos]
 
     instance FromJSON Tile where
         parseJSON (Object value) = do

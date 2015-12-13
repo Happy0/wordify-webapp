@@ -8,6 +8,7 @@ module Controllers.Game.Game(
     import Control.Monad
     import Control.Monad.STM
     import Control.Concurrent.STM.TVar
+    import Control.Concurrent.STM.TChan
     import qualified Data.Map as M
     import Data.Text
     import Wordify.Rules.Game
@@ -36,6 +37,8 @@ module Controllers.Game.Game(
                         Right (MoveTransition newPlayerState newGame wordsFormed) ->
                             do
                                 let updatedServerGame = serverGame {game = newGame}
+                                let channel = broadcastChannel updatedServerGame
+                                atomically $ writeTChan channel (PlayerBoardMove placed)
                                 atomically $ writeTVar sharedServerGame updatedServerGame
                                 return $ BoardMoveSuccess (tilesOnRack newPlayerState)
 
