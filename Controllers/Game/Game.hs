@@ -38,8 +38,10 @@ module Controllers.Game.Game(
                             do
                                 let updatedServerGame = serverGame {game = newGame}
                                 let channel = broadcastChannel updatedServerGame
-                                atomically $ writeTChan channel (PlayerBoardMove placed)
-                                atomically $ writeTVar sharedServerGame updatedServerGame
+                                atomically $ do
+                                     writeTChan channel (PlayerBoardMove placed)
+                                     writeTVar sharedServerGame updatedServerGame
+
                                 return $ BoardMoveSuccess (tilesOnRack newPlayerState)
 
                         Left err -> return $ InvalidCommand $ (pack . show) err
