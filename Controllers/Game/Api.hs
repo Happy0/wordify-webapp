@@ -31,7 +31,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
         commandName (PlayerBoardMove _) = "playerBoardMove"
 
     instance ToJSON GameMessage where
-        toJSON (PlayerBoardMove placed) = object ["placed" .= toJSON placed]
+        toJSON (PlayerBoardMove placed) = object ["placed" .= fmap writePosAndTile placed]
 
     instance FromJSON ClientMessage where
         parseJSON (Object request) =
@@ -51,6 +51,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
         commandName (PlayerSaid _ _) = "said"
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
         commandName (InvalidCommand _) = "error"
+
+
+    writePosAndTile :: (Pos, Tile) -> Value
+    writePosAndTile (pos, tile) = object ["pos" .= toJSON pos, "tile" .= toJSON tile]
 
     parseCommand :: Text -> Value -> Parser ClientMessage
     parseCommand "say" value = parseChatMessage value
