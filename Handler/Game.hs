@@ -123,9 +123,8 @@ setupPrerequisets serverGame =
 gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
 gameApp game channel maybePlayerId playerNumber =
         race_
-            (forever $ 
-                    handleChannelMessage <$> atomically (readTChan channel) >>= sendTextData . toJSONResponse)
-            (forever $ 
+            (forever $ atomically (readTChan channel) >>= sendTextData . toJSONResponse)
+            (forever $
                 do
                     msg <- receiveData
                     case (eitherDecode msg :: Either String ClientMessage) of

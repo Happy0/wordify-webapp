@@ -18,9 +18,17 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
 
     data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)]
 
-    data ServerResponse = PlayerSaid Text Text | InvalidCommand Text | BoardMoveSuccess [Tile]
+    data ServerResponse = PlayerSaid Text Text |
+                          BoardMoveSuccess [Tile] |
+                          InvalidCommand Text
 
-    data GameMessage
+    data GameMessage = PlayerBoardMove [Tile]
+
+    instance ServerMessage GameMessage where
+        commandName (PlayerBoardMove _) = "playerBoardMove"
+
+    instance ToJSON GameMessage where
+        toJSON (PlayerBoardMove placed) = object ["placed" .= toJSON placed]
 
     instance FromJSON ClientMessage where
         parseJSON (Object request) =
@@ -55,7 +63,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
     parseBoardMove _ = error "A board move should have an array as its payload"
 
     getPosAndTile :: Value -> Parser (Pos, Tile)
-    getPosAndTile (Object val) = 
+    getPosAndTile (Object val) =
         do
             pos <-  val .: "pos" >>= parseJSON
             tile <-  val .: "tile" >>= parseJSON
@@ -101,7 +109,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
         parseJSON _ = error "Tile must be a JSON object value, rather than an array, etc"
 
     groupSquaresByColumn :: [(Pos, Square)] -> [[Square]]
-    groupSquaresByColumn squares = 
+    groupSquaresByColumn squares =
         let columns = L.groupBy sameColumn squares
         in (Prelude.map . Prelude.map) snd columns
         where

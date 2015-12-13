@@ -1,5 +1,4 @@
 module Controllers.Game.Game(
-    handleChannelMessage,
     performRequest
 ) where
 
@@ -17,9 +16,6 @@ module Controllers.Game.Game(
     import Wordify.Rules.Move
     import Wordify.Rules.Tile
 
-    handleChannelMessage :: GameMessage -> ServerResponse
-    handleChannelMessage bleh = undefined
-
     performRequest :: TVar ServerGame -> Maybe Int -> ClientMessage -> IO ServerResponse
     performRequest serverGame player (BoardMove placed) = handleBoardMove serverGame player placed
     performRequest serverGame player (ChatMessage msg) = error "Not implemented yet."
@@ -30,11 +26,10 @@ module Controllers.Game.Game(
         do
             serverGame <- readTVarIO sharedServerGame
             let gameState = game serverGame
-            
-            if (playerNumber gameState) /= playerNo 
+
+            if (playerNumber gameState) /= playerNo
                 then return $ InvalidCommand "Not your move"
                 else do
-
                     let moveOutcome = makeMove gameState (PlaceTiles (M.fromList placed))
 
                     case moveOutcome of
@@ -46,4 +41,4 @@ module Controllers.Game.Game(
 
                         Left err -> return $ InvalidCommand $ (pack . show) err
                         _ -> return $ InvalidCommand "Internal server error. Expected board move"
- 
+
