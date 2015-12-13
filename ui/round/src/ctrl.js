@@ -3,14 +3,17 @@ var s = require('./socket');
 var d = require('./data');
 var m = require('mithril');
 var $ = require('jquery');
+var merge = require('merge');
 
 module.exports = function(opts) {
+
+    var exports = {};
 
     var data = d(opts);
 
     var socketOpts = {
         send : opts.send,
-        ctrl : this
+        ctrl : exports
     }
 
     var socket = s(socketOpts);
@@ -24,7 +27,7 @@ module.exports = function(opts) {
      * A player has made a board move
      */
     var boardMoveMade = function(move) {
-
+        alert("board move made controller");
     }
 
     /**
@@ -123,7 +126,7 @@ module.exports = function(opts) {
 
     scrabbleGroundCtrl.setCustomRevertFunction(tileDroppedOffBoardFunction);
 
-    return {
+    var controllerFunctions = {
         data: data,
         boardMoveMade : boardMoveMade,
         makeBoardMove : makeBoardMove,
@@ -132,4 +135,8 @@ module.exports = function(opts) {
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
     };
+
+    merge.recursive(exports, controllerFunctions);
+
+    return exports;
 };
