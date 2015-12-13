@@ -68,8 +68,7 @@ getGameR gameId = do
                 (serverGame, messageChannel) <- atomically $ setupPrerequisets gameInProgress
                 let currentGame = game serverGame
 
-                --TODO: Fix this out by one in haskellscrabble
-                let maybePlayerNumber = subtract 1 <$> (maybePlayerId >>= getPlayerNumber serverGame)
+                let maybePlayerNumber = (maybePlayerId >>= getPlayerNumber serverGame)
                 let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= getPlayer currentGame)
 
                 webSockets $ gameApp gameInProgress messageChannel maybePlayerId maybePlayerNumber

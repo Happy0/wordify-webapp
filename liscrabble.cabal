@@ -101,7 +101,7 @@ library
                  , containers
                  , vector
                  , time
-                 , haskellscrabble >= 1.2
+                 , haskellscrabble >= 1.2.1
                  , split > 0.2 && <= 0.3
                  , filepath
                  , semigroups

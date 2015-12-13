@@ -18,7 +18,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
 
     data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)]
 
-    data ServerResponse = PlayerSaid Text Text | InvalidCommand Text | BoardMoveSuccess
+    data ServerResponse = PlayerSaid Text Text | InvalidCommand Text | BoardMoveSuccess [Tile]
 
     data GameMessage
 
@@ -33,12 +33,12 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
 
     instance ToJSON ServerResponse where
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
-        toJSON (BoardMoveSuccess) = object []
+        toJSON (BoardMoveSuccess tiles) = object ["tiles" .= toJSON tiles]
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where
         commandName (PlayerSaid _ _) = "said"
-        commandName (BoardMoveSuccess) = "boardMoveSuccess"
+        commandName (BoardMoveSuccess _) = "boardMoveSuccess"
         commandName (InvalidCommand _) = "error"
 
     parseCommand :: Text -> Value -> Parser ClientMessage

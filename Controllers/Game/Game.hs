@@ -13,6 +13,7 @@ module Controllers.Game.Game(
     import Data.Text
     import Wordify.Rules.Game
     import Wordify.Rules.Pos
+    import Wordify.Rules.Player
     import Wordify.Rules.Move
     import Wordify.Rules.Tile
 
@@ -37,11 +38,11 @@ module Controllers.Game.Game(
                     let moveOutcome = makeMove gameState (PlaceTiles (M.fromList placed))
 
                     case moveOutcome of
-                        Right (MoveTransition player newGame wordsFormed) ->
+                        Right (MoveTransition newPlayerState newGame wordsFormed) ->
                             do
                                 let updatedServerGame = serverGame {game = newGame}
                                 atomically $ writeTVar sharedServerGame updatedServerGame
-                                return BoardMoveSuccess
+                                return $ BoardMoveSuccess (tilesOnRack newPlayerState)
 
                         Left err -> return $ InvalidCommand $ (pack . show) err
                         _ -> return $ InvalidCommand "Internal server error. Expected board move"

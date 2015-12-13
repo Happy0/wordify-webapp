@@ -5,7 +5,7 @@ module.exports = function(opts) {
 
     
     var parseAndIssueCommand = function(command) {
-        console.info("I got a message from the server...arooni");
+        console.dir(command);
     }
 
     return {
