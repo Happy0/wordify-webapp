@@ -6,6 +6,10 @@ module.exports = function(opts) {
     var handlers = {
         "playerBoardMove" : function(data) {
             controller.boardMoveMade(data);
+        },
+        "boardMoveSuccess" : function(data) {
+            var rack = data.rack;
+            controller.updateRack(rack);
         }
     };
 
