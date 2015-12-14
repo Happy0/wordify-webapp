@@ -5,7 +5,8 @@ module.exports = function(opts) {
 
     var handlers = {
         "playerBoardMove" : function(data) {
-            controller.boardMoveMade(data);
+            var placed = data.placed;
+            controller.boardMoveMade(placed);
         },
         "boardMoveSuccess" : function(data) {
             var rack = data.rack;
