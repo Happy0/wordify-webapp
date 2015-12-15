@@ -45,7 +45,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
 
     instance ToJSON ServerResponse where
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
-        toJSON (BoardMoveSuccess tiles) = object ["tiles" .= toJSON tiles]
+        toJSON (BoardMoveSuccess tiles) = object ["rack" .= toJSON tiles]
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where

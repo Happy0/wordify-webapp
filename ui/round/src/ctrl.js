@@ -26,8 +26,8 @@ module.exports = function(opts) {
     /**
      * A player has made a board move
      */
-    var boardMoveMade = function(move) {
-        scrabbleGroundCtrl.move(move.placed);
+    var boardMoveMade = function(placed) {
+        scrabbleGroundCtrl.move(placed);
     }
 
     /**
@@ -45,7 +45,7 @@ module.exports = function(opts) {
             return {
                 pos : {
                   x: x + 1,
-                  y: y + 1,
+                  y: y + 1
                 },
                 tile: tile
             };
@@ -92,7 +92,14 @@ module.exports = function(opts) {
      * the player.
      */
     var updateRack = function(fullNewRack) {
-
+        // Just write over the old tiles for now... Will do a diff once main
+        // functionality is there
+        data.rack.forEach(function(slot, slotNo) {
+            if (fullNewRack[slotNo]) {
+                slot.tile = fullNewRack[slotNo];
+            }
+        });       
+        
     };
 
     var putTileOnFirstEmptySlot = function (tile) {
