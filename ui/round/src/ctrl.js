@@ -50,7 +50,6 @@ module.exports = function(opts) {
                 tile: tile
             };
         });
-        console.dir(tilesPlaced);
 
         var data = {
             command : "boardMove",
@@ -58,6 +57,14 @@ module.exports = function(opts) {
         };
 
         socketOpts.send(data);
+    };
+
+    var setPlayerToMove = function(playerToMove) {
+        data.playerToMove = playerToMove;
+    };
+
+    var setPlayers = function(players) {
+        data.players = players;
     };
 
     var setRackTiles = function(rackTiles) {
@@ -130,6 +137,8 @@ module.exports = function(opts) {
         data: data,
         boardMoveMade : boardMoveMade,
         makeBoardMove : makeBoardMove,
+        setPlayers : setPlayers,
+        setPlayerToMove : setPlayerToMove,
         setRackTiles : setRackTiles,
         updateRack : updateRack,
         scrabbleGroundCtrl: scrabbleGroundCtrl,

@@ -7,4 +7,3 @@
 / HomeR GET
 /game/#Text/lobby GameLobbyR GET
 /game/#Text GameR GET
-/game/test/test GameTestR GET

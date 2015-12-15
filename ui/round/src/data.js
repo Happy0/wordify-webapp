@@ -1,8 +1,9 @@
 module.exports = function(opts) {
-    
+
     var defaults = {
-        rack : [{}, {}, {}, {}, {}, {}, {}]
-    
+        rack : [{}, {}, {}, {}, {}, {}, {}],
+        players : [],
+        playerToMove : 1
     }
 
     return defaults;

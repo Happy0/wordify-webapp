@@ -11,6 +11,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
     import qualified Data.HashMap.Strict as HM
     import Model.Api
     import Wordify.Rules.Board
+    import Wordify.Rules.Player
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
     import Wordify.Rules.Square
@@ -52,7 +53,6 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
         commandName (InvalidCommand _) = "error"
 
-
     writePosAndTile :: (Pos, Tile) -> Value
     writePosAndTile (pos, tile) = object ["pos" .= toJSON pos, "tile" .= toJSON tile]
 
@@ -86,6 +86,9 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
         toJSON (TripleLetter tile) = object ["tile" .= tile, "bonus" .= ("TL" :: Text)]
         toJSON (DoubleWord tile) = object ["tile" .= tile, "bonus" .= ("DW" :: Text)]
         toJSON (TripleWord tile) = object ["tile" .= tile, "bonus" .= ("TW" :: Text)]
+
+    instance ToJSON Player where
+        toJSON player = object ["name" .= name player, "score" .= score player]
 
     instance ToJSON Tile where
         toJSON (Letter letter value) = object ["letter" .= letter, "value" .= value]

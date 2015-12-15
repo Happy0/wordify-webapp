@@ -22,36 +22,6 @@ import Data.Aeson
 import Wordify.Rules.Player
 import Controllers.Game.Game
 
-getGameTestR :: Handler Html
-getGameTestR =
-    defaultLayout $ do
-        addStylesheet $ (StaticR css_scrabble_css)
-        addScript $ (StaticR js_round_js)
-        toWidget $
-            do
-                game <- lift $ testGame
-                let neMoves = NE.fromList moves
-                let fullGame = join $ fmap (flip (restoreGame) neMoves) $ game
-
-                case fullGame of
-                    Left  err -> [whamlet|Hello World! #{(show err)}|]
-                    Right gameTransitions ->
-                        let currentGame = newGame $ NE.last gameTransitions
-                        in let currentBoard = (board currentGame)
-                        in
-                            do
-                                toWidget $ do
-                                    [julius|
-                                        var opts = {element: document.getElementById("pisharooni")};
-                                        opts.ground = {};
-                                        opts.ground.board = #{(toJSON currentBoard) }
-                                        var round = Round(opts);
-                                    |]
-                                toWidget $ do
-                                    [whamlet|
-                                    <div #pisharooni style="width: 600px; height: 600px;">
-                                    |]
-
 getGameR :: Text -> Handler Html
 getGameR gameId = do
     request <- getRequest
@@ -98,6 +68,7 @@ getGameR gameId = do
                             opts.ground.board = #{toJSON (board currentGame)};
                             opts.send = send;
                             var round = Round(opts);
+                            round.controller.setPlayers( #{toJSON (players currentGame)});
                             round.controller.setRackTiles(#{toJSON (maybePlayerRack)})
 
                             conn.onmessage = function (e) {
