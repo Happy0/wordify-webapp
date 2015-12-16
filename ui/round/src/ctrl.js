@@ -59,6 +59,15 @@ module.exports = function(opts) {
         socketOpts.send(data);
     };
 
+    var makePassMove = function() {
+        var data = {
+            command : "passMove",
+            payload : {}
+        }
+
+        socketOpts.send(data);
+    }
+
     var setPlayerToMove = function(playerToMove) {
         data.playerToMove = playerToMove;
     };
@@ -144,6 +153,7 @@ module.exports = function(opts) {
         data: data,
         boardMoveMade : boardMoveMade,
         makeBoardMove : makeBoardMove,
+        makePassMove : makePassMove,
         setPlayers : setPlayers,
         setPlayerToMove : setPlayerToMove,
         setRackTiles : setRackTiles,

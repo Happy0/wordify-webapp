@@ -1,6 +1,6 @@
-module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
-                             GameMessage(PlayerBoardMove),
-                             ServerResponse(PlayerSaid, BoardMoveSuccess, InvalidCommand)) where
+module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
+                             GameMessage(PlayerBoardMove, PlayerPassMove),
+                             ServerResponse(PlayerSaid, BoardMoveSuccess, PassMoveSuccess, InvalidCommand)) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -17,24 +17,29 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
     import Wordify.Rules.Square
     import qualified Data.List as L
 
-    data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)]
+    data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)] | PassMove
 
     -- Response messages to a client request over the websocket
     data ServerResponse = PlayerSaid Text Text |
                           BoardMoveSuccess [Tile] |
+                          PassMoveSuccess |
                           InvalidCommand Text
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player]
+    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int | PlayerPassMove Int
 
     instance ServerMessage GameMessage where
-        commandName (PlayerBoardMove _ _) = "playerBoardMove"
+        commandName (PlayerBoardMove _ _ _) = "playerBoardMove"
+        commandName (PlayerPassMove _) = "playerPassMove"
 
     instance ToJSON GameMessage where
-        toJSON (PlayerBoardMove placed players) =
+        toJSON (PlayerBoardMove placed players nowPlaying) =
             object ["placed" .= fmap writePosAndTile placed,
-                    "players" .= toJSON players]
+                    "players" .= toJSON players,
+                    "nowPlaying" .= nowPlaying]
+        toJSON (PlayerPassMove nowPlaying) = 
+            object ["nowPlaying" .= nowPlaying]
 
     instance FromJSON ClientMessage where
         parseJSON (Object request) =
@@ -48,12 +53,13 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
     instance ToJSON ServerResponse where
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
         toJSON (BoardMoveSuccess tiles) = object ["rack" .= toJSON tiles]
-
+        toJSON PassMoveSuccess = object []
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where
         commandName (PlayerSaid _ _) = "said"
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
+        commandName PassMoveSuccess = "passMoveSuccess"
         commandName (InvalidCommand _) = "error"
 
     writePosAndTile :: (Pos, Tile) -> Value
@@ -62,6 +68,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
     parseCommand :: Text -> Value -> Parser ClientMessage
     parseCommand "say" value = parseChatMessage value
     parseCommand "boardMove" value = parseBoardMove value
+    parseCommand "passMove" _ = return PassMove
     parseCommand _ _ = error "Unrecognised command"
 
     parseChatMessage :: Value -> Parser ClientMessage

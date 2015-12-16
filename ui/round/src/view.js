@@ -19,7 +19,7 @@ module.exports = function(ctrl) {
         return m('div', {class: 'action-buttons'}, [
                      renderButton("Submit", ctrl.makeBoardMove),
                      renderButton("Exchange"),
-                     renderButton("Pass")]);
+                     renderButton("Pass", ctrl.makePassMove)]);
    };
 
     var renderTileRack = function() {
