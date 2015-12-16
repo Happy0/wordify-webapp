@@ -60,7 +60,7 @@
 
 .tile.blank {
     font-weight: bold;
-    font-color: red;
+    color: white;
 }
 
 .lettertext {
