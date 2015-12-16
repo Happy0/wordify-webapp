@@ -67,5 +67,18 @@ module.exports = function(ctrl) {
         return m('div', attrs, scrabblegroundView);
     }
 
-    return m('div', {}, [renderBoard(), renderTileRack()]);
+    var renderScoreBoard = function() {
+        var players = ctrl.data.players;
+
+        var renderPlayerRow = function(player) {
+            return m('tr', {class: "score-table-border"},
+                     [m('td', {class : "score-table-border"}, player.name),
+                         m('td', {class: "score-table-border"}, player.score)]);
+        }
+
+        return m('table', {class: "score-table-border" }, players.map(renderPlayerRow));
+    };
+
+
+    return m('div', {}, [renderScoreBoard(), renderBoard(), renderTileRack()]);
 }

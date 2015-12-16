@@ -27,3 +27,8 @@
 .submit-move-button {
     margin-right: 10px;
 }
+
+.score-table-border {
+    border: 1px solid black;
+
+}

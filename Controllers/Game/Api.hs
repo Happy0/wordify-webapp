@@ -26,13 +26,15 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove [(Pos, Tile)]
+    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player]
 
     instance ServerMessage GameMessage where
-        commandName (PlayerBoardMove _) = "playerBoardMove"
+        commandName (PlayerBoardMove _ _) = "playerBoardMove"
 
     instance ToJSON GameMessage where
-        toJSON (PlayerBoardMove placed) = object ["placed" .= fmap writePosAndTile placed]
+        toJSON (PlayerBoardMove placed players) =
+            object ["placed" .= fmap writePosAndTile placed,
+                    "players" .= toJSON players]
 
     instance FromJSON ClientMessage where
         parseJSON (Object request) =
@@ -46,6 +48,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove),
     instance ToJSON ServerResponse where
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
         toJSON (BoardMoveSuccess tiles) = object ["rack" .= toJSON tiles]
+
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where

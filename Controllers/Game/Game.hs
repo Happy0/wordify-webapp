@@ -39,7 +39,7 @@ module Controllers.Game.Game(
                                 let updatedServerGame = serverGame {game = newGame}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
-                                     writeTChan channel (PlayerBoardMove placed)
+                                     writeTChan channel (PlayerBoardMove placed (players newGame))
                                      writeTVar sharedServerGame updatedServerGame
 
                                 return $ BoardMoveSuccess (tilesOnRack newPlayerState)
