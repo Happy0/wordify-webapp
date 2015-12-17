@@ -68,8 +68,11 @@ getGameR gameId = do
                             opts.ground.board = #{toJSON (board currentGame)};
                             opts.send = send;
                             var round = Round(opts);
+
                             round.controller.setPlayers( #{toJSON (players currentGame)});
-                            round.controller.setRackTiles(#{toJSON (maybePlayerRack)})
+                            round.controller.setRackTiles(#{toJSON (maybePlayerRack)});
+                            round.controller.setPlayerNumber(#{toJSON maybePlayerNumber});
+                            round.controller.setPlayerToMove(#{toJSON (playerNumber currentGame)})
 
                             conn.onmessage = function (e) {
                                 var data = JSON.parse(e.data);

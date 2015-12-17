@@ -11,6 +11,10 @@ module.exports = function(ctrl) {
             class: "btn btn-success"
         };
 
+        if (ctrl.data.playerNumber != ctrl.data.playerToMove){
+            buttonAttrs.disabled = true;
+        }
+
         return m('span', {class : "submit-move-button"},
                         m('button', buttonAttrs, text));
     };
@@ -31,6 +35,16 @@ module.exports = function(ctrl) {
                     // We mark the slot that the tile is from so that we
                     // can later empty those slots in the internal model
                     tile.rackSlot = slot;
+
+                    if (ctrl.data.playerToMove == ctrl.data.playerNumber)
+                    {
+                        tile.isCandidate = true;
+                    }
+                    else
+                    {
+                        tile.isCandidate = false;
+                    }
+
                     return ctrl.scrabbleGroundCtrl.makeMithrilTile(tile);
                 }
             };

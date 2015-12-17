@@ -72,6 +72,10 @@ module.exports = function(opts) {
         data.playerToMove = playerToMove;
     };
 
+    var setPlayerNumber = function(playerNumber) {
+        data.playerNumber = playerNumber;
+    }
+
     var setPlayers = function(players) {
         data.players = players;
     };
@@ -107,8 +111,8 @@ module.exports = function(opts) {
             if (fullNewRack[slotNo]) {
                 slot.tile = fullNewRack[slotNo];
             }
-        });       
-        
+        });
+
     };
 
     var putTileOnFirstEmptySlot = function (tile) {
@@ -156,6 +160,7 @@ module.exports = function(opts) {
         makePassMove : makePassMove,
         setPlayers : setPlayers,
         setPlayerToMove : setPlayerToMove,
+        setPlayerNumber: setPlayerNumber,
         setRackTiles : setRackTiles,
         updateRack : updateRack,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
