@@ -36,15 +36,6 @@ module.exports = function(ctrl) {
                     // can later empty those slots in the internal model
                     tile.rackSlot = slot;
 
-                    if (ctrl.data.playerToMove == ctrl.data.playerNumber)
-                    {
-                        tile.isCandidate = true;
-                    }
-                    else
-                    {
-                        tile.isCandidate = false;
-                    }
-
                     return ctrl.scrabbleGroundCtrl.makeMithrilTile(tile);
                 }
             };
@@ -52,8 +43,6 @@ module.exports = function(ctrl) {
         var putTileOnRack = function(slot, slotNumber) {
 
             var updateSlotWithElement = function(element, initialised, context) {
-                if (initialised) return;
-
                 rack[slotNumber].element = element;
             }
 

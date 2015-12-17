@@ -7,8 +7,12 @@ module.exports = function(opts) {
         "playerBoardMove" : function(data) {
             var placed = data.placed;
             var players = data.players;
+            controller.setPlayerToMove(data.nowPlaying);
             controller.boardMoveMade(placed);
             controller.setPlayers(players);
+        },
+        "playerPassMove" : function(data) {
+            controller.setPlayerToMove(data.nowPlaying);
         },
         "boardMoveSuccess" : function(data) {
             var rack = data.rack;
