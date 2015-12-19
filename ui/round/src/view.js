@@ -40,42 +40,44 @@ module.exports = function(ctrl) {
                 }
             };
 
-        var removeSlotBorder = function(element) {
-                $($(element).children()[0]).css('border', '');
-        }
-
         var handleSelectedForExchange = function(element, slot) {
-            if (ctrl.data.exchangeMode) {
                 var onClick = function () {
+                    if (!ctrl.data.exchangeMode) {
+                        return;
+                    }
+
+                    m.startComputation();
                     if (!slot.selectedForExchange)
                     {
                         slot.selectedForExchange = true;
-                        $($(element).children()[0]).css('border', 'solid 2px red');
                     }
                     else
                     {
                         
                         slot.selectedForExchange = false;
-                        removeSlotBorder(element);
                     }
+                    m.endComputation();
                 }
 
                 $(element).click(onClick);
-            }
-            else {
-                $(element).off("click");
-                return;
-            }
         }
 
         var putTileOnRack = function(slot, slotNumber) {
 
             var configSlot = function(element, initialised, context) {
                 rack[slotNumber].element = element;
-                handleSelectedForExchange(element, slot);
+
+                if (!initialised) {
+                    handleSelectedForExchange(element, slot);
+                }
             }
 
-            return m("span", {class : "rack-slot"},
+            var classes = "rack-slot";
+            if (slot.selectedForExchange) {
+                classes = classes.concat(" highlighted-slot");
+            }
+
+            return m("span", {class : classes},
                      m("square", {config: configSlot},
                            renderTile(slot.tile, slotNumber))
                     );

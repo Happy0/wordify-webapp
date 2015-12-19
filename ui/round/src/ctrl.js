@@ -157,6 +157,8 @@ module.exports = function(opts) {
             else {
                 slot.tile = null;
             }
+
+            slot.selectedForExchange = false;
         });
         
         m.endComputation();

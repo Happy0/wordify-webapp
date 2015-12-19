@@ -32,3 +32,8 @@
     border: 1px solid black;
 
 }
+
+.highlighted-slot {
+    border: 2px solid red;
+}
+
