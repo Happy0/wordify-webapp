@@ -81,6 +81,7 @@ module.exports = function(opts) {
     };
 
     var setRackTiles = function(rackTiles) {
+        m.startComputation();
 
         var emptySlotArray = [{}, {}, {}, {}, {}, {}, {}];
         var numTiles = rackTiles.length;
@@ -96,7 +97,7 @@ module.exports = function(opts) {
             data.rack[slotNumber].tile = tile;
         })
 
-        m.redraw();
+        m.endComputation();
     };
 
     /**
@@ -110,6 +111,8 @@ module.exports = function(opts) {
         data.rack.forEach(function(slot, slotNo) {
             if (fullNewRack[slotNo]) {
                 slot.tile = fullNewRack[slotNo];
+                slot.tile.isCandidate = true;
+                slot.tile.slotNumber = slotNo;
             }
         });
 
