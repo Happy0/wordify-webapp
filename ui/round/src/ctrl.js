@@ -154,6 +154,9 @@ module.exports = function(opts) {
                 slot.tile.isCandidate = true;
                 slot.tile.slotNumber = slotNo;
             }
+            else {
+                slot.tile = null;
+            }
         });
         
         m.endComputation();
