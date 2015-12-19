@@ -86,7 +86,7 @@ module.exports = function(opts) {
             if (wantsToExchange.length) {
                 var payload = {
                     command : "exchangeMove",
-                    payload : {tiles : wantsToExchange}
+                    payload : wantsToExchange
                 };
 
                 socketOpts.send(payload);
@@ -146,6 +146,8 @@ module.exports = function(opts) {
     var updateRack = function(fullNewRack) {
         // Just write over the old tiles for now... Will do a diff once main
         // functionality is there
+        m.startComputation();
+
         data.rack.forEach(function(slot, slotNo) {
             if (fullNewRack[slotNo]) {
                 slot.tile = fullNewRack[slotNo];
@@ -153,7 +155,8 @@ module.exports = function(opts) {
                 slot.tile.slotNumber = slotNo;
             }
         });
-
+        
+        m.endComputation();
     };
 
     var putTileOnFirstEmptySlot = function (tile) {

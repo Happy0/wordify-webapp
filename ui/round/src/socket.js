@@ -11,10 +11,17 @@ module.exports = function(opts) {
             controller.boardMoveMade(placed);
             controller.setPlayers(players);
         },
+        "playerExchangeMove" : function(data) {
+            controller.setPlayerToMove(data.nowPlaying)
+        },
         "playerPassMove" : function(data) {
             controller.setPlayerToMove(data.nowPlaying);
         },
         "boardMoveSuccess" : function(data) {
+            var rack = data.rack;
+            controller.updateRack(rack);
+        },
+        "exchangeMoveSuccess" : function(data) {
             var rack = data.rack;
             controller.updateRack(rack);
         }

@@ -1,6 +1,7 @@
-module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
-                             GameMessage(PlayerBoardMove, PlayerPassMove),
-                             ServerResponse(PlayerSaid, BoardMoveSuccess, PassMoveSuccess, InvalidCommand)) where
+module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove, PassMove),
+                             GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove),
+                             ServerResponse(PlayerSaid, BoardMoveSuccess, ExchangeMoveSuccess, 
+                                PassMoveSuccess, InvalidCommand)) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -17,27 +18,31 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
     import Wordify.Rules.Square
     import qualified Data.List as L
 
-    data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)] | PassMove
+    data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)] | ExchangeMove [Tile] | PassMove
 
     -- Response messages to a client request over the websocket
     data ServerResponse = PlayerSaid Text Text |
                           BoardMoveSuccess [Tile] |
+                          ExchangeMoveSuccess [Tile] |
                           PassMoveSuccess |
                           InvalidCommand Text
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int | PlayerPassMove Int
+    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int | PlayerPassMove Int | PlayerExchangeMove Int
 
     instance ServerMessage GameMessage where
         commandName (PlayerBoardMove _ _ _) = "playerBoardMove"
         commandName (PlayerPassMove _) = "playerPassMove"
+        commandName (PlayerExchangeMove _) = "playerExchangeMove"
 
     instance ToJSON GameMessage where
         toJSON (PlayerBoardMove placed players nowPlaying) =
             object ["placed" .= fmap writePosAndTile placed,
                     "players" .= toJSON players,
                     "nowPlaying" .= nowPlaying]
+        toJSON (PlayerExchangeMove nowPlaying) =
+            object ["nowPlaying" .= nowPlaying]
         toJSON (PlayerPassMove nowPlaying) = 
             object ["nowPlaying" .= nowPlaying]
 
@@ -54,11 +59,13 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
         toJSON (BoardMoveSuccess tiles) = object ["rack" .= toJSON tiles]
         toJSON PassMoveSuccess = object []
+        toJSON (ExchangeMoveSuccess tiles) = object ["rack" .= toJSON tiles]
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where
         commandName (PlayerSaid _ _) = "said"
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
+        commandName (ExchangeMoveSuccess _) = "exchangeMoveSuccess"
         commandName PassMoveSuccess = "passMoveSuccess"
         commandName (InvalidCommand _) = "error"
 
@@ -68,6 +75,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
     parseCommand :: Text -> Value -> Parser ClientMessage
     parseCommand "say" value = parseChatMessage value
     parseCommand "boardMove" value = parseBoardMove value
+    parseCommand "exchangeMove" value = parseExchangeMove value
     parseCommand "passMove" _ = return PassMove
     parseCommand _ _ = fail "Unrecognised command"
 
@@ -78,6 +86,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
     parseBoardMove :: Value -> Parser ClientMessage
     parseBoardMove (Array a) = BoardMove <$> (sequence . V.toList $ fmap getPosAndTile a)
     parseBoardMove _ = fail "A board move should have an array as its payload"
+
+    parseExchangeMove :: Value -> Parser ClientMessage
+    parseExchangeMove (Array a) = ExchangeMove <$> (sequence . V.toList $ fmap (parseJSON) a)
+    parseExchangeMove _ = fail "An exchange move should have an array of tiles as its payload"
 
     getPosAndTile :: Value -> Parser (Pos, Tile)
     getPosAndTile (Object val) =
