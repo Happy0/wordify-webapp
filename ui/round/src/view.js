@@ -40,14 +40,25 @@ module.exports = function(ctrl) {
                 }
             };
 
+        var handleSelectedForExchange = function(element, slot) {
+            var onClick = function () {
+            }
+
+            $(element).click(onClick);
+        }
+
         var putTileOnRack = function(slot, slotNumber) {
 
-            var updateSlotWithElement = function(element, initialised, context) {
+            var configSlot = function(element, initialised, context) {
+                if (initialised) return;
+
                 rack[slotNumber].element = element;
+
+                handleSelectedForExchange(element, slot);
             }
 
             return m("span", {class : "rack-slot"},
-                     m("square", {config: updateSlotWithElement},
+                     m("square", {config: configSlot},
                            renderTile(slot.tile, slotNumber))
                     );
         };

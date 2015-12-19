@@ -70,6 +70,16 @@ module.exports = function(opts) {
 
     var setPlayerToMove = function(playerToMove) {
         data.playerToMove = playerToMove;
+        
+        if (data.playerToMove == data.playerNumber)
+        {
+            scrabbleGroundCtrl.setBoardViewOnly(false);
+        }
+        else
+        {
+            scrabbleGroundCtrl.setBoardViewOnly(true);
+        }
+
     };
 
     var setPlayerNumber = function(playerNumber) {
