@@ -68,6 +68,10 @@ module.exports = function(opts) {
         socketOpts.send(data);
     }
 
+    var toggleExchangeMode = function() {
+        data.exchangeMode = !data.exchangeMode;
+    }
+
     var setPlayerToMove = function(playerToMove) {
         data.playerToMove = playerToMove;
         
@@ -171,6 +175,7 @@ module.exports = function(opts) {
         boardMoveMade : boardMoveMade,
         makeBoardMove : makeBoardMove,
         makePassMove : makePassMove,
+        toggleExchangeMode : toggleExchangeMode,
         setPlayers : setPlayers,
         setPlayerToMove : setPlayerToMove,
         setPlayerNumber: setPlayerNumber,

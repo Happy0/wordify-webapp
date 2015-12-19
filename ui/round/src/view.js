@@ -11,7 +11,7 @@ module.exports = function(ctrl) {
             class: "btn btn-success"
         };
 
-        if (ctrl.data.playerNumber != ctrl.data.playerToMove){
+        if (ctrl.data.playerNumber != ctrl.data.playerToMove || text != "Exchange" && ctrl.data.exchangeMode){
             buttonAttrs.disabled = true;
         }
 
@@ -22,7 +22,7 @@ module.exports = function(ctrl) {
     var renderActionButtons = function () {
         return m('div', {class: 'action-buttons'}, [
                      renderButton("Submit", ctrl.makeBoardMove),
-                     renderButton("Exchange"),
+                     renderButton("Exchange", ctrl.toggleExchangeMode),
                      renderButton("Pass", ctrl.makePassMove)]);
    };
 
