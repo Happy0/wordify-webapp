@@ -40,20 +40,38 @@ module.exports = function(ctrl) {
                 }
             };
 
-        var handleSelectedForExchange = function(element, slot) {
-            var onClick = function () {
-            }
+        var removeSlotBorder = function(element) {
+                $($(element).children()[0]).css('border', '');
+        }
 
-            $(element).click(onClick);
+        var handleSelectedForExchange = function(element, slot) {
+            if (ctrl.data.exchangeMode) {
+                var onClick = function () {
+                    if (!slot.selectedForExchange)
+                    {
+                        slot.selectedForExchange = true;
+                        $($(element).children()[0]).css('border', 'solid 2px red');
+                    }
+                    else
+                    {
+                        
+                        slot.selectedForExchange = false;
+                        removeSlotBorder(element);
+                    }
+                }
+
+                $(element).click(onClick);
+            }
+            else {
+                $(element).off("click");
+                return;
+            }
         }
 
         var putTileOnRack = function(slot, slotNumber) {
 
             var configSlot = function(element, initialised, context) {
-                if (initialised) return;
-
                 rack[slotNumber].element = element;
-
                 handleSelectedForExchange(element, slot);
             }
 

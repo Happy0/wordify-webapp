@@ -66,11 +66,35 @@ module.exports = function(opts) {
         }
 
         socketOpts.send(data);
-    }
+    };
 
     var toggleExchangeMode = function() {
+        if (exports.data.exchangeMode)
+        {
+            // The player has finished selecting the tiles she wants to exchange
+            
+            var slotIsSelected = function(slot) {
+                return slot.selectedForExchange;
+            };
+
+            var getSlotTile = function(slot) {
+                return slot.tile;
+            };
+
+            var wantsToExchange = data.rack.filter(slotIsSelected).map(getSlotTile);
+
+            if (wantsToExchange.length) {
+                var payload = {
+                    command : "exchangeMove",
+                    payload : {tiles : wantsToExchange}
+                };
+
+                socketOpts.send(payload);
+            }
+        }
+      
         data.exchangeMode = !data.exchangeMode;
-    }
+    };
 
     var setPlayerToMove = function(playerToMove) {
         data.playerToMove = playerToMove;
@@ -88,7 +112,7 @@ module.exports = function(opts) {
 
     var setPlayerNumber = function(playerNumber) {
         data.playerNumber = playerNumber;
-    }
+    };
 
     var setPlayers = function(players) {
         data.players = players;

@@ -46,9 +46,9 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
             case HM.lookup "command" request of
                 Just (String command) ->
                     request .: "payload" >>= parseCommand command
-                _ -> error "Expected command to have text value"
+                _ -> fail "Expected command to have text value"
 
-        parseJSON _ = error "Invalid JSON"
+        parseJSON _ = fail "Invalid JSON"
 
     instance ToJSON ServerResponse where
         toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
@@ -69,15 +69,15 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
     parseCommand "say" value = parseChatMessage value
     parseCommand "boardMove" value = parseBoardMove value
     parseCommand "passMove" _ = return PassMove
-    parseCommand _ _ = error "Unrecognised command"
+    parseCommand _ _ = fail "Unrecognised command"
 
     parseChatMessage :: Value -> Parser ClientMessage
     parseChatMessage (Object object) = ChatMessage <$> object .: "message"
-    parseChatMessage _ = error "Unrecognised chat message"
+    parseChatMessage _ = fail "Unrecognised chat message"
 
     parseBoardMove :: Value -> Parser ClientMessage
     parseBoardMove (Array a) = BoardMove <$> (sequence . V.toList $ fmap getPosAndTile a)
-    parseBoardMove _ = error "A board move should have an array as its payload"
+    parseBoardMove _ = fail "A board move should have an array as its payload"
 
     getPosAndTile :: Value -> Parser (Pos, Tile)
     getPosAndTile (Object val) =
@@ -85,7 +85,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
             pos <-  val .: "pos" >>= parseJSON
             tile <-  val .: "tile" >>= parseJSON
             return (pos, tile)
-    getPosAndTile _ = error "expected object payload with pos and tile"
+    getPosAndTile _ = fail "expected object payload with pos and tile"
 
     instance ToJSON Board where
         toJSON = toJSON . groupSquaresByColumn . allSquares
@@ -111,9 +111,9 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
             y <- value .:"y"
             let pos = posAt(x,y)
             case pos of
-                Nothing -> error "Position is not in valid board coordinate boundaries"
+                Nothing -> fail "Position is not in valid board coordinate boundaries"
                 Just p -> return p
-        parseJSON _ = error "Position must be a JSON object value, rather than an array, etc"
+        parseJSON _ = fail "Position must be a JSON object value, rather than an array, etc"
 
     instance ToJSON Pos where
         toJSON pos = object ["x" .= xPos pos, "y" .= yPos pos]
@@ -129,7 +129,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, PassMove),
                                 '_' -> Blank Nothing
                                 chr -> Blank (Just chr)
                         x -> Letter letter tileValue
-        parseJSON _ = error "Tile must be a JSON object value, rather than an array, etc"
+        parseJSON _ = fail "Tile must be a JSON object value, rather than an array, etc"
 
     groupSquaresByColumn :: [(Pos, Square)] -> [[Square]]
     groupSquaresByColumn squares =
