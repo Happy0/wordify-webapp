@@ -97,6 +97,7 @@ module.exports = function(opts) {
     };
 
     var setPlayerToMove = function(playerToMove) {
+        m.startComputation();
         data.playerToMove = playerToMove;
         
         if (data.playerToMove == data.playerNumber)
@@ -107,7 +108,7 @@ module.exports = function(opts) {
         {
             scrabbleGroundCtrl.setBoardViewOnly(true);
         }
-
+        m.endComputation();
     };
 
     var setPlayerNumber = function(playerNumber) {
