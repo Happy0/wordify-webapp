@@ -1,7 +1,7 @@
 module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove, PassMove),
-                             GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove),
-                             ServerResponse(PlayerSaid, BoardMoveSuccess, ExchangeMoveSuccess, 
-                                PassMoveSuccess, InvalidCommand)) where
+                             GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove, PlayerChat),
+                             ServerResponse(PlayerSaid, BoardMoveSuccess, ExchangeMoveSuccess,
+                                PassMoveSuccess, ChatSuccess, InvalidCommand)) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -25,16 +25,18 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
                           BoardMoveSuccess [Tile] |
                           ExchangeMoveSuccess [Tile] |
                           PassMoveSuccess |
+                          ChatSuccess |
                           InvalidCommand Text
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int | PlayerPassMove Int | PlayerExchangeMove Int
+    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int | PlayerPassMove Int | PlayerExchangeMove Int | PlayerChat Text Text
 
     instance ServerMessage GameMessage where
-        commandName (PlayerBoardMove _ _ _) = "playerBoardMove"
+        commandName PlayerBoardMove{}  = "playerBoardMove"
         commandName (PlayerPassMove _) = "playerPassMove"
         commandName (PlayerExchangeMove _) = "playerExchangeMove"
+        commandName (PlayerChat _ _) = "playerChat"
 
     instance ToJSON GameMessage where
         toJSON (PlayerBoardMove placed players nowPlaying) =
@@ -43,8 +45,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
                     "nowPlaying" .= nowPlaying]
         toJSON (PlayerExchangeMove nowPlaying) =
             object ["nowPlaying" .= nowPlaying]
-        toJSON (PlayerPassMove nowPlaying) = 
+        toJSON (PlayerPassMove nowPlaying) =
             object ["nowPlaying" .= nowPlaying]
+        toJSON (PlayerChat player message) =
+            object ["player" .= player, "message" .= message]
 
     instance FromJSON ClientMessage where
         parseJSON (Object request) =
@@ -60,6 +64,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
         toJSON (BoardMoveSuccess tiles) = object ["rack" .= toJSON tiles]
         toJSON PassMoveSuccess = object []
         toJSON (ExchangeMoveSuccess tiles) = object ["rack" .= toJSON tiles]
+        toJSON (ChatSuccess) = object []
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where
@@ -67,6 +72,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
         commandName (ExchangeMoveSuccess _) = "exchangeMoveSuccess"
         commandName PassMoveSuccess = "passMoveSuccess"
+        commandName ChatSuccess = "chatSuccess"
         commandName (InvalidCommand _) = "error"
 
     writePosAndTile :: (Pos, Tile) -> Value
@@ -88,7 +94,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
     parseBoardMove _ = fail "A board move should have an array as its payload"
 
     parseExchangeMove :: Value -> Parser ClientMessage
-    parseExchangeMove (Array a) = ExchangeMove <$> (sequence . V.toList $ fmap (parseJSON) a)
+    parseExchangeMove (Array a) = ExchangeMove <$> (sequence . V.toList $ fmap parseJSON a)
     parseExchangeMove _ = fail "An exchange move should have an array of tiles as its payload"
 
     getPosAndTile :: Value -> Parser (Pos, Tile)

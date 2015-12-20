@@ -72,7 +72,7 @@ module.exports = function(opts) {
         if (exports.data.exchangeMode)
         {
             // The player has finished selecting the tiles she wants to exchange
-            
+
             var slotIsSelected = function(slot) {
                 return slot.selectedForExchange;
             };
@@ -92,14 +92,14 @@ module.exports = function(opts) {
                 socketOpts.send(payload);
             }
         }
-      
+
         data.exchangeMode = !data.exchangeMode;
     };
 
     var setPlayerToMove = function(playerToMove) {
         m.startComputation();
         data.playerToMove = playerToMove;
-        
+
         if (data.playerToMove == data.playerNumber)
         {
             scrabbleGroundCtrl.setBoardViewOnly(false);
@@ -139,6 +139,10 @@ module.exports = function(opts) {
         m.endComputation();
     };
 
+    var setChatMessages = function(messages) {
+        data.chatMessages = messages;
+    };
+
     /**
      * Given a full new rack, update the old rack without moving
      * any non-played tiles to new locations so as not to confuse
@@ -161,7 +165,7 @@ module.exports = function(opts) {
 
             slot.selectedForExchange = false;
         });
-        
+
         m.endComputation();
     };
 
@@ -213,6 +217,7 @@ module.exports = function(opts) {
         setPlayerToMove : setPlayerToMove,
         setPlayerNumber: setPlayerNumber,
         setRackTiles : setRackTiles,
+        setChatMessages : setChatMessages,
         updateRack : updateRack,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket

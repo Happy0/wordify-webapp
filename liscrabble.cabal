@@ -97,6 +97,7 @@ library
                  , wai-logger                    >= 2.2        && < 2.3
                  , file-embed
                  , safe
+                 , listsafe
                  , unordered-containers
                  , containers
                  , vector

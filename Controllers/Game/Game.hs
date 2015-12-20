@@ -5,6 +5,7 @@ module Controllers.Game.Game(
     import Prelude
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
+    import qualified Controllers.Game.Model.ServerPlayer as SP
     import Control.Monad
     import Control.Monad.STM
     import Control.Concurrent.STM.TVar
@@ -36,7 +37,7 @@ module Controllers.Game.Game(
                     let moveOutcome = makeMove gameState (PlaceTiles (M.fromList placed))
 
                     case moveOutcome of
-                        Right (GameFinished game maybeWords players ) -> 
+                        Right (GameFinished game maybeWords players ) ->
                             return $ InvalidCommand "game finish not handled yet."
 
                         Right (MoveTransition newPlayerState newGame wordsFormed) ->
@@ -54,7 +55,7 @@ module Controllers.Game.Game(
 
     handleExchangeMove :: TVar ServerGame -> Maybe Int -> [Tile] -> IO ServerResponse
     handleExchangeMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
-    handleExchangeMove sharedServerGame (Just playerNo) exchanged = 
+    handleExchangeMove sharedServerGame (Just playerNo) exchanged =
         do
             serverGame <- readTVarIO sharedServerGame
             let gameState = game serverGame
@@ -76,7 +77,7 @@ module Controllers.Game.Game(
 
                         Left err -> return $ InvalidCommand $ (pack . show) err
 
-    
+
     handlePassMove :: TVar ServerGame ->  Maybe Int -> IO ServerResponse
     handlePassMove _ Nothing = return $ InvalidCommand "Observers cannot move"
     handlePassMove sharedServerGame (Just playerNo) =
@@ -97,7 +98,29 @@ module Controllers.Game.Game(
                                     writeTVar sharedServerGame (serverGame {game = newGame})
                                     writeTChan channel $ PlayerPassMove (playerNumber newGame)
                                 return PassMoveSuccess
-                        Right (GameFinished game maybeWords players ) -> 
+                        Right (GameFinished game maybeWords players ) ->
                             return $ InvalidCommand "game finish not handled yet."
+
+    handleChatMessage :: TVar ServerGame -> Maybe Int -> Text -> IO ServerResponse
+    handleChatMessage _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
+    handleChatMessage sharedServerGame (Just playerNumber) message =
+        do
+            serverGame <- readTVarIO sharedServerGame
+            let playerName = SP.name <$> (getServerPlayer serverGame playerNumber)
+
+            case playerName of
+                Nothing -> return $ InvalidCommand "Internal server error"
+                Just name -> do
+                    let channel = broadcastChannel serverGame
+                    atomically $ writeTChan channel $ (PlayerChat name message)
+                    return ChatSuccess
+
+
+
+
+
+
+
+
 
 
