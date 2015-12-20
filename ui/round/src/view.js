@@ -133,8 +133,8 @@ module.exports = function(ctrl) {
     };
 
     return m('div', {}, 
-             [m('div', {}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
-                 m('div', {}, renderTileRack()),
-                 m('div', {}, renderActionButtons())
+             [
+                m('div', {}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
+                m('div', {class: "below-board"}, [renderTileRack(), renderActionButtons()])
              ]);
 }
