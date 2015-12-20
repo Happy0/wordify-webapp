@@ -124,17 +124,16 @@ module.exports = function(ctrl) {
         var players = ctrl.data.players;
 
         var renderPlayerRow = function(player) {
-            return m('tr', {class: "score-table-border"},
+            return m('tr', {},
                      [m('td', {class : "score-table-border"}, player.name),
                          m('td', {class: "score-table-border"}, player.score)]);
         }
 
-        return m('table', {class: "score-table-border" }, players.map(renderPlayerRow));
+        return m('table', {class: "score-table" }, players.map(renderPlayerRow));
     };
 
     return m('div', {}, 
-             [renderScoreBoard(),
-                 m('div', {}, [renderBoard(), renderChatBox()]),
+             [m('div', {}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
                  m('div', {}, renderTileRack()),
                  m('div', {}, renderActionButtons())
              ]);
