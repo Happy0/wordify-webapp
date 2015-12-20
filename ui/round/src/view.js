@@ -86,7 +86,7 @@ module.exports = function(ctrl) {
         var renderedSlots = rack.map(putTileOnRack);
 
         return  m('div', {},
-              m("div", {class : "rack", id : "rack" }, renderedSlots));
+              m("div", {class : "rack"}, renderedSlots));
     };
 
     var renderChatBox = function() {
@@ -96,6 +96,10 @@ module.exports = function(ctrl) {
             return m('li', {}, [m('span', {}, user), message]);
         }
 
+        var renderInputBox = function() {
+            return m('div', {}, m('input', {class: 'chat-input'}, "test"));
+        }
+
         var testMessages = [];
         var i = 0;
         for (i = 0; i < 50; i++)
@@ -103,10 +107,13 @@ module.exports = function(ctrl) {
             testMessages.push("message " + i);
         }
 
-        return m('span', {class: 'chat-box'}, 
-            m('ul', {}, testMessages.map(function(message) {
-                return renderMessage('testUser', message);
-            }))
+        return m('span', {class: 'chat-box'},
+                 [
+                 m('ul', {class: 'chat-messages'}, testMessages.map(function(message) {
+                    return renderMessage('testUser', message)
+            })),
+             renderInputBox()
+            ]
         )
     }
 
@@ -134,7 +141,7 @@ module.exports = function(ctrl) {
 
     return m('div', {class: 'round'}, 
              [
-                m('div', {}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
+                 m('div', {class: "round-main"}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
                 m('div', {class: "below-board"}, [renderTileRack(), renderActionButtons()])
              ]);
 }
