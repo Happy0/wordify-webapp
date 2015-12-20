@@ -132,7 +132,7 @@ module.exports = function(ctrl) {
         return m('table', {class: "score-table" }, players.map(renderPlayerRow));
     };
 
-    return m('div', {}, 
+    return m('div', {class: 'round'}, 
              [
                 m('div', {}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
                 m('div', {class: "below-board"}, [renderTileRack(), renderActionButtons()])
