@@ -104,6 +104,7 @@ module.exports = function(ctrl) {
                     if (e.which == 13 && $(element).val())
                     {
                         ctrl.sendChatMessage($(element).val())
+                        $(element).val("");
                     }
                 })
 

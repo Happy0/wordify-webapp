@@ -71,6 +71,9 @@ body {
     width: 300px;
     list-style-type: none;
     padding: 0px;
+    padding-left: 10px;
+    padding-top: 10px;
+    border: 1px solid;
 }
 
 .chat-messages {
