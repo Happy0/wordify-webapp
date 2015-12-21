@@ -76,7 +76,8 @@ body {
     border: 1px solid;
 }
 
-.chat-messages {
+.chat-message {
+    margin-bottom: 5px;
 }
 
 .chat-input {

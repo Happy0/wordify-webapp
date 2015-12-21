@@ -93,14 +93,14 @@ module.exports = function(ctrl) {
 
         var renderMessage = function(sender, message)
         {
-            return m('li', {}, [m('span', {class: 'chat-user'}, m('b',"<" + sender  + ">")), message]);
+            return m('li', {class: 'chat-message'}, [m('span', {class: 'chat-user'}, m('b',"<" + sender  + ">")), message]);
         }
 
         var renderInputBox = function() {
             var listenForEnter = function(element, initialised, context) {
                 if (initialised) return;
 
-                $(element).keyup(function(e) {
+                $(element).keydown(function(e) {
                     if (e.which == 13 && $(element).val())
                     {
                         ctrl.sendChatMessage($(element).val())
