@@ -101,7 +101,7 @@ gameApp game channel maybePlayerId playerNumber =
             (forever $
                 do
                     msg <- receiveData
-                    case (eitherDecode msg :: Either String ClientMessage) of
+                    case eitherDecode msg of
                         Left err -> sendTextData $ toJSONResponse (InvalidCommand (pack err))
                         Right parsedCommand -> do
                             response <- liftIO $ performRequest game playerNumber parsedCommand
