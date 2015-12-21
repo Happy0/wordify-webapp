@@ -24,6 +24,12 @@ module.exports = function(opts) {
         "exchangeMoveSuccess" : function(data) {
             var rack = data.rack;
             controller.updateRack(rack);
+        },
+        "playerChat" : function(data) {
+            var playerName = data.player;
+            var message = data.message;
+
+            controller.addChatMessage(playerName, message);
         }
     };
 

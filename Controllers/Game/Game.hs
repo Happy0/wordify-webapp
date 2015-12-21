@@ -22,7 +22,7 @@ module Controllers.Game.Game(
     performRequest serverGame player (BoardMove placed) = handleBoardMove serverGame player placed
     performRequest serverGame player (ExchangeMove exchanged) = handleExchangeMove serverGame player exchanged
     performRequest serverGame player PassMove = handlePassMove serverGame player
-    performRequest serverGame player (ChatMessage msg) = error "Not implemented yet."
+    performRequest serverGame player (ChatMessage msg) = handleChatMessage serverGame player msg
 
     handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
     handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"

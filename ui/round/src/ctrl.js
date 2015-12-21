@@ -96,6 +96,18 @@ module.exports = function(opts) {
         data.exchangeMode = !data.exchangeMode;
     };
 
+    var sendChatMessage = function(message) {
+        var data = {
+            command: "say",
+            "payload" : {
+                "message" : message
+            }
+        }
+        
+        socketOpts.send(data);
+    }
+
+
     var setPlayerToMove = function(playerToMove) {
         m.startComputation();
         data.playerToMove = playerToMove;
@@ -142,6 +154,13 @@ module.exports = function(opts) {
     var setChatMessages = function(messages) {
         data.chatMessages = messages;
     };
+
+    var addChatMessage = function(sender, message) {
+        m.startComputation();
+        var messages = data.chatMessages;
+        messages.push({sender: sender, message: message});
+        m.endComputation();
+    }
 
     /**
      * Given a full new rack, update the old rack without moving
@@ -213,11 +232,13 @@ module.exports = function(opts) {
         makeBoardMove : makeBoardMove,
         makePassMove : makePassMove,
         toggleExchangeMode : toggleExchangeMode,
+        sendChatMessage : sendChatMessage,
         setPlayers : setPlayers,
         setPlayerToMove : setPlayerToMove,
         setPlayerNumber: setPlayerNumber,
         setRackTiles : setRackTiles,
         setChatMessages : setChatMessages,
+        addChatMessage : addChatMessage,
         updateRack : updateRack,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket

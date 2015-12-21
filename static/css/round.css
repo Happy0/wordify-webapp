@@ -1,11 +1,31 @@
+body {
+  font: 12px 'Noto Sans','Lucida Grande','Lucida Sans Unicode',Geneva,Verdana,Sans-Serif
+}
+
 .liscrabble-board-wrap {
     width: 600px;
     height: 600px;
+    float: left;
+    padding-right: 50px;
+    padding-bottom: 20px;
+}
+
+.round {
+    margin: auto;
+    width: 60%;
+    margin-top: 40px;
+}
+
+.below-board {
+    margin-left: 250px;
+    margin-top: 20px;
+}
+
+.round-main {
+    position: relative;
 }
 
 .rack {
-    margin-left: 150px;
-    margin-top: 20px;
     height: 40px;
     width: 310px;
 }
@@ -15,12 +35,12 @@
     float: left;
     margin-left: 2px;
     margin-right: 2px;
-    height: 40px;
+    height: 100%;
     width: 40px;
 }
 
 .action-buttons {
-    margin-left: 188px;
+    margin-left: 30px;
     margin-top: 10px;
 }
 
@@ -28,12 +48,39 @@
     margin-right: 10px;
 }
 
+.score-table {
+    float: left;
+    margin-right: 50px;
+}
+
 .score-table-border {
     border: 1px solid black;
-
 }
 
 .highlighted-slot {
     border: 2px solid red;
 }
 
+.chat-box {
+    position: relative;
+}
+
+.chat-messages {
+    overflow: auto;
+    height: 550px;
+    width: 300px;
+    list-style-type: none;
+    padding: 0px;
+}
+
+.chat-messages {
+}
+
+.chat-input {
+    width: 300px;
+}
+
+.chat-user {
+    padding-right: 10px;
+
+}

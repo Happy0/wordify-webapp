@@ -91,26 +91,35 @@ module.exports = function(ctrl) {
 
     var renderChatBox = function() {
 
-        var renderMessage = function(user, message)
+        var renderMessage = function(sender, message)
         {
-            return m('li', {}, [m('span', {}, user), message]);
+            return m('li', {}, [m('span', {class: 'chat-user'}, m('b',"<" + sender  + ">")), message]);
         }
 
         var renderInputBox = function() {
-            return m('div', {}, m('input', {class: 'chat-input'}, "test"));
-        }
+            var listenForEnter = function(element, initialised, context) {
+                if (initialised) return;
 
-        var testMessages = [];
-        var i = 0;
-        for (i = 0; i < 50; i++)
-        {
-            testMessages.push("message " + i);
+                $(element).keyup(function(e) {
+                    if (e.which == 13 && $(element).val())
+                    {
+                        ctrl.sendChatMessage($(element).val())
+                    }
+                })
+
+            }
+
+            return m('div', {}, m('input', {config: listenForEnter, class: 'chat-input'}, "test"));
+        };
+
+        var messagesConfig = function(element, initialised, context) {
+            $(element).scrollTop($(element).height());
         }
 
         return m('span', {class: 'chat-box'},
                  [
-                 m('ul', {class: 'chat-messages'}, testMessages.map(function(message) {
-                    return renderMessage('testUser', message)
+                     m('ul', {class: 'chat-messages', config: messagesConfig}, ctrl.data.chatMessages.map(function(message) {
+                    return renderMessage(message.sender, message.message)
             })),
              renderInputBox()
             ]
