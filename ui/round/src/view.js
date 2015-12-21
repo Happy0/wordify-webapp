@@ -146,7 +146,8 @@ module.exports = function(ctrl) {
                          m('td', {class: "score-table-border"}, player.score)]);
         }
 
-        return m('table', {class: "score-table" }, players.map(renderPlayerRow));
+        return m('table', {class: "score-table" }, [players.map(renderPlayerRow),
+                 m('tr', m('td', {class: "score-table-border"}, 'tiles remaining: ' + ctrl.data.tilesRemaining)) ]);
     };
 
     return m('div', {class: 'round'}, 

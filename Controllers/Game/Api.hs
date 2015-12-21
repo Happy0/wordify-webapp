@@ -30,7 +30,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int | PlayerPassMove Int | PlayerExchangeMove Int | PlayerChat Text Text
+    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int Int | PlayerPassMove Int | PlayerExchangeMove Int | PlayerChat Text Text
 
     instance ServerMessage GameMessage where
         commandName PlayerBoardMove{}  = "playerBoardMove"
@@ -39,10 +39,11 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
         commandName (PlayerChat _ _) = "playerChat"
 
     instance ToJSON GameMessage where
-        toJSON (PlayerBoardMove placed players nowPlaying) =
+        toJSON (PlayerBoardMove placed players nowPlaying tilesRemaining) =
             object ["placed" .= fmap writePosAndTile placed,
                     "players" .= toJSON players,
-                    "nowPlaying" .= nowPlaying]
+                    "nowPlaying" .= nowPlaying,
+                    "tilesRemaining" .= tilesRemaining]
         toJSON (PlayerExchangeMove nowPlaying) =
             object ["nowPlaying" .= nowPlaying]
         toJSON (PlayerPassMove nowPlaying) =

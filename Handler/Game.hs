@@ -17,6 +17,7 @@ import Control.Concurrent
 import qualified Data.List.NonEmpty as NE
 import Widgets.Game.TestGame
 import Wordify.Rules.Game
+import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
 import Data.Aeson
 import Wordify.Rules.Player
@@ -72,7 +73,8 @@ getGameR gameId = do
                             round.controller.setPlayers( #{toJSON (players currentGame)});
                             round.controller.setRackTiles(#{toJSON (maybePlayerRack)});
                             round.controller.setPlayerNumber(#{toJSON maybePlayerNumber});
-                            round.controller.setPlayerToMove(#{toJSON (playerNumber currentGame)})
+                            round.controller.setPlayerToMove(#{toJSON (playerNumber currentGame)});
+                            round.controller.setTilesRemaining(#{toJSON (bagSize (bag currentGame))})
 
                             conn.onmessage = function (e) {
                                 var data = JSON.parse(e.data);

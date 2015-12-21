@@ -13,6 +13,7 @@ module Controllers.Game.Game(
     import qualified Data.Map as M
     import Data.Text
     import Wordify.Rules.Game
+    import Wordify.Rules.LetterBag
     import Wordify.Rules.Pos
     import Wordify.Rules.Player
     import Wordify.Rules.Move
@@ -45,7 +46,7 @@ module Controllers.Game.Game(
                                 let updatedServerGame = serverGame {game = newGame}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
-                                     writeTChan channel (PlayerBoardMove placed (players newGame) (playerNumber newGame))
+                                     writeTChan channel (PlayerBoardMove placed (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
                                      writeTVar sharedServerGame updatedServerGame
 
                                 return $ BoardMoveSuccess (tilesOnRack newPlayerState)

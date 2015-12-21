@@ -151,6 +151,10 @@ module.exports = function(opts) {
         m.endComputation();
     };
 
+    var setTilesRemaining = function(tilesRemaining) {
+        data.tilesRemaining = tilesRemaining;
+    };
+
     var setChatMessages = function(messages) {
         data.chatMessages = messages;
     };
@@ -237,6 +241,7 @@ module.exports = function(opts) {
         setPlayerToMove : setPlayerToMove,
         setPlayerNumber: setPlayerNumber,
         setRackTiles : setRackTiles,
+        setTilesRemaining : setTilesRemaining,
         setChatMessages : setChatMessages,
         addChatMessage : addChatMessage,
         updateRack : updateRack,

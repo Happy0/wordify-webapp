@@ -7,9 +7,11 @@ module.exports = function(opts) {
         "playerBoardMove" : function(data) {
             var placed = data.placed;
             var players = data.players;
+            var tilesRemaining = data.tilesRemaining;
             controller.setPlayerToMove(data.nowPlaying);
             controller.boardMoveMade(placed);
             controller.setPlayers(players);
+            controller.setTilesRemaining(tilesRemaining);
         },
         "playerExchangeMove" : function(data) {
             controller.setPlayerToMove(data.nowPlaying)
