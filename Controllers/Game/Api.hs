@@ -1,7 +1,7 @@
 module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove, PassMove),
                              GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove, PlayerChat),
                              ServerResponse(PlayerSaid, BoardMoveSuccess, ExchangeMoveSuccess,
-                                PassMoveSuccess, ChatSuccess, InvalidCommand), BoardMoveSummary(BoardMoveSummary)) where
+                                PassMoveSuccess, ChatSuccess, InvalidCommand), BoardMoveSummary(BoardMoveSummary), toMoveSummary) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -12,6 +12,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
     import qualified Data.HashMap.Strict as HM
     import Model.Api
     import Wordify.Rules.Board
+    import Wordify.Rules.FormedWord
     import Wordify.Rules.Player
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
@@ -116,6 +117,14 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
             tile <-  val .: "tile" >>= parseJSON
             return (pos, tile)
     getPosAndTile _ = fail "expected object payload with pos and tile"
+
+    toMoveSummary :: FormedWords -> BoardMoveSummary
+    toMoveSummary formedWords =
+        let (overall, wordsAndScores) = wordsWithScores formedWords
+        in BoardMoveSummary overall (toTextScores wordsAndScores)
+        where
+            toTextScores = fmap (\(word, score) -> (pack word, score))
+
 
     instance ToJSON Board where
         toJSON = toJSON . groupSquaresByColumn . allSquares
