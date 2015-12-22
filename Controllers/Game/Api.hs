@@ -1,7 +1,7 @@
 module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove, PassMove),
                              GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove, PlayerChat),
                              ServerResponse(PlayerSaid, BoardMoveSuccess, ExchangeMoveSuccess,
-                                PassMoveSuccess, ChatSuccess, InvalidCommand)) where
+                                PassMoveSuccess, ChatSuccess, InvalidCommand), BoardMoveSummary(BoardMoveSummary)) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -18,6 +18,8 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
     import Wordify.Rules.Square
     import qualified Data.List as L
 
+    data BoardMoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]}
+
     data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)] | ExchangeMove [Tile] | PassMove
 
     -- Response messages to a client request over the websocket
@@ -30,7 +32,15 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove [(Pos, Tile)] [Player] Int Int | PlayerPassMove Int | PlayerExchangeMove Int | PlayerChat Text Text
+    data GameMessage = PlayerBoardMove {placed :: [(Pos, Tile)], summary :: BoardMoveSummary, players :: [Player], nowPlaying :: Int, tilesRemaining :: Int} |
+                                     PlayerPassMove Int |
+                                     PlayerExchangeMove Int |
+                                     PlayerChat Text Text
+
+    instance ToJSON BoardMoveSummary where
+        toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores]
+            where
+                wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
 
     instance ServerMessage GameMessage where
         commandName PlayerBoardMove{}  = "playerBoardMove"
@@ -39,8 +49,9 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
         commandName (PlayerChat _ _) = "playerChat"
 
     instance ToJSON GameMessage where
-        toJSON (PlayerBoardMove placed players nowPlaying tilesRemaining) =
+        toJSON (PlayerBoardMove placed summary players nowPlaying tilesRemaining) =
             object ["placed" .= fmap writePosAndTile placed,
+                    "summary" .= toJSON summary,
                     "players" .= toJSON players,
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]

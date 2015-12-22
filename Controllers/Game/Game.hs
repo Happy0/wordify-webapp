@@ -18,6 +18,7 @@ module Controllers.Game.Game(
     import Wordify.Rules.Player
     import Wordify.Rules.Move
     import Wordify.Rules.Tile
+    import Wordify.Rules.FormedWord
 
     performRequest :: TVar ServerGame -> Maybe Int -> ClientMessage -> IO ServerResponse
     performRequest serverGame player (BoardMove placed) = handleBoardMove serverGame player placed
@@ -43,16 +44,23 @@ module Controllers.Game.Game(
 
                         Right (MoveTransition newPlayerState newGame wordsFormed) ->
                             do
+                                let moveSummary = toMoveSummary wordsFormed
                                 let updatedServerGame = serverGame {game = newGame}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
-                                     writeTChan channel (PlayerBoardMove placed (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
+                                     writeTChan channel (PlayerBoardMove placed moveSummary (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
                                      writeTVar sharedServerGame updatedServerGame
 
                                 return $ BoardMoveSuccess (tilesOnRack newPlayerState)
 
                         Left err -> return $ InvalidCommand $ (pack . show) err
                         _ -> return $ InvalidCommand "Internal server error. Expected board move"
+    toMoveSummary :: FormedWords -> BoardMoveSummary
+    toMoveSummary formedWords = BoardMoveSummary overall (toTextScores wordsAndScores)
+        where
+            (overall, wordsAndScores) = wordsWithScores formedWords
+
+            toTextScores = fmap (\(word, score) -> (pack word, score))
 
     handleExchangeMove :: TVar ServerGame -> Maybe Int -> [Tile] -> IO ServerResponse
     handleExchangeMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
@@ -115,13 +123,3 @@ module Controllers.Game.Game(
                     let channel = broadcastChannel serverGame
                     atomically $ writeTChan channel $ (PlayerChat name message)
                     return ChatSuccess
-
-
-
-
-
-
-
-
-
-
