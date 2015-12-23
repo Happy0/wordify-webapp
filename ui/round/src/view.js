@@ -134,7 +134,7 @@ module.exports = function(ctrl) {
 
         var scrabblegroundView = scrabbleground.view(ctrl.scrabbleGroundCtrl);
 
-        return m('span', attrs, scrabblegroundView);
+        return m('div', attrs, scrabblegroundView);
     }
 
     var renderScoreBoard = function() {
@@ -150,9 +150,16 @@ module.exports = function(ctrl) {
                  m('tr', m('td', {class: "score-table-border"}, 'tiles remaining: ' + ctrl.data.tilesRemaining)) ]);
     };
 
+    return m('div', {class: 'round'}, [
+        m('span', {class: 'left'}, [renderScoreBoard()]),
+        m('span', {class: 'mid'}, [renderBoard(), renderTileRack(), renderActionButtons()]),
+        m('span', {class: 'right'}, [renderChatBox()])
+    
+    ])
+};
+
+    /*
     return m('div', {class: 'round'}, 
              [
                  m('div', {class: "round-main"}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
-                m('div', {class: "below-board"}, [renderTileRack(), renderActionButtons()])
-             ]);
-}
+                m('div', {class: "below-board"}, [renderTileRack(), renderActionButtons()]) */

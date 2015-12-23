@@ -2,32 +2,41 @@ body {
   font: 12px 'Noto Sans','Lucida Grande','Lucida Sans Unicode',Geneva,Verdana,Sans-Serif
 }
 
+.left {
+    width: 25%;
+    position: absolute;
+}
+
+.mid {
+    width: 50%;
+    left: 25%;
+    position: absolute;
+}
+
+.right {
+    left: 75%;
+    width: 25%;
+    position: absolute;
+}
+
 .liscrabble-board-wrap {
     width: 600px;
     height: 600px;
-    float: left;
     padding-right: 50px;
     padding-bottom: 20px;
+    margin: auto;
 }
 
 .round {
-    margin: auto;
-    width: 60%;
     margin-top: 40px;
 }
 
-.below-board {
-    margin-left: 340px;
-    margin-top: 20px;
-}
-
-.round-main {
-    position: relative;
-}
-
 .rack {
+    position: relative;
+    margin: auto;
     height: 40px;
     width: 310px;
+    margin-bottom: 10px;
 }
 
 .rack-slot {
@@ -40,8 +49,10 @@ body {
 }
 
 .action-buttons {
-    margin-left: 30px;
-    margin-top: 10px;
+    position: relative;
+    width: 300px;
+    margin: auto;
+    padding-left: 25px;
 }
 
 .submit-move-button {
@@ -49,8 +60,7 @@ body {
 }
 
 .score-table {
-    float: left;
-    margin-right: 50px;
+    margin: auto;
 }
 
 .score-table-border {
