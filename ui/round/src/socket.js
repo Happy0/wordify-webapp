@@ -12,12 +12,15 @@ module.exports = function(opts) {
             controller.boardMoveMade(placed);
             controller.setPlayers(players);
             controller.setTilesRemaining(tilesRemaining);
+            controller.addBoardMoveToHistory(data.summary);
         },
         "playerExchangeMove" : function(data) {
-            controller.setPlayerToMove(data.nowPlaying)
+            controller.setPlayerToMove(data.nowPlaying);
+            controller.addExchangeMoveToHistory();
         },
         "playerPassMove" : function(data) {
             controller.setPlayerToMove(data.nowPlaying);
+            controller.addPassMoveToHistory();
         },
         "boardMoveSuccess" : function(data) {
             var rack = data.rack;
@@ -51,6 +54,8 @@ module.exports = function(opts) {
             console.info("Unrecognised command: ");
             console.dir(command);
         }
+
+        console.dir(command);
     }
 
     return {

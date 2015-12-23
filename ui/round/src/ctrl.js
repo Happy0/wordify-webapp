@@ -167,6 +167,36 @@ module.exports = function(opts) {
         data.chatMessages = messages;
     };
 
+    var addBoardMoveToHistory = function(summary) {
+        m.startComputation();
+        
+        data.moveHistory.push({ 
+            "type" : "board",
+            wordsMade: summary.wordsMade,
+            overallScore : summary.overallScore
+        });
+
+        m.endComputation();
+    };
+
+    var addPassMoveToHistory = function(pass) {
+        m.startComputation();
+        data.moveHistory.push({
+            "type" : "pass"
+        });
+
+        m.endComputation();
+    };
+
+    var addExchangeMoveToHistory = function(exchange) {
+        m.startComputation();
+        data.moveHistory.push({
+            "type" : "exchange"
+        });
+
+        m.endComputation();
+    }
+
     var addChatMessage = function(sender, message) {
         m.startComputation();
         var messages = data.chatMessages;
@@ -251,6 +281,9 @@ module.exports = function(opts) {
         setRackTiles : setRackTiles,
         setTilesRemaining : setTilesRemaining,
         setChatMessages : setChatMessages,
+        addBoardMoveToHistory : addBoardMoveToHistory,
+        addPassMoveToHistory: addPassMoveToHistory,
+        addExchangeMoveToHistory : addExchangeMoveToHistory,
         addChatMessage : addChatMessage,
         updateRack : updateRack,
         scrabbleGroundCtrl: scrabbleGroundCtrl,

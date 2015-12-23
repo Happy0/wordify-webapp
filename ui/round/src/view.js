@@ -135,7 +135,37 @@ module.exports = function(ctrl) {
         var scrabblegroundView = scrabbleground.view(ctrl.scrabbleGroundCtrl);
 
         return m('div', attrs, scrabblegroundView);
-    }
+    };
+
+    var renderMoveHistory = function() {
+        var history = ctrl.data.moveHistory;
+
+        var renderBoardMoveRow = function(boardMove) {
+            var wordsAndScore = boardMove.wordsMade.map(function(word) {
+                return m('p', {}, word.word + " (" + word.score + ")");
+            });
+
+            return m('tr', {class: 'score-table-border'}, [
+                m('td', {class: 'score-table-border'}, wordsAndScore),
+                m('td', {class: 'score-table-border'}, boardMove.overallScore)
+                ]);
+        }
+
+        var historyTable = m('table', {class: 'history score-table-border'}, 
+
+            history.map(function(move) {
+                if (move.type == "board") {
+                    return renderBoardMoveRow(move);
+                } else if (move.type == "exchange") {
+                    return m('tr', {}, "exchange");   
+                }
+                else if (move.type == "pass") {
+                    return m('tr', {}, "pass");
+                }
+        }));
+
+        return m('div', {class : "history"}, historyTable);
+    };
 
     var renderScoreBoard = function() {
         var players = ctrl.data.players;
@@ -151,15 +181,9 @@ module.exports = function(ctrl) {
     };
 
     return m('div', {class: 'round'}, [
-        m('span', {class: 'left'}, [renderScoreBoard()]),
+        m('span', {class: 'left'}, [renderScoreBoard(), renderMoveHistory()]),
         m('span', {class: 'mid'}, [renderBoard(), renderTileRack(), renderActionButtons()]),
         m('span', {class: 'right'}, [renderChatBox()])
     
     ])
-};
-
-    /*
-    return m('div', {class: 'round'}, 
-             [
-                 m('div', {class: "round-main"}, [renderScoreBoard(), renderBoard(), renderChatBox()]),
-                m('div', {class: "below-board"}, [renderTileRack(), renderActionButtons()]) */
+}
