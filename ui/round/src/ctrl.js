@@ -28,7 +28,11 @@ module.exports = function(opts) {
      */
     var boardMoveMade = function(placed) {
         scrabbleGroundCtrl.move(placed);
-    }
+    };
+
+    var showErrorMessage = function(errorMessage) {
+        alert(errorMessage.error);
+    };
 
     /**
      * The user has made a move
@@ -225,7 +229,6 @@ module.exports = function(opts) {
         {
             putTileOnFirstEmptySlot(tile);
         }
-
     };
 
     scrabbleGroundCtrl.setCustomRevertFunction(tileDroppedOffBoardFunction);
@@ -237,6 +240,7 @@ module.exports = function(opts) {
         makePassMove : makePassMove,
         toggleExchangeMode : toggleExchangeMode,
         sendChatMessage : sendChatMessage,
+        showErrorMessage : showErrorMessage,
         setPlayers : setPlayers,
         setPlayerToMove : setPlayerToMove,
         setPlayerNumber: setPlayerNumber,

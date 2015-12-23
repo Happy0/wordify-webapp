@@ -32,6 +32,9 @@ module.exports = function(opts) {
             var message = data.message;
 
             controller.addChatMessage(playerName, message);
+        },
+        "error" : function(data) {
+            controller.showErrorMessage(data);
         }
     };
 
