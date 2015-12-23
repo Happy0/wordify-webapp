@@ -5,7 +5,6 @@
     "main" : "src/main.js",
     "devDependencies": {
         "browserify": "~9.0.8",
-        "bootstrap" :"3.3.6",
         "watchify" : "3.1.1",
         "gulp": "~3.9.0",
         "gulp-util": "~3.0.4",
