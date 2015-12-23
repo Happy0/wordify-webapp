@@ -31,6 +31,7 @@ module.exports = function(opts) {
     };
 
     var showErrorMessage = function(errorMessage) {
+        // Improve on this later... Can gracefully handed some cases
         alert(errorMessage.error);
     };
 
@@ -136,6 +137,9 @@ module.exports = function(opts) {
     };
 
     var setRackTiles = function(rackTiles) {
+        if (!rackTiles || rackTiles.length == 0)
+            return;
+
         m.startComputation();
 
         var emptySlotArray = [{}, {}, {}, {}, {}, {}, {}];
