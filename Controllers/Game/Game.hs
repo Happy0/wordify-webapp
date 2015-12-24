@@ -72,7 +72,7 @@ module Controllers.Game.Game(
                                 let updatedServerGame = serverGame {game = newGameState}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
-                                    writeTChan channel (PlayerExchangeMove (playerNumber newGameState))
+                                    writeTChan channel (PlayerExchangeMove (playerNumber newGameState) ExchangeMoveSummary)
                                     writeTVar sharedServerGame updatedServerGame
 
                                 return $ ExchangeMoveSuccess (tilesOnRack afterExchangePlayer)
@@ -98,7 +98,7 @@ module Controllers.Game.Game(
                                 let channel = broadcastChannel serverGame
                                 atomically $ do
                                     writeTVar sharedServerGame (serverGame {game = newGame})
-                                    writeTChan channel $ PlayerPassMove (playerNumber newGame)
+                                    writeTChan channel $ PlayerPassMove (playerNumber newGame) PassMoveSummary
                                 return PassMoveSuccess
                         Right (GameFinished game maybeWords players ) ->
                             return $ InvalidCommand "game finish not handled yet."

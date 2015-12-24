@@ -3,17 +3,11 @@ module Handler.Home where
 import Import
 import Yesod.Form.Bootstrap3 (BootstrapFormLayout (..), renderBootstrap3,
                               withSmallInput)
-import Widgets.Game.Board
-import Widgets.Game.Rack
 import Wordify.Rules.Tile
-import Widgets.Game.TestGame
 import qualified Data.List.NonEmpty as NE
 import Wordify.Rules.Board
 import Wordify.Rules.Move
 import Wordify.Rules.Game
-import Widgets.Game.ChatBox
-import Widgets.Game.Game
-import Widgets.Game.ScoreBoard
 import Yesod.Core
 import Yesod.WebSockets
 import qualified Data.Text as T
@@ -24,7 +18,6 @@ import Controllers.Home.Api
 import Model.Api
 import Data.Aeson
 import Web.Cookie
-import Controllers.Game.Model.MoveSummary
 
 getHomeR :: Handler Html
 getHomeR = do
@@ -35,7 +28,6 @@ getHomeR = do
         [whamlet|
             <div>
                 <button .btn .btn-info .btn-lg data-toggle="modal" data-target="#create-game-lobby">Create Game
-                ^{emptyGame}
 
                 <div .modal .fade #create-game-lobby role="dialog">
                     <div .modal-dialog>
@@ -137,22 +129,4 @@ homeWebSocketHandler = do
                                 sendTextData $ toJSONResponse requestResponse
             Left reason -> 
                 sendTextData $ toJSONResponse (ClientError $ T.pack reason)
-
-blah :: Handler Html
-blah = do
-    defaultLayout $ do
-        setTitle "Wordify"
-        game <- lift $ testGame
-        let neMoves = NE.fromList moves
-        let fullGame = join $ fmap (flip (restoreGame) neMoves) $ game
-
-        case fullGame of
-            Left  err -> [whamlet|Hello World! #{(show err)}|]
-            Right gameTransitions ->
-                let currentGame = newGame $ NE.last gameTransitions
-                in let currentPlayers = players currentGame
-                in let movesPlayed = map toSummary $ NE.toList gameTransitions
-                in let currentBoard = (board currentGame)
-                in let tiles = []
-                in $(widgetFile "game")
 

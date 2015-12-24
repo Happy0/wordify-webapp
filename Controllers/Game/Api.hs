@@ -1,7 +1,7 @@
 module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove, PassMove),
                              GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove, PlayerChat),
                              ServerResponse(PlayerSaid, BoardMoveSuccess, ExchangeMoveSuccess,
-                                PassMoveSuccess, ChatSuccess, InvalidCommand), BoardMoveSummary(BoardMoveSummary), toMoveSummary) where
+                                PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -19,7 +19,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
     import Wordify.Rules.Square
     import qualified Data.List as L
 
-    data BoardMoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]}
+    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary
 
     data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)] | ExchangeMove [Tile] | PassMove
 
@@ -33,21 +33,26 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove {placed :: [(Pos, Tile)], summary :: BoardMoveSummary, players :: [Player], nowPlaying :: Int, tilesRemaining :: Int} |
-                                     PlayerPassMove Int |
-                                     PlayerExchangeMove Int |
+    data GameMessage = PlayerBoardMove {placed :: [(Pos, Tile)], summary :: MoveSummary, players :: [Player], nowPlaying :: Int, tilesRemaining :: Int} |
+                                     PlayerPassMove Int MoveSummary |
+                                     PlayerExchangeMove Int MoveSummary |
                                      PlayerChat Text Text
 
-    instance ToJSON BoardMoveSummary where
-        toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores]
-            where
-                wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
+    instance ToJSON MoveSummary where
+        toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
+        toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
+        toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
+
+    wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
+    boardSummaryType = ("board" :: Text)
+    passSummaryType = ("pass" :: Text)
+    exchangeSummaryType = ("exchange" :: Text)
 
     instance ServerMessage GameMessage where
         commandName PlayerBoardMove{}  = "playerBoardMove"
-        commandName (PlayerPassMove _) = "playerPassMove"
-        commandName (PlayerExchangeMove _) = "playerExchangeMove"
-        commandName (PlayerChat _ _) = "playerChat"
+        commandName (PlayerPassMove {}) = "playerPassMove"
+        commandName (PlayerExchangeMove {}) = "playerExchangeMove"
+        commandName (PlayerChat {}) = "playerChat"
 
     instance ToJSON GameMessage where
         toJSON (PlayerBoardMove placed summary players nowPlaying tilesRemaining) =
@@ -56,10 +61,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
                     "players" .= toJSON players,
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]
-        toJSON (PlayerExchangeMove nowPlaying) =
-            object ["nowPlaying" .= nowPlaying]
-        toJSON (PlayerPassMove nowPlaying) =
-            object ["nowPlaying" .= nowPlaying]
+        toJSON (PlayerExchangeMove nowPlaying summary) =
+            object ["nowPlaying" .= nowPlaying, "summary" .= summary]
+        toJSON (PlayerPassMove nowPlaying summary) =
+            object ["nowPlaying" .= nowPlaying, "summary" .= summary]
         toJSON (PlayerChat player message) =
             object ["player" .= player, "message" .= message]
 
@@ -118,7 +123,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
             return (pos, tile)
     getPosAndTile _ = fail "expected object payload with pos and tile"
 
-    toMoveSummary :: FormedWords -> BoardMoveSummary
+    toMoveSummary :: FormedWords -> MoveSummary
     toMoveSummary formedWords =
         let (overall, wordsAndScores) = wordsWithScores formedWords
         in BoardMoveSummary overall (toTextScores wordsAndScores)

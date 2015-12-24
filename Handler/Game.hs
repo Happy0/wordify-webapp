@@ -7,7 +7,6 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Monoid as M
 import Data.Text (Text)
 import Controllers.Game.Model.ServerGame
-import Widgets.Game.Game
 import Controllers.Game.Api
 import qualified Data.List as L
 import Controllers.Game.Model.ServerPlayer
@@ -15,7 +14,6 @@ import Controllers.Game.Api
 import Model.Api
 import Control.Concurrent
 import qualified Data.List.NonEmpty as NE
-import Widgets.Game.TestGame
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move

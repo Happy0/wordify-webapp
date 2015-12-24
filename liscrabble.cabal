@@ -21,7 +21,6 @@ library
                      Settings
                      Settings.StaticFiles
                      Controllers.Game.Model.GameLobby
-                     Controllers.Game.Model.MoveSummary
                      Controllers.Game.Model.ServerGame
                      Controllers.Game.Model.ServerPlayer
                      Controllers.Game.Game
@@ -35,12 +34,6 @@ library
                      Handler.Game
                      Handler.GameLobby
                      Model.Api
-                     Widgets.Game.Board
-                     Widgets.Game.ChatBox
-                     Widgets.Game.Game
-                     Widgets.Game.Rack
-                     Widgets.Game.ScoreBoard
-                     Widgets.Game.TestGame
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
