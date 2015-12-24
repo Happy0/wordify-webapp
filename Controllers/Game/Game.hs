@@ -44,7 +44,8 @@ module Controllers.Game.Game(
                         Right (MoveTransition newPlayerState newGame wordsFormed) ->
                             do
                                 let moveSummary = toMoveSummary wordsFormed
-                                let updatedServerGame = serverGame {game = newGame}
+                                let newSummaries = moveSummaries serverGame ++ [moveSummary]
+                                let updatedServerGame = serverGame {game = newGame, moveSummaries = newSummaries}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
                                      writeTChan channel (PlayerBoardMove placed moveSummary (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
@@ -69,10 +70,12 @@ module Controllers.Game.Game(
                     case moveOutcome of
                         Right (ExchangeTransition newGameState beforeExchangePlayer afterExchangePlayer) ->
                             do
-                                let updatedServerGame = serverGame {game = newGameState}
+                                let summary = ExchangeMoveSummary 
+                                let newSummaries = (moveSummaries serverGame ++ [summary])
+                                let updatedServerGame = serverGame {game = newGameState, moveSummaries = newSummaries}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
-                                    writeTChan channel (PlayerExchangeMove (playerNumber newGameState) ExchangeMoveSummary)
+                                    writeTChan channel (PlayerExchangeMove (playerNumber newGameState) summary)
                                     writeTVar sharedServerGame updatedServerGame
 
                                 return $ ExchangeMoveSuccess (tilesOnRack afterExchangePlayer)
@@ -96,9 +99,11 @@ module Controllers.Game.Game(
                         Right (PassTransition newGame) ->
                             do
                                 let channel = broadcastChannel serverGame
+                                let summary = PassMoveSummary
+                                let newSummaries = (moveSummaries serverGame ++ [summary])
                                 atomically $ do
-                                    writeTVar sharedServerGame (serverGame {game = newGame})
-                                    writeTChan channel $ PlayerPassMove (playerNumber newGame) PassMoveSummary
+                                    writeTVar sharedServerGame (serverGame {game = newGame, moveSummaries = newSummaries})
+                                    writeTChan channel $ PlayerPassMove (playerNumber newGame) summary
                                 return PassMoveSuccess
                         Right (GameFinished game maybeWords players ) ->
                             return $ InvalidCommand "game finish not handled yet."

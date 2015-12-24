@@ -159,6 +159,20 @@ module.exports = function(opts) {
         m.endComputation();
     };
 
+    var setMoveHistory = function(moveList) {
+        moveList.forEach(function(move) {
+            if (move.type == "pass") {
+                addPassMoveToHistory(move);
+            }
+            else if (move.type == "exchange") {
+                addExchangeMoveToHistory(move)
+            }
+            else {
+                addBoardMoveToHistory(move);            
+            }
+        });
+    };
+
     var setTilesRemaining = function(tilesRemaining) {
         data.tilesRemaining = tilesRemaining;
     };
@@ -279,6 +293,7 @@ module.exports = function(opts) {
         setPlayerToMove : setPlayerToMove,
         setPlayerNumber: setPlayerNumber,
         setRackTiles : setRackTiles,
+        setMoveHistory : setMoveHistory,
         setTilesRemaining : setTilesRemaining,
         setChatMessages : setChatMessages,
         addBoardMoveToHistory : addBoardMoveToHistory,

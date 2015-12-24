@@ -39,6 +39,7 @@ getGameR gameId = do
 
                 let maybePlayerNumber = (maybePlayerId >>= getPlayerNumber serverGame)
                 let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= getPlayer currentGame)
+                let moveHistory = moveSummaries serverGame
 
                 webSockets $ gameApp gameInProgress messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
@@ -72,7 +73,8 @@ getGameR gameId = do
                             round.controller.setRackTiles(#{toJSON (maybePlayerRack)});
                             round.controller.setPlayerNumber(#{toJSON maybePlayerNumber});
                             round.controller.setPlayerToMove(#{toJSON (playerNumber currentGame)});
-                            round.controller.setTilesRemaining(#{toJSON (bagSize (bag currentGame))})
+                            round.controller.setTilesRemaining(#{toJSON (bagSize (bag currentGame))});
+                            round.controller.setMoveHistory(#{toJSON moveHistory});
 
                             conn.onmessage = function (e) {
                                 var data = JSON.parse(e.data);
