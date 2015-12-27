@@ -127,6 +127,7 @@ module.exports = function(opts) {
         else
         {
             scrabbleGroundCtrl.setBoardViewOnly(true);
+            setPotentialScore(0);
         }
         m.endComputation();
     };
@@ -174,6 +175,12 @@ module.exports = function(opts) {
                 addBoardMoveToHistory(move);            
             }
         });
+    };
+
+    var setPotentialScore = function(potentialScore) {
+        m.startComputation();
+        data.potentialScore = potentialScore;
+        m.endComputation();
     };
 
     var setTilesRemaining = function(tilesRemaining) {
@@ -307,6 +314,7 @@ module.exports = function(opts) {
         setRackTiles : setRackTiles,
         setMoveHistory : setMoveHistory,
         setTilesRemaining : setTilesRemaining,
+        setPotentialScore : setPotentialScore,
         setChatMessages : setChatMessages,
         addBoardMoveToHistory : addBoardMoveToHistory,
         addPassMoveToHistory: addPassMoveToHistory,

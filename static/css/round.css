@@ -39,6 +39,13 @@ body {
     margin-bottom: 10px;
 }
 
+.potential-score {
+    position: relative;
+    width: 150px;
+    margin: auto;
+
+}
+
 .rack-slot {
     position: relative;
     float: left;

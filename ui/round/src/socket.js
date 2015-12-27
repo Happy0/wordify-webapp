@@ -36,6 +36,10 @@ module.exports = function(opts) {
 
             controller.addChatMessage(playerName, message);
         },
+        "potentialScore" : function(data) {
+            var potentialScore = data.potentialScore;
+            controller.setPotentialScore(potentialScore);
+        },
         "error" : function(data) {
             controller.showErrorMessage(data);
         }

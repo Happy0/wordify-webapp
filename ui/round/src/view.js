@@ -180,9 +180,14 @@ module.exports = function(ctrl) {
                  m('tr', m('td', {class: "score-table-border"}, 'tiles remaining: ' + ctrl.data.tilesRemaining)) ]);
     };
 
+    var renderPotentialScore = function()
+    {
+        return m('div', {class: 'potential-score'}, "potential score: " + ctrl.data.potentialScore) ;
+    }
+
     return m('div', {class: 'round'}, [
         m('span', {class: 'left'}, [renderScoreBoard(), renderMoveHistory()]),
-        m('span', {class: 'mid'}, [renderBoard(), renderTileRack(), renderActionButtons()]),
+        m('span', {class: 'mid'}, [renderPotentialScore(), renderBoard(), renderTileRack(), renderActionButtons()]),
         m('span', {class: 'right'}, [renderChatBox()])
     
     ])

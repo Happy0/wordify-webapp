@@ -33,11 +33,13 @@ module Controllers.Game.Game(
             serverGame <- readTVarIO sharedServerGame
             let gameState = game serverGame
             let gameBoard = board gameState
-            let formedWords = wordsFormedMidGame gameBoard (M.fromList placedTiles)
-            return $
-                case formedWords of
-                    Left _ -> PotentialScore 0
-                    Right formed -> PotentialScore (overallScore formed)
+            let formedWords = if (moveNumber gameState) > 1
+                    then wordsFormedMidGame gameBoard (M.fromList placedTiles)
+                        else wordFormedFirstMove gameBoard (M.fromList placedTiles)
+
+            return $ case formedWords of
+                Left _ -> PotentialScore 0
+                Right formed -> PotentialScore (overallScore formed)
 
     handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
     handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
