@@ -8,6 +8,7 @@ module Controllers.Game.Model.ServerGame (ServerGame(ServerGame), game, playing,
     import Controllers.Game.Api
     import Control.Concurrent.STM.TChan
     import qualified Data.List.Safe as SL
+    import Control.Concurrent.STM.TVar
 
     data ServerGame = ServerGame {game :: Game, playing :: [ServerPlayer], broadcastChannel :: (TChan GameMessage), moveSummaries :: [MoveSummary] }
 

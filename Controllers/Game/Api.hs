@@ -1,6 +1,8 @@
-module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove, PassMove),
+module Controllers.Game.Api (
+                             ChatMessage(ChatMessage),
+                             ClientMessage(AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
                              GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove, PlayerChat),
-                             ServerResponse(PlayerSaid, BoardMoveSuccess, ExchangeMoveSuccess,
+                             ServerResponse(PotentialScore, BoardMoveSuccess, ExchangeMoveSuccess,
                                 PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary) where
 
     import Data.Aeson
@@ -19,12 +21,14 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
     import Wordify.Rules.Square
     import qualified Data.List as L
 
+    data ChatMessage = ChatMessage {user :: Text, message :: Text}
+
     data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary
 
-    data ClientMessage = ChatMessage Text | BoardMove [(Pos, Tile)] | ExchangeMove [Tile] | PassMove
+    data ClientMessage = AskPotentialScore [(Pos, Tile)] | SendChatMessage Text | BoardMove [(Pos, Tile)] | ExchangeMove [Tile] | PassMove
 
     -- Response messages to a client request over the websocket
-    data ServerResponse = PlayerSaid Text Text |
+    data ServerResponse = PotentialScore Int |
                           BoardMoveSuccess [Tile] |
                           ExchangeMoveSuccess [Tile] |
                           PassMoveSuccess |
@@ -36,7 +40,10 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
     data GameMessage = PlayerBoardMove {placed :: [(Pos, Tile)], summary :: MoveSummary, players :: [Player], nowPlaying :: Int, tilesRemaining :: Int} |
                                      PlayerPassMove Int MoveSummary |
                                      PlayerExchangeMove Int MoveSummary |
-                                     PlayerChat Text Text
+                                     PlayerChat ChatMessage
+
+    instance ToJSON ChatMessage where
+        toJSON (ChatMessage user message) = object ["player" .= user, "message" .= message]
 
     instance ToJSON MoveSummary where
         toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
@@ -65,8 +72,7 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
             object ["nowPlaying" .= nowPlaying, "summary" .= summary]
         toJSON (PlayerPassMove nowPlaying summary) =
             object ["nowPlaying" .= nowPlaying, "summary" .= summary]
-        toJSON (PlayerChat player message) =
-            object ["player" .= player, "message" .= message]
+        toJSON (PlayerChat chatMessage) = toJSON chatMessage
 
     instance FromJSON ClientMessage where
         parseJSON (Object request) =
@@ -78,7 +84,6 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
         parseJSON _ = fail "Invalid JSON"
 
     instance ToJSON ServerResponse where
-        toJSON (PlayerSaid name message) = object ["name" .= name, "message" .= message]
         toJSON (BoardMoveSuccess tiles) = object ["rack" .= toJSON tiles]
         toJSON PassMoveSuccess = object []
         toJSON (ExchangeMoveSuccess tiles) = object ["rack" .= toJSON tiles]
@@ -86,7 +91,6 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
         toJSON (InvalidCommand msg) = object ["error" .= msg]
 
     instance ServerMessage ServerResponse where
-        commandName (PlayerSaid _ _) = "said"
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
         commandName (ExchangeMoveSuccess _) = "exchangeMoveSuccess"
         commandName PassMoveSuccess = "passMoveSuccess"
@@ -98,14 +102,19 @@ module Controllers.Game.Api (ClientMessage(ChatMessage, BoardMove, ExchangeMove,
 
     parseCommand :: Text -> Value -> Parser ClientMessage
     parseCommand "say" value = parseChatMessage value
+    parseCommand "potentialScore" value = parsePotentialScore value
     parseCommand "boardMove" value = parseBoardMove value
     parseCommand "exchangeMove" value = parseExchangeMove value
     parseCommand "passMove" _ = return PassMove
     parseCommand _ _ = fail "Unrecognised command"
 
     parseChatMessage :: Value -> Parser ClientMessage
-    parseChatMessage (Object object) = ChatMessage <$> object .: "message"
+    parseChatMessage (Object object) = SendChatMessage <$> object .: "message"
     parseChatMessage _ = fail "Unrecognised chat message"
+
+    parsePotentialScore :: Value -> Parser ClientMessage
+    parsePotentialScore (Array a) = AskPotentialScore <$> (sequence . V.toList $ fmap getPosAndTile a)
+    parsePotentialScore _ = fail "Unexpected payload for 'potentialScore'"
 
     parseBoardMove :: Value -> Parser ClientMessage
     parseBoardMove (Array a) = BoardMove <$> (sequence . V.toList $ fmap getPosAndTile a)

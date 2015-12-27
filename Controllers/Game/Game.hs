@@ -12,6 +12,7 @@ module Controllers.Game.Game(
     import Control.Concurrent.STM.TChan
     import qualified Data.Map as M
     import Data.Text
+    import Wordify.Rules.FormedWord
     import Wordify.Rules.Game
     import Wordify.Rules.LetterBag
     import Wordify.Rules.Pos
@@ -23,7 +24,20 @@ module Controllers.Game.Game(
     performRequest serverGame player (BoardMove placed) = handleBoardMove serverGame player placed
     performRequest serverGame player (ExchangeMove exchanged) = handleExchangeMove serverGame player exchanged
     performRequest serverGame player PassMove = handlePassMove serverGame player
-    performRequest serverGame player (ChatMessage msg) = handleChatMessage serverGame player msg
+    performRequest serverGame player (SendChatMessage msg) = handleChatMessage serverGame player msg
+    performRequest serverGame player (AskPotentialScore placed) = handlePotentialScore serverGame placed
+
+    handlePotentialScore :: TVar ServerGame -> [(Pos,Tile)] -> IO ServerResponse
+    handlePotentialScore sharedServerGame placedTiles =
+        do
+            serverGame <- readTVarIO sharedServerGame
+            let gameState = game serverGame
+            let gameBoard = board gameState
+            let formedWords = wordsFormedMidGame gameBoard (M.fromList placedTiles)
+            return $
+                case formedWords of
+                    Left _ -> PotentialScore 0
+                    Right formed -> PotentialScore (overallScore formed)
 
     handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
     handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
@@ -119,5 +133,5 @@ module Controllers.Game.Game(
                 Nothing -> return $ InvalidCommand "Internal server error"
                 Just name -> do
                     let channel = broadcastChannel serverGame
-                    atomically $ writeTChan channel $ (PlayerChat name message)
+                    atomically $ writeTChan channel $ PlayerChat (ChatMessage name message)
                     return ChatSuccess
