@@ -89,12 +89,14 @@ module Controllers.Game.Api (
         toJSON (ExchangeMoveSuccess tiles) = object ["rack" .= toJSON tiles]
         toJSON (ChatSuccess) = object []
         toJSON (InvalidCommand msg) = object ["error" .= msg]
+        toJSON (PotentialScore score) = object ["potentialScore" .= score]
 
     instance ServerMessage ServerResponse where
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
         commandName (ExchangeMoveSuccess _) = "exchangeMoveSuccess"
         commandName PassMoveSuccess = "passMoveSuccess"
         commandName ChatSuccess = "chatSuccess"
+        commandName (PotentialScore _) = "potentialScore"
         commandName (InvalidCommand _) = "error"
 
     writePosAndTile :: (Pos, Tile) -> Value

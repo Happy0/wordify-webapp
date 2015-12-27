@@ -35,27 +35,30 @@ module.exports = function(opts) {
         alert(errorMessage.error);
     };
 
+    var getServerPlacedModel = function () {
+        return scrabbleGroundCtrl.getCandidateTiles().map(function(placed) {
+                var x = placed.x;
+                var y = placed.y;
+                var tile = {
+                    letter: placed.tile.letter,
+                    value: placed.tile.value
+                };
+
+                return {
+                    pos : {
+                    x: x + 1,
+                    y: y + 1
+                    },
+                    tile: tile
+                };
+            });
+    }
+
     /**
      * The user has made a move
      */
     var makeBoardMove = function(move) {
-        var tilesPlaced = scrabbleGroundCtrl.getCandidateTiles().map(function(placed) {
-            var x = placed.x;
-            var y = placed.y;
-            var tile = {
-                letter: placed.tile.letter,
-                value: placed.tile.value
-            };
-
-            return {
-                pos : {
-                  x: x + 1,
-                  y: y + 1
-                },
-                tile: tile
-            };
-        });
-
+        var tilesPlaced = getServerPlacedModel();
         var data = {
             command : "boardMove",
             payload : tilesPlaced
@@ -256,7 +259,16 @@ module.exports = function(opts) {
     scrabbleGroundCtrl.setTileDroppedOnSquareListener(function (tile) {
         var fromSlot = tile.slotNumber;
         data.rack[fromSlot].tile = null;
+        askPotentialScore();
     });
+
+    var askPotentialScore = function() {
+        var placed = getServerPlacedModel();
+        socketOpts.send({
+            command : "potentialScore",
+            payload: placed
+        });
+    };
 
     var tileDroppedOffBoardFunction = function(tile, tileElement) {
         var fromSlot = tile.slotNumber;
