@@ -54,7 +54,8 @@ module Controllers.Game.Game(
                     let moveOutcome = makeMove gameState (PlaceTiles (M.fromList placed))
 
                     case moveOutcome of
-                        Right (GameFinished game maybeWords players ) ->
+                        Right (GameFinished newGame maybeWords players ) -> do
+                            atomically $ writeTVar sharedServerGame serverGame { game = newGame}
                             return $ InvalidCommand "game finish not handled yet."
 
                         Right (MoveTransition newPlayerState newGame wordsFormed) ->
@@ -86,7 +87,7 @@ module Controllers.Game.Game(
                     case moveOutcome of
                         Right (ExchangeTransition newGameState beforeExchangePlayer afterExchangePlayer) ->
                             do
-                                let summary = ExchangeMoveSummary 
+                                let summary = ExchangeMoveSummary
                                 let newSummaries = (moveSummaries serverGame ++ [summary])
                                 let updatedServerGame = serverGame {game = newGameState, moveSummaries = newSummaries}
                                 let channel = broadcastChannel updatedServerGame
