@@ -111,7 +111,7 @@ module.exports = function(opts) {
                 "message" : message
             }
         }
-        
+
         socketOpts.send(data);
     }
 
@@ -172,7 +172,7 @@ module.exports = function(opts) {
                 addExchangeMoveToHistory(move)
             }
             else {
-                addBoardMoveToHistory(move);            
+                addBoardMoveToHistory(move);
             }
         });
     };
@@ -193,8 +193,8 @@ module.exports = function(opts) {
 
     var addBoardMoveToHistory = function(summary) {
         m.startComputation();
-        
-        data.moveHistory.push({ 
+
+        data.moveHistory.push({
             "type" : "board",
             wordsMade: summary.wordsMade,
             overallScore : summary.overallScore
@@ -296,6 +296,8 @@ module.exports = function(opts) {
         {
             putTileOnFirstEmptySlot(tile);
         }
+
+        askPotentialScore();
     };
 
     scrabbleGroundCtrl.setCustomRevertFunction(tileDroppedOffBoardFunction);
