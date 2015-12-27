@@ -185,10 +185,15 @@ module.exports = function(ctrl) {
         return m('div', {class: 'potential-score'}, "potential score: " + ctrl.data.potentialScore) ;
     }
 
-    return m('div', {class: 'round'}, [
-        m('span', {class: 'left'}, [renderScoreBoard(), renderMoveHistory()]),
-        m('span', {class: 'mid'}, [renderPotentialScore(), renderBoard(), renderTileRack(), renderActionButtons()]),
-        m('span', {class: 'right'}, [renderChatBox()])
-    
-    ])
+
+    return m('div', {class: 'round'},
+        [
+            m('div', {class: 'potential-score'}, renderPotentialScore()),
+            m('div', {class: 'main'},
+                 [
+                        m('span', {class: 'left'}, [renderScoreBoard(), renderMoveHistory()]),
+                        m('span', {class: 'mid'}, [renderBoard(), renderTileRack(), renderActionButtons()]),
+                        m('span', {class: 'right'}, [renderChatBox()])
+                 ])
+        ]);
 }

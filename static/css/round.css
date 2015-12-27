@@ -2,6 +2,10 @@ body {
   font: 12px 'Noto Sans','Lucida Grande','Lucida Sans Unicode',Geneva,Verdana,Sans-Serif
 }
 
+.round {
+    margin-top: 10px;
+}
+
 .left {
     width: 25%;
     position: absolute;
@@ -27,8 +31,8 @@ body {
     margin: auto;
 }
 
-.round {
-    margin-top: 40px;
+.main {
+    margin-top: 20px;
 }
 
 .rack {
