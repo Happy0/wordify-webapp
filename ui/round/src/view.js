@@ -53,7 +53,7 @@ module.exports = function(ctrl) {
                     }
                     else
                     {
-                        
+
                         slot.selectedForExchange = false;
                     }
                     m.endComputation();
@@ -114,7 +114,9 @@ module.exports = function(ctrl) {
         };
 
         var messagesConfig = function(element, initialised, context) {
-            $(element).scrollTop($(element).height());
+            var scrollHeight = $(element)[0].scrollHeight;
+
+            $(element).scrollTop(scrollHeight);
         }
 
         return m('span', {class: 'chat-box'},
@@ -151,13 +153,13 @@ module.exports = function(ctrl) {
                 ]);
         }
 
-        var historyTable = m('table', {class: 'history score-table-border'}, 
+        var historyTable = m('table', {class: 'history score-table-border'},
 
             history.map(function(move) {
                 if (move.type == "board") {
                     return renderBoardMoveRow(move);
                 } else if (move.type == "exchange") {
-                    return m('tr', {}, "exchange");   
+                    return m('tr', {}, "exchange");
                 }
                 else if (move.type == "pass") {
                     return m('tr', {}, "pass");
