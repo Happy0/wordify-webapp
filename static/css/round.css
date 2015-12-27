@@ -70,6 +70,8 @@ body {
     position:relative;
     padding-top: 15px;
     margin:auto;
+    overflow: auto;
+    max-height: 500px;
 }
 
 .submit-move-button {
