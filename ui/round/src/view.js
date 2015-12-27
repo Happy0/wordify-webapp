@@ -85,8 +85,14 @@ module.exports = function(ctrl) {
 
         var renderedSlots = rack.map(putTileOnRack);
 
-        return  m('div', {},
-              m("div", {class : "rack"}, renderedSlots));
+        return  m('div', {class : "rack"},
+              [
+                  m("span", {}, renderedSlots),
+                  m("span", {class: 'shuffle-rack-button'},
+                    m('button', {onclick: ctrl.shuffleRack, class: "btn btn-success btn-large"},
+                        m('span', {'class' : 'icon-white glyphicon glyphicon-refresh'} ))
+                  )
+              ]);
     };
 
     var renderChatBox = function() {

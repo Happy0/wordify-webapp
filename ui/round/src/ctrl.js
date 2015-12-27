@@ -277,6 +277,25 @@ module.exports = function(opts) {
         });
     };
 
+    var shuffleRack = function() {
+        var shuffle = function(input) {
+            for (var i = input.length-1; i >=0; i--) {
+
+                    var randomIndex = Math.floor(Math.random()*(i+1));
+                    var itemAtIndex = input[randomIndex];
+
+                    input[randomIndex] = input[i];
+                    input[i] = itemAtIndex;
+                }
+            return input;
+        };
+
+        m.startComputation();
+        shuffle(exports.data.rack);
+
+        m.endComputation();
+    }
+
     var tileDroppedOffBoardFunction = function(tile, tileElement) {
         var fromSlot = tile.slotNumber;
 
@@ -318,6 +337,7 @@ module.exports = function(opts) {
         setTilesRemaining : setTilesRemaining,
         setPotentialScore : setPotentialScore,
         setChatMessages : setChatMessages,
+        shuffleRack : shuffleRack,
         addBoardMoveToHistory : addBoardMoveToHistory,
         addPassMoveToHistory: addPassMoveToHistory,
         addExchangeMoveToHistory : addExchangeMoveToHistory,

@@ -39,7 +39,7 @@ body {
     position: relative;
     margin: auto;
     height: 40px;
-    width: 310px;
+    width: 350px;
     margin-bottom: 10px;
 }
 
@@ -64,6 +64,10 @@ body {
     width: 300px;
     margin: auto;
     padding-left: 25px;
+}
+
+.shuffle-rack-button {
+    height: 100%;
 }
 
 .history {
