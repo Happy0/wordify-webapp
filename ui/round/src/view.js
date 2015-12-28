@@ -89,7 +89,7 @@ module.exports = function(ctrl) {
               [
                   m("span", {}, renderedSlots),
                   m("span", {class: 'shuffle-rack-button'},
-                    m('button', {onclick: ctrl.shuffleRack, class: "btn btn-success btn-large"},
+                    m('button', {class: "btn btn-success btn-large"},
                         m('span', {'class' : 'icon-white glyphicon glyphicon-refresh'} ))
                   )
               ]);
