@@ -40,21 +40,20 @@ module.exports = function(ctrl) {
                 }
             };
 
-        var handleSelectedForExchange = function(element, slot) {
+        var handleSelectedForExchange = function(element, slotNumber) {
                 var onClick = function () {
                     if (!ctrl.data.exchangeMode) {
                         return;
                     }
 
                     m.startComputation();
-                    if (!slot.selectedForExchange)
+                    if (!rack[slotNumber].selectedForExchange)
                     {
-                        slot.selectedForExchange = true;
+                        rack[slotNumber].selectedForExchange = true;
                     }
                     else
                     {
-
-                        slot.selectedForExchange = false;
+                        rack[slotNumber].selectedForExchange = false;
                     }
                     m.endComputation();
                 }
@@ -68,7 +67,7 @@ module.exports = function(ctrl) {
                 rack[slotNumber].element = element;
 
                 if (!initialised) {
-                    handleSelectedForExchange(element, slot);
+                    handleSelectedForExchange(element, slotNumber);
                 }
             }
 
