@@ -291,7 +291,14 @@ module.exports = function(opts) {
         };
 
         m.startComputation();
-        shuffle(exports.data.rack);
+
+        shuffle(data.rack);
+
+        data.rack.forEach(function(slot, i) {
+            if (slot.tile) {
+                slot.tile.slotNumber = i;
+            }
+        });
 
         m.endComputation();
     }
