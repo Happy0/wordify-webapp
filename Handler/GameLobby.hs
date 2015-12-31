@@ -7,6 +7,7 @@ module Handler.GameLobby where
     import qualified Data.Map as M
     import Controllers.Game.Model.GameLobby
     import Controllers.Game.Model.ServerPlayer
+    import Controllers.Game.Model.ServerGame
     import Model.Api
     import Controllers.GameLobby.GameLobby
     import qualified Data.Text as T
@@ -97,7 +98,7 @@ module Handler.GameLobby where
         Sets up the broadcast channel for servicing the websocket, returning an ID for the new player
         if they have not joined the lobby before and received a cookie.
     -}
-    setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (Maybe Text, TChan LobbyMessage))
+    setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (Maybe Text, TChan LobbyMessage, Maybe ServerGame, Maybe (TChan GameMessage)))
     setupPrequisets app gameId maybePlayerId =
         runEitherT $
             -- TODO: This function probably takes on too many responsibilities
@@ -108,10 +109,12 @@ module Handler.GameLobby where
                 case maybePlayerId of
                     Nothing ->
                         do
-                            newPlayer <- lift $ handleJoinNewPlayer app gameId lobby
-                            return (Just $ identifier newPlayer, broadcastChan)
+                            (newPlayer, maybeNewGame) <- lift $ handleJoinNewPlayer app gameId lobby
+                            let maybeGameChannel = dupTChan . broadcastChannel <$> maybeNewGame
+
+                            return (Just $ identifier newPlayer, broadcastChan, maybeNewGame, maybeGameChannel)
                     Just playerId ->
-                        hoistEither $ (\_ -> (Nothing, broadcastChan)) <$> getExistingPlayer oldLobby playerId
+                        hoistEither $ (\_ -> (Nothing, broadcastChan, Nothing, Nothing)) <$> getExistingPlayer oldLobby playerId
 
     lobbyWebSocketHandler :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
     lobbyWebSocketHandler app gameId maybePlayerId =
@@ -124,7 +127,7 @@ module Handler.GameLobby where
             case prequisets of
                 Left err -> 
                     sendTextData $ toJSONResponse err
-                Right (maybeNewId, channel) ->
+                Right (maybeNewId, channel, serverGame, gameChannel) ->
                     do
                         sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)
                         {-
