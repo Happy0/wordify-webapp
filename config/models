@@ -8,5 +8,14 @@ Email
     user UserId Maybe
     verkey Text Maybe
     UniqueEmail email
+Game
+    gameId Text
+    Primary gameId
+
+ChatMessage
+    game GameId
+    createdAt UTCTime
+    sentBy Text
+    message Text
 
  -- By default this file is used in Model.hs (which is imported by Foundation.hs)
