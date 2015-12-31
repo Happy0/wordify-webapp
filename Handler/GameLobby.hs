@@ -7,6 +7,7 @@ module Handler.GameLobby where
     import qualified Data.Map as M
     import Controllers.Game.Model.GameLobby
     import Controllers.Game.Model.ServerPlayer
+    import Controllers.Game.Model.ServerGame
     import Model.Api
     import Controllers.GameLobby.GameLobby
     import qualified Data.Text as T
@@ -18,6 +19,7 @@ module Handler.GameLobby where
     import Control.Error.Util
     import Control.Concurrent
     import Control.Monad.Loops
+    import Controllers.Game.Api
 
     getGameLobbyR :: Text -> Handler Html
     getGameLobbyR gameId =
@@ -97,7 +99,7 @@ module Handler.GameLobby where
         Sets up the broadcast channel for servicing the websocket, returning an ID for the new player
         if they have not joined the lobby before and received a cookie.
     -}
-    setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (Maybe Text, TChan LobbyMessage))
+    setupPrequisets :: App -> Text -> Maybe Text -> STM (Either LobbyResponse (Maybe Text, TChan LobbyMessage, Maybe (ServerGame, TChan GameMessage)))
     setupPrequisets app gameId maybePlayerId =
         runEitherT $
             -- TODO: This function probably takes on too many responsibilities
@@ -108,10 +110,17 @@ module Handler.GameLobby where
                 case maybePlayerId of
                     Nothing ->
                         do
-                            newPlayer <- lift $ handleJoinNewPlayer app gameId lobby
-                            return (Just $ identifier newPlayer, broadcastChan)
+                            (newPlayer, maybeNewGame) <- lift $ handleJoinNewPlayer app gameId lobby
+                            maybeGameSetup <-
+                                case maybeNewGame of
+                                    Just game -> do
+                                        gameChannel <- lift $ dupTChan . broadcastChannel $ game
+                                        return $ Just (game, gameChannel)
+                                    Nothing -> return Nothing
+
+                            return (Just $ identifier newPlayer, broadcastChan, maybeGameSetup)
                     Just playerId ->
-                        hoistEither $ (\_ -> (Nothing, broadcastChan)) <$> getExistingPlayer oldLobby playerId
+                        hoistEither $ (\_ -> (Nothing, broadcastChan, Nothing)) <$> getExistingPlayer oldLobby playerId
 
     lobbyWebSocketHandler :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
     lobbyWebSocketHandler app gameId maybePlayerId =
@@ -122,9 +131,9 @@ module Handler.GameLobby where
             -- anyway, i digress...
             prequisets <- atomically $ setupPrequisets app gameId maybePlayerId
             case prequisets of
-                Left err -> 
+                Left err ->
                     sendTextData $ toJSONResponse err
-                Right (maybeNewId, channel) ->
+                Right (maybeNewId, channel, maybeGameSetup) ->
                     do
                         sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)
                         {-

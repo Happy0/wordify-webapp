@@ -15,6 +15,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
     import Control.Concurrent.STM.TVar
     import qualified Data.Map as M
     import Controllers.Game.Model.ServerGame
+    import Controllers.Game.Api
 
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
@@ -24,7 +25,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
         Creates a new player, adds them to the lobby, notifying the players
         of the new arrival via the broadcast channel and returns the new player.
     -}
-    handleJoinNewPlayer :: App -> T.Text -> TVar GameLobby -> STM ServerPlayer
+    handleJoinNewPlayer :: App -> T.Text -> TVar GameLobby -> STM (ServerPlayer, Maybe ServerGame)
     handleJoinNewPlayer app gameId gameLobby =
         do
             lobby <- readTVar gameLobby
@@ -41,37 +42,38 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
             writeTVar gameLobby newLobby
 
             writeTChan (channel lobby) $ PlayerJoined newPlayer
-            handleLobbyFull app newLobby gameId
+            maybeServerGame <- handleLobbyFull app newLobby gameId
 
-            return newPlayer
+            return (newPlayer, maybeServerGame)
 
-    handleLobbyFull :: App -> GameLobby -> T.Text -> STM ()
+    handleLobbyFull :: App -> GameLobby -> T.Text -> STM (Maybe ServerGame)
     handleLobbyFull app lobby gameId =
-        when (length (lobbyPlayers lobby) == (awaiting lobby)) $
+        if (length (lobbyPlayers lobby) == (awaiting lobby)) then
             do
                 -- Broadcast that the game is ready to begin
                 let broadcastChannel = channel lobby
                 writeTChan broadcastChannel (LobbyFull gameId)
 
                 removeGameLobby app gameId
-                createGame app gameId lobby
-
+                serverGame <- (createGame app gameId lobby)
+                return $ Just serverGame
+        else 
+            return Nothing
 
     removeGameLobby :: App -> T.Text -> STM ()
     removeGameLobby app gameId =
         let lobbies = gameLobbies app
         in modifyTVar lobbies $ M.delete gameId
 
-
-    createGame :: App -> T.Text -> GameLobby -> STM ()
+    createGame :: App -> T.Text -> GameLobby -> STM ServerGame
     createGame app gameId lobby =
         do
             let gamesInProgress = games app
             newChannel <- newBroadcastTChan
-            gameRef <- newTVar $ ServerGame newGame players newChannel []
+            let serverGame = ServerGame newGame players newChannel []
+            gameRef <- newTVar serverGame
             modifyTVar gamesInProgress $ M.insert gameId gameRef
+            return serverGame
         where
             players = lobbyPlayers lobby
             newGame = pendingGame lobby
-
-
