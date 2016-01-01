@@ -12,7 +12,7 @@ Game
     gameId Text
     Primary gameId
 ChatMessage
-    game GameId
+    game Text
     createdAt UTCTime
     sentBy Text
     message Text

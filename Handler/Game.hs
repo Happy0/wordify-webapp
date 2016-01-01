@@ -11,6 +11,9 @@ import Controllers.Game.Api
 import qualified Data.List as L
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Api
+import Controllers.Game.Persist
+import Data.Conduit
+import qualified Data.Conduit.List as CL
 import Model.Api
 import Control.Concurrent
 import qualified Data.List.NonEmpty as NE
@@ -41,7 +44,7 @@ getGameR gameId = do
                 let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= getPlayer currentGame)
                 let moveHistory = moveSummaries serverGame
 
-                webSockets $ gameApp gameInProgress messageChannel maybePlayerId maybePlayerNumber
+                webSockets $ gameApp app gameId gameInProgress messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
                     addStylesheet $ (StaticR css_scrabble_css)
                     addStylesheet $ (StaticR css_round_css)
@@ -96,8 +99,9 @@ setupPrerequisets serverGame =
         return (game, channel)
 
 
-gameApp :: TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
-gameApp game channel maybePlayerId playerNumber =
+gameApp :: App -> Text -> TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
+gameApp app gameId game channel maybePlayerId playerNumber = do
+        -- liftIO $ getChatMessages (appConnPool app) gameId (CL.map toJSONResponse =$ sinkWSText)
         race_
             (forever $ atomically (readTChan channel) >>= sendTextData . toJSONResponse)
             (forever $
