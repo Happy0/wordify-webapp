@@ -1,5 +1,6 @@
 module Handler.Game where
 
+import Data.Pool
 import Database.Persist.Sql
 import Import
 import Yesod.Core
@@ -113,3 +114,11 @@ gameApp app gameId game channel maybePlayerId playerNumber = do
                             response <- liftIO $ performRequest game playerNumber parsedCommand
                             sendTextData . toJSONResponse $ response
             )
+
+{-
+    Send the chat log history to the client
+-}
+sendPreviousChatMessages :: Pool SqlBackend -> Text -> WebSocketsT Handler ()
+sendPreviousChatMessages pool gameId = 
+    liftIO $ flip runSqlPersistMPool pool $ do
+       getChatMessages gameId $$ CL.map toJSONResponse =$ sinkWSText
