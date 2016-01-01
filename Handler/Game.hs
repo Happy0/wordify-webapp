@@ -2,6 +2,7 @@ module Handler.Game where
 
 import Data.Pool
 import Database.Persist.Sql
+import qualified Network.WebSockets.Connection as C
 import Import
 import Yesod.Core
 import Yesod.WebSockets
@@ -103,6 +104,8 @@ setupPrerequisets serverGame =
 
 gameApp :: App -> Text -> TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
 gameApp app gameId game channel maybePlayerId playerNumber = do
+       connection <- ask
+       liftIO $ sendPreviousChatMessages (appConnPool app) gameId connection
        race_
             (forever $ atomically (readTChan channel) >>= sendTextData . toJSONResponse)
             (forever $
@@ -118,7 +121,12 @@ gameApp app gameId game channel maybePlayerId playerNumber = do
 {-
     Send the chat log history to the client
 -}
-sendPreviousChatMessages :: Pool SqlBackend -> Text -> WebSocketsT Handler ()
-sendPreviousChatMessages pool gameId = 
-    liftIO $ flip runSqlPersistMPool pool $ do
-       getChatMessages gameId $$ CL.map toJSONResponse =$ sinkWSText
+sendPreviousChatMessages :: Pool SqlBackend -> Text -> C.Connection -> IO ()
+sendPreviousChatMessages pool gameId connection = do
+    liftIO $ flip runSqlPersistMPool pool $
+        getChatMessages gameId $$ CL.map toJSONResponse $= (CL.mapM_ (liftIO . C.sendTextData connection))
+
+
+
+
+
