@@ -16,13 +16,14 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import Data.Time.Clock
     import qualified Model as M
 
-    chatMessageFromEntity :: Entity M.ChatMessage -> GameMessage
-    chatMessageFromEntity (Entity _ (M.ChatMessage _ created user message )) = PlayerChat (ChatMessage user message)
+    chatMessageFromEntity :: Monad m => Conduit (Entity M.ChatMessage) m GameMessage
+    chatMessageFromEntity = CL.map fromEntity
+        where 
+            fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message)
 
-    getChatMessages pool gameId sink = liftIO $ withPool pool $ 
-                 return $ selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
-                    $= CL.map chatMessageFromEntity
-                    $$ sink
+    getChatMessages gameId =
+                 selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
+                    $= chatMessageFromEntity
 
     {-
         Persists the original game state (before the game has begun) and

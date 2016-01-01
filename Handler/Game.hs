@@ -1,5 +1,6 @@
 module Handler.Game where
 
+import Database.Persist.Sql
 import Import
 import Yesod.Core
 import Yesod.WebSockets
@@ -101,8 +102,7 @@ setupPrerequisets serverGame =
 
 gameApp :: App -> Text -> TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
 gameApp app gameId game channel maybePlayerId playerNumber = do
-        -- liftIO $ getChatMessages (appConnPool app) gameId (CL.map toJSONResponse =$ sinkWSText)
-        race_
+       race_
             (forever $ atomically (readTChan channel) >>= sendTextData . toJSONResponse)
             (forever $
                 do
