@@ -11,7 +11,6 @@ Email
 Game
     gameId Text
     Primary gameId
-
 ChatMessage
     game GameId
     createdAt UTCTime

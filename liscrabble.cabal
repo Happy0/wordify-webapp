@@ -24,6 +24,7 @@ library
                      Controllers.Game.Model.ServerGame
                      Controllers.Game.Model.ServerPlayer
                      Controllers.Game.Game
+                     Controllers.Game.Persist
                      Controllers.GameLobby.GameLobby
                      Controllers.GameLobby.Api
                      Controllers.Game.Api
@@ -109,6 +110,7 @@ library
                  , stm
                  , websockets
                  , monad-loops
+                 , resource-pool
 
 executable         liscrabble
     if flag(library-only)

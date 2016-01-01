@@ -5,6 +5,7 @@ module Handler.GameLobby where
     import Yesod.Core
     import Yesod.WebSockets
     import qualified Data.Map as M
+    import Controllers.Game.Persist
     import Controllers.Game.Model.GameLobby
     import Controllers.Game.Model.ServerPlayer
     import Controllers.Game.Model.ServerGame
@@ -14,7 +15,7 @@ module Handler.GameLobby where
     import Controllers.GameLobby.Api
     import Data.Aeson
     import Model.Api
-    import Control.Monad
+    import qualified Control.Monad as CM
     import Control.Monad.Trans.Either
     import Control.Error.Util
     import Control.Concurrent
@@ -135,6 +136,11 @@ module Handler.GameLobby where
                     sendTextData $ toJSONResponse err
                 Right (maybeNewId, channel, maybeGameSetup) ->
                     do
+                        let pool = appConnPool app
+                        liftIO $ case maybeGameSetup of
+                            Just (game, gameChannel) -> persistNewGame pool gameId game gameChannel
+                            _ -> return ()
+
                         sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)
                         {-
                             We race a thread that sends pings to the client so that when the client closes its connection,
