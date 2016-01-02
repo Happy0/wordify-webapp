@@ -17,7 +17,7 @@ Move
     tiles Text Maybe
     startX Int Maybe
     startY Int Maybe
-    direction Int Maybe
+    isHorizontal Bool Maybe
 ChatMessage
     game Text
     createdAt UTCTime

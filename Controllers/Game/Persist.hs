@@ -11,6 +11,7 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import Data.Conduit
     import qualified Data.Conduit.List as CL
     import qualified Data.Char as C
+    import qualified Data.List as L
     import Data.Pool
     import Database.Persist.Sql
     import Data.Text
@@ -63,10 +64,22 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
  
     persistBoardMove :: Pool SqlBackend -> Text -> Int -> [(Pos, Tile)] -> IO ()
     persistBoardMove pool gameId moveNumber placed = do
-        let move = M.Move gameId moveNumber (Just $ tilesToDbRepresentation (Prelude.map  snd placed)) (Just 0) (Just 0) (Just 1)
+        let move = M.Move 
+                        gameId 
+                        moveNumber 
+                        (Just $ tilesToDbRepresentation (Prelude.map snd placedSorted)) 
+                        (Just $ xPos min) 
+                        (Just $ yPos min) 
+                        (Just isHorizontal)
+
         withPool pool $ do
             insert move
             return ()
+        where
+            placedSorted = L.sort placed
+            positions = L.map fst placedSorted
+            (min, max) = (L.minimum positions, L.maximum positions)
+            isHorizontal = (xPos min == xPos max)
 
     persistPassMove :: Pool SqlBackend -> Text -> Int -> IO ()
     persistPassMove pool gameId moveNumber =
