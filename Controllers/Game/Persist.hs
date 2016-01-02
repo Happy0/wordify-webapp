@@ -17,8 +17,10 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import Data.Text
     import Data.Time.Clock
     import qualified Model as M
+    import Wordify.Rules.LetterBag
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
+    import Wordify.Rules.Game
 
     chatMessageFromEntity :: Monad m => Conduit (Entity M.ChatMessage) m GameMessage
     chatMessageFromEntity = CL.map fromEntity
@@ -47,7 +49,15 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
 
     persistGameState :: Pool SqlBackend -> Text -> ServerGame -> IO (Key M.Game)
     persistGameState pool gameId serverGame =
-         withPool pool $ insert (M.Game gameId)
+        withPool pool $ 
+            insert $
+                (M.Game 
+                    gameId
+                    (tilesToDbRepresentation (tiles letterBag))
+                    (pack $ show (getGenerator letterBag)))
+        where
+            gameState = game serverGame
+            History letterBag _ = history gameState 
 
     watchForUpdates :: Pool SqlBackend -> Text -> TChan GameMessage -> IO ()
     watchForUpdates pool gameId messageChannel =

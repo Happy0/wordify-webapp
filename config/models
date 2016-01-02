@@ -10,6 +10,8 @@ Email
     UniqueEmail email
 Game
     gameId Text
+    originalLetterBag Text
+    letterBagSeed Text
     Primary gameId
 Move
     game Text
