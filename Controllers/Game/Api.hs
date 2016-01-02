@@ -25,7 +25,11 @@ module Controllers.Game.Api (
 
     data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary
 
-    data ClientMessage = AskPotentialScore [(Pos, Tile)] | SendChatMessage Text | BoardMove [(Pos, Tile)] | ExchangeMove [Tile] | PassMove
+    data ClientMessage = AskPotentialScore [(Pos, Tile)] |
+                         SendChatMessage Text |
+                         BoardMove [(Pos, Tile)] |
+                         ExchangeMove [Tile] |
+                         PassMove
 
     -- Response messages to a client request over the websocket
     data ServerResponse = PotentialScore Int |
@@ -37,9 +41,14 @@ module Controllers.Game.Api (
 
     -- Messages sent over the server game channel to notify clients of changes
     -- such as a player making a move successfully
-    data GameMessage = PlayerBoardMove {placed :: [(Pos, Tile)], summary :: MoveSummary, players :: [Player], nowPlaying :: Int, tilesRemaining :: Int} |
-                                     PlayerPassMove Int MoveSummary |
-                                     PlayerExchangeMove Int MoveSummary |
+    data GameMessage = PlayerBoardMove {moveNumber :: Int,
+                                        placed :: [(Pos, Tile)],
+                                        summary :: MoveSummary,
+                                        players :: [Player],
+                                         nowPlaying :: Int,
+                                        tilesRemaining :: Int} |
+                                     PlayerPassMove Int Int MoveSummary |
+                                     PlayerExchangeMove Int Int [Tile] MoveSummary |
                                      PlayerChat ChatMessage
 
     instance ToJSON ChatMessage where
@@ -62,16 +71,18 @@ module Controllers.Game.Api (
         commandName (PlayerChat {}) = "playerChat"
 
     instance ToJSON GameMessage where
-        toJSON (PlayerBoardMove placed summary players nowPlaying tilesRemaining) =
-            object ["placed" .= fmap writePosAndTile placed,
+        toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
+            object ["moveNumber" .= moveNumber,
+                    "placed" .= fmap writePosAndTile placed,
                     "summary" .= toJSON summary,
                     "players" .= toJSON players,
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]
-        toJSON (PlayerExchangeMove nowPlaying summary) =
-            object ["nowPlaying" .= nowPlaying, "summary" .= summary]
-        toJSON (PlayerPassMove nowPlaying summary) =
-            object ["nowPlaying" .= nowPlaying, "summary" .= summary]
+        toJSON (PlayerExchangeMove moveNumber nowPlaying _ summary) =
+            -- We do not tell clients what tiles the player exchanged
+            object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
+        toJSON (PlayerPassMove moveNumber nowPlaying summary) =
+            object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
         toJSON (PlayerChat chatMessage) = toJSON chatMessage
 
     instance FromJSON ClientMessage where

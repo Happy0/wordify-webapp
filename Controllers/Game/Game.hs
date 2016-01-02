@@ -67,7 +67,7 @@ module Controllers.Game.Game(
                                 let updatedServerGame = serverGame {game = newGame, moveSummaries = newSummaries}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
-                                     writeTChan channel (PlayerBoardMove placed moveSummary (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
+                                     writeTChan channel $ (PlayerBoardMove (moveNumber newGame) placed moveSummary (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
                                      writeTVar sharedServerGame updatedServerGame
 
                                 return $ BoardMoveSuccess (tilesOnRack newPlayerState)
@@ -94,7 +94,7 @@ module Controllers.Game.Game(
                                 let updatedServerGame = serverGame {game = newGameState, moveSummaries = newSummaries}
                                 let channel = broadcastChannel updatedServerGame
                                 atomically $ do
-                                    writeTChan channel (PlayerExchangeMove (playerNumber newGameState) summary)
+                                    writeTChan channel (PlayerExchangeMove (moveNumber newGameState) (playerNumber newGameState) exchanged summary)
                                     writeTVar sharedServerGame updatedServerGame
 
                                 return $ ExchangeMoveSuccess (tilesOnRack afterExchangePlayer)
@@ -122,7 +122,7 @@ module Controllers.Game.Game(
                                 let newSummaries = (moveSummaries serverGame ++ [summary])
                                 atomically $ do
                                     writeTVar sharedServerGame (serverGame {game = newGame, moveSummaries = newSummaries})
-                                    writeTChan channel $ PlayerPassMove (playerNumber newGame) summary
+                                    writeTChan channel $ PlayerPassMove (moveNumber newGame) (playerNumber newGame) summary
                                 return PassMoveSuccess
                         Right (GameFinished game maybeWords players ) ->
                             return $ InvalidCommand "game finish not handled yet."

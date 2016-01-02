@@ -11,6 +11,13 @@ Email
 Game
     gameId Text
     Primary gameId
+Move
+    game Text
+    moveNumber Int
+    tiles Text Maybe
+    startX Int Maybe
+    startY Int Maybe
+    direction Int Maybe
 ChatMessage
     game Text
     createdAt UTCTime
