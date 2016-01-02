@@ -49,24 +49,26 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     withPool pool = flip runSqlPersistMPool pool
 
     persistGameState :: Pool SqlBackend -> Text -> ServerGame -> IO (Key M.Game)
-    persistGameState pool gameId serverGame =
-        withPool pool $ 
-            insert $
+    persistGameState pool gameId serverGame = do
+        withPool pool $ do
+            gameId <- insert $
                 (M.Game 
                     gameId
                     (tilesToDbRepresentation (tiles letterBag))
                     (pack $ show (getGenerator letterBag)))
+
+            persistPlayers (playing serverGame)
+            return gameId
         where
-            gameState = game serverGame
-            History letterBag _ = history gameState
+                gameState = game serverGame
+                History letterBag _ = history gameState
 
     persistPlayers players =
         let playersWithNumbers = L.zip [1 .. 4] players
         in flip mapM_ playersWithNumbers $ do
-            \blah -> case blah of
-                         (playerNumber, (ServerPlayer playerName identifier)) ->
-                            insert $
-                                M.Player playerName identifier playerNumber
+                    \(playerNumber, (ServerPlayer playerName identifier)) ->
+                        insert $
+                            M.Player playerName identifier playerNumber
 
     watchForUpdates :: Pool SqlBackend -> Text -> TChan GameMessage -> IO ()
     watchForUpdates pool gameId messageChannel =
