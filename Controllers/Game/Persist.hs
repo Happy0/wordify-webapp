@@ -79,7 +79,7 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
             placedSorted = L.sort placed
             positions = L.map fst placedSorted
             (min, max) = (L.minimum positions, L.maximum positions)
-            isHorizontal = (xPos min == xPos max)
+            isHorizontal = (yPos min == yPos max)
 
     persistPassMove :: Pool SqlBackend -> Text -> Int -> IO ()
     persistPassMove pool gameId moveNumber =
