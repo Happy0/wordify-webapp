@@ -8,6 +8,7 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import Control.Concurrent.STM.TChan
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
+    import Controllers.Game.Model.ServerPlayer
     import Data.Conduit
     import qualified Data.Conduit.List as CL
     import qualified Data.Char as C
@@ -57,7 +58,15 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
                     (pack $ show (getGenerator letterBag)))
         where
             gameState = game serverGame
-            History letterBag _ = history gameState 
+            History letterBag _ = history gameState
+
+    persistPlayers players =
+        let playersWithNumbers = L.zip [1 .. 4] players
+        in flip mapM_ playersWithNumbers $ do
+            \blah -> case blah of
+                         (playerNumber, (ServerPlayer playerName identifier)) ->
+                            insert $
+                                M.Player playerName identifier playerNumber
 
     watchForUpdates :: Pool SqlBackend -> Text -> TChan GameMessage -> IO ()
     watchForUpdates pool gameId messageChannel =

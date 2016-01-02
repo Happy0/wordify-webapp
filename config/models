@@ -25,5 +25,9 @@ ChatMessage
     createdAt UTCTime
     sentBy Text
     message Text
+Player
+    name Text
+    playerId Text
+    playerNumber Int
 
  -- By default this file is used in Model.hs (which is imported by Foundation.hs)
