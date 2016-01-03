@@ -59,7 +59,18 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
             Left err -> return $ Left err
 
     playThroughGame :: Game -> [M.Move] -> Either Text Game
-    playThroughGame game moves = undefined
+    playThroughGame game moves = foldM playNextMove game moves
+        where
+            initialBag = bag game
+            playNextMove :: Game -> M.Move -> Either Text Game
+            playNextMove game moveModel = 
+                case moveFromEntity (board game) initialBag moveModel of
+                    Left err ->  Left err
+                    Right move ->
+                        let moveResult = makeMove game move
+                        in case moveResult of
+                            Left invalidState -> Left $ pack $ show invalidState
+                            Right moveResult -> Right (newGame moveResult)
 
     {-
         Persists the original game state (before the game has begun) and
