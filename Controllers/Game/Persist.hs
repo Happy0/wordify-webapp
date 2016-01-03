@@ -54,9 +54,17 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                     internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
                     tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
                     let bag = makeBagUsingGenerator tiles (read (show bagSeed) :: StdGen)
-                    let game = makeGame internalPlayers bag dictionary
-                    return undefined
+                    game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers bag dictionary)
+
+                    currentGame <- hoistEither $ playThroughGame game moveModels
+                    channel <- liftIO $ newBroadcastTChanIO
+                    return $ ServerGame game serverPlayers channel []
+
             Left err -> return $ Left err
+        where
+            mapLeft :: (a -> c) -> Either a b -> Either c b
+            mapLeft func (Left err) = Left $ func err
+            mapLeft _ (Right r) = Right r
 
     playThroughGame :: Game -> [M.Move] -> Either Text Game
     playThroughGame game moves = foldM playNextMove game moves
@@ -69,7 +77,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                     Right move ->
                         let moveResult = makeMove game move
                         in case moveResult of
-                            Left invalidState -> Left $ pack $ show invalidState
+                            Left invalidState -> Left $ pack . show $ invalidState
                             Right moveResult -> Right (newGame moveResult)
 
     {-
