@@ -13,24 +13,54 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import qualified Data.Conduit.List as CL
     import qualified Data.Char as C
     import qualified Data.List as L
+    import qualified Data.Map as Mp
     import Data.Pool
     import Database.Persist.Sql
     import Data.Text
     import Data.Time.Clock
     import qualified Model as M
     import Wordify.Rules.LetterBag
+    import Wordify.Rules.Move
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
     import Wordify.Rules.Game
 
     chatMessageFromEntity :: Monad m => Conduit (Entity M.ChatMessage) m GameMessage
     chatMessageFromEntity = CL.map fromEntity
-        where 
+        where
             fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message)
 
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
                     $= chatMessageFromEntity
+
+    moveFromEntity :: LetterBag -> M.Move -> Move
+    moveFromEntity letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Pass
+    moveFromEntity letterBag (M.Move gameId moveNumber (Just tiles) Nothing Nothing Nothing) =
+        case dbTileRepresentationToTiles letterBag tiles of
+            Left err -> error $ "you've dun goofed... " ++ show err
+            Right tiles -> Exchange tiles
+    moveFromEntity _ (M.Move
+                     gameId
+                     moveNumber
+                     (Just tiles)
+                     (Just startx)
+                     (Just starty)
+                     (Just isHorizontal)) = undefined
+    moveFromEntity _ (m@M.Move {})  = error $ "you've dun goofed, see database logs (hopefully) "
+
+    dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
+    dbTileRepresentationToTiles letterBag textRepresentation =
+            sequence $ fmap getTile (show textRepresentation)
+        where
+            letterMap = bagLetters letterBag
+            getTile :: Char -> Either Text Tile
+            getTile character
+                | (C.isLower character) =  Right $ Blank (Just character)
+                | character == '_' =  Right $ Blank Nothing
+                | otherwise = case Mp.lookup character letterMap of
+                                Just tile -> Right tile
+                                _ -> Left $ pack $ (show character) ++ " not found in letterbag"
 
     {-
         Persists the original game state (before the game has begun) and
@@ -52,7 +82,7 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     persistGameState pool gameId serverGame = do
         withPool pool $ do
             gameDbId <- insert $
-                (M.Game 
+                (M.Game
                     gameId
                     (tilesToDbRepresentation (tiles letterBag))
                     (pack $ show (getGenerator letterBag)))
@@ -76,21 +106,21 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
 
     persistUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
     persistUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
-    persistUpdate pool gameId (PlayerBoardMove moveNumber placed _ _ _ _) = 
+    persistUpdate pool gameId (PlayerBoardMove moveNumber placed _ _ _ _) =
         persistBoardMove pool gameId moveNumber placed
     persistUpdate pool gameId (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId moveNumber
-    persistUpdate pool gameId (PlayerExchangeMove moveNumber _ exchanged _) = 
+    persistUpdate pool gameId (PlayerExchangeMove moveNumber _ exchanged _) =
         persistExchangeMove pool gameId moveNumber exchanged
     persistUpdate _ _ _ = return ()
- 
+
     persistBoardMove :: Pool SqlBackend -> Text -> Int -> [(Pos, Tile)] -> IO ()
     persistBoardMove pool gameId moveNumber placed = do
-        let move = M.Move 
-                        gameId 
-                        moveNumber 
-                        (Just $ tilesToDbRepresentation (Prelude.map snd placedSorted)) 
-                        (Just $ xPos min) 
-                        (Just $ yPos min) 
+        let move = M.Move
+                        gameId
+                        moveNumber
+                        (Just $ tilesToDbRepresentation (Prelude.map snd placedSorted))
+                        (Just $ xPos min)
+                        (Just $ yPos min)
                         (Just isHorizontal)
 
         withPool pool $ do
@@ -128,4 +158,4 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     tileToDbRepresentation (Letter lettr val) = lettr
     tileToDbRepresentation (Blank Nothing) = '_'
     tileToDbRepresentation (Blank (Just letter)) = C.toLower letter
-        
+
