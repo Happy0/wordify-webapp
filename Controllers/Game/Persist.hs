@@ -14,11 +14,13 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import qualified Data.Char as C
     import qualified Data.List as L
     import qualified Data.Map as Mp
+    import qualified Data.Text as T
     import Data.Pool
     import Database.Persist.Sql
     import Data.Text
     import Data.Time.Clock
     import qualified Model as M
+    import Wordify.Rules.Board
     import Wordify.Rules.LetterBag
     import Wordify.Rules.Move
     import Wordify.Rules.Pos
@@ -34,20 +36,29 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
                     $= chatMessageFromEntity
 
-    moveFromEntity :: LetterBag -> M.Move -> Move
-    moveFromEntity letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Pass
-    moveFromEntity letterBag (M.Move gameId moveNumber (Just tiles) Nothing Nothing Nothing) =
+    moveFromEntity :: Board -> LetterBag -> M.Move -> Either Text Move
+    moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
+    moveFromEntity board letterBag (M.Move gameId moveNumber (Just tiles) Nothing Nothing Nothing) =
         case dbTileRepresentationToTiles letterBag tiles of
             Left err -> error $ "you've dun goofed... " ++ show err
-            Right tiles -> Exchange tiles
-    moveFromEntity _ (M.Move
+            Right tiles -> Right $ Exchange tiles
+    moveFromEntity board letterBag (M.Move
                      gameId
                      moveNumber
                      (Just tiles)
                      (Just startx)
                      (Just starty)
-                     (Just isHorizontal)) = undefined
-    moveFromEntity _ (m@M.Move {})  = error $ "you've dun goofed, see database logs (hopefully) "
+                     (Just isHorizontal)) =
+            do
+                let direction = if isHorizontal then Horizontal else Vertical
+                let startPos = posAt (startx, starty)
+ 
+                positions <- case startPos of
+                    Nothing -> Left $ "u dun goofed. Start position stored for the move is invalid "
+                    Just pos -> Right $ emptySquaresFrom board pos (T.length tiles) direction
+                tiles <- dbTileRepresentationToTiles letterBag tiles
+                return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
+    moveFromEntity _ _ (m@M.Move {})  = error $ "you've dun goofed, see database logs (hopefully) "
 
     dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
     dbTileRepresentationToTiles letterBag textRepresentation =
