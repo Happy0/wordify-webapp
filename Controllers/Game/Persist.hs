@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (getChatMessages, persistNewGame) where
+module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
 
     import Prelude
     import Control.Concurrent
@@ -6,9 +6,11 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import Control.Monad.IO.Class
     import Control.Concurrent.STM
     import Control.Concurrent.STM.TChan
+    import Control.Monad.Trans.Either
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
     import Controllers.Game.Model.ServerPlayer
+    import Control.Error.Util
     import Data.Conduit
     import qualified Data.Conduit.List as CL
     import qualified Data.Char as C
@@ -20,58 +22,44 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     import Data.Text
     import Data.Time.Clock
     import qualified Model as M
+    import System.Random
     import Wordify.Rules.Board
+    import Wordify.Rules.Dictionary
     import Wordify.Rules.LetterBag
     import Wordify.Rules.Move
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
     import Wordify.Rules.Game
 
-    chatMessageFromEntity :: Monad m => Conduit (Entity M.ChatMessage) m GameMessage
-    chatMessageFromEntity = CL.map fromEntity
-        where
-            fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message)
-
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
                     $= chatMessageFromEntity
 
-    moveFromEntity :: Board -> LetterBag -> M.Move -> Either Text Move
-    moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
-    moveFromEntity board letterBag (M.Move gameId moveNumber (Just tiles) Nothing Nothing Nothing) =
-        case dbTileRepresentationToTiles letterBag tiles of
-            Left err -> error $ "you've dun goofed... " ++ show err
-            Right tiles -> Right $ Exchange tiles
-    moveFromEntity board letterBag (M.Move
-                     gameId
-                     moveNumber
-                     (Just tiles)
-                     (Just startx)
-                     (Just starty)
-                     (Just isHorizontal)) =
-            do
-                let direction = if isHorizontal then Horizontal else Vertical
-                let startPos = posAt (startx, starty)
- 
-                positions <- case startPos of
-                    Nothing -> Left $ "u dun goofed. Start position stored for the move is invalid "
-                    Just pos -> Right $ emptySquaresFrom board pos (T.length tiles) direction
-                tiles <- dbTileRepresentationToTiles letterBag tiles
-                return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
-    moveFromEntity _ _ (m@M.Move {})  = error $ "you've dun goofed, see database logs (hopefully) "
+    getGame :: Pool SqlBackend -> LetterBag -> Dictionary -> Text -> IO (Either Text ServerGame)
+    getGame pool bag dictionary gameId = do
+        dbEntries <- withPool pool $ do
+            maybeGame <- selectFirst [M.GameGameId ==. gameId] []
+            case maybeGame of
+                Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
+                Just gameModel -> do
+                    players <- selectList [M.PlayerGame ==. gameId] []
+                    moves <- selectList [M.MoveGame ==. gameId] []
+                    return $ Right (gameModel, players, L.map entityVal moves)
 
-    dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
-    dbTileRepresentationToTiles letterBag textRepresentation =
-            sequence $ fmap getTile (show textRepresentation)
-        where
-            letterMap = bagLetters letterBag
-            getTile :: Char -> Either Text Tile
-            getTile character
-                | (C.isLower character) =  Right $ Blank (Just character)
-                | character == '_' =  Right $ Blank Nothing
-                | otherwise = case Mp.lookup character letterMap of
-                                Just tile -> Right tile
-                                _ -> Left $ pack $ (show character) ++ " not found in letterbag"
+        case dbEntries of
+            Right (Entity _ (M.Game _ bagText bagSeed), playerModels, moveModels) -> do
+                let serverPlayers = L.map playerFromEntity playerModels
+
+                runEitherT $ do
+                    internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
+                    tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
+                    let bag = makeBagUsingGenerator tiles (read (show bagSeed) :: StdGen)
+                    let game = makeGame internalPlayers bag dictionary
+                    return undefined
+            Left err -> return $ Left err
+
+    playThroughGame :: Game -> [M.Move] -> Either Text Game
+    playThroughGame game moves = undefined
 
     {-
         Persists the original game state (before the game has begun) and
@@ -170,3 +158,47 @@ module Controllers.Game.Persist (getChatMessages, persistNewGame) where
     tileToDbRepresentation (Blank Nothing) = '_'
     tileToDbRepresentation (Blank (Just letter)) = C.toLower letter
 
+    chatMessageFromEntity :: Monad m => Conduit (Entity M.ChatMessage) m GameMessage
+    chatMessageFromEntity = CL.map fromEntity
+        where
+            fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message)
+
+    moveFromEntity :: Board -> LetterBag -> M.Move -> Either Text Move
+    moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
+    moveFromEntity board letterBag (M.Move gameId moveNumber (Just tiles) Nothing Nothing Nothing) =
+        case dbTileRepresentationToTiles letterBag tiles of
+            Left err -> error $ "you've dun goofed... " ++ show err
+            Right tiles -> Right $ Exchange tiles
+    moveFromEntity board letterBag (M.Move
+                     gameId
+                     moveNumber
+                     (Just tiles)
+                     (Just startx)
+                     (Just starty)
+                     (Just isHorizontal)) =
+            do
+                let direction = if isHorizontal then Horizontal else Vertical
+                let startPos = posAt (startx, starty)
+ 
+                positions <- case startPos of
+                    Nothing -> Left $ "u dun goofed. Start position stored for the move is invalid "
+                    Just pos -> Right $ emptySquaresFrom board pos (T.length tiles) direction
+                tiles <- dbTileRepresentationToTiles letterBag tiles
+                return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
+    moveFromEntity _ _ (m@M.Move {})  = error $ "you've dun goofed, see database logs (hopefully) "
+
+    playerFromEntity :: Entity M.Player -> ServerPlayer
+    playerFromEntity (Entity _ (M.Player gameId name playerId _)) = makeNewPlayer name playerId
+
+    dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
+    dbTileRepresentationToTiles letterBag textRepresentation =
+            sequence $ fmap getTile (show textRepresentation)
+        where
+            letterMap = bagLetters letterBag
+            getTile :: Char -> Either Text Tile
+            getTile character
+                | (C.isLower character) =  Right $ Blank (Just character)
+                | character == '_' =  Right $ Blank Nothing
+                | otherwise = case Mp.lookup character letterMap of
+                                Just tile -> Right tile
+                                _ -> Left $ pack $ (show character) ++ " not found in letterbag"
