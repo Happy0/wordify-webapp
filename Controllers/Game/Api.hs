@@ -3,7 +3,7 @@ module Controllers.Game.Api (
                              ClientMessage(AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
                              GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove, PlayerChat),
                              ServerResponse(PotentialScore, BoardMoveSuccess, ExchangeMoveSuccess,
-                                PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary) where
+                                PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary, transitionToSummary) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -15,6 +15,7 @@ module Controllers.Game.Api (
     import Model.Api
     import Wordify.Rules.Board
     import Wordify.Rules.FormedWord
+    import Wordify.Rules.Move
     import Wordify.Rules.Player
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
@@ -23,7 +24,7 @@ module Controllers.Game.Api (
 
     data ChatMessage = ChatMessage {user :: Text, message :: Text}
 
-    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary
+    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary | GameEndSummary
 
     data ClientMessage = AskPotentialScore [(Pos, Tile)] |
                          SendChatMessage Text |
@@ -144,6 +145,12 @@ module Controllers.Game.Api (
             tile <-  val .: "tile" >>= parseJSON
             return (pos, tile)
     getPosAndTile _ = fail "expected object payload with pos and tile"
+
+    transitionToSummary :: GameTransition -> MoveSummary
+    transitionToSummary (MoveTransition player game formed) = toMoveSummary formed
+    transitionToSummary (PassTransition _) = PassMoveSummary
+    transitionToSummary (ExchangeTransition _ _ _ ) = ExchangeMoveSummary
+    transitionToSummary _ = GameEndSummary
 
     toMoveSummary :: FormedWords -> MoveSummary
     toMoveSummary formedWords =

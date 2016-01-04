@@ -56,31 +56,48 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                     let bag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
                     game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers bag dictionary)
 
-                    currentGame <- hoistEither $ playThroughGame game moveModels
+                    currentGameTransitions <- hoistEither $ playThroughGame game moveModels
+                    let currentGame = if (L.length currentGameTransitions) > 0 then newGame (L.last currentGameTransitions) else game
+                    let summaries = L.map transitionToSummary currentGameTransitions
+
                     channel <- liftIO $ newBroadcastTChanIO
-                    liftIO $ newTVarIO $ ServerGame game serverPlayers channel []
+                    liftIO $ newTVarIO $ ServerGame currentGame serverPlayers channel summaries
 
             Left err -> return $ Left err
-        where
-            mapLeft :: (a -> c) -> Either a b -> Either c b
-            mapLeft func (Left err) = Left $ func err
-            mapLeft _ (Right r) = Right r
 
-    playThroughGame :: Game -> [M.Move] -> Either Text Game
-    playThroughGame game moves = foldM playNextMove game moves
+    playThroughGame :: Game -> [M.Move] -> Either Text [GameTransition]
+    playThroughGame game moves = do
+        case moves of
+            [] -> Right []
+            (x:xs) -> do
+                firstMove <- moveFromEntity (board game) initialBag x
+                firstTransition <- mapLeft (pack . show) $ makeMove game firstMove
+                scanM playNextMove firstTransition xs
         where
             initialBag = bag game
-            playNextMove :: Game -> M.Move -> Either Text Game
-            playNextMove game moveModel = 
-                case moveFromEntity (board game) initialBag moveModel of
+            playNextMove :: GameTransition -> M.Move -> Either Text GameTransition
+            playNextMove gameTransition moveModel = 
+                case moveFromEntity (board (newGame gameTransition)) initialBag moveModel of
                     Left err ->  Left err
                     Right move ->
-                        let moveResult = makeMove game move
+                        let moveResult = makeMove (newGame gameTransition) move
                         in case moveResult of
                             Left invalidState -> Left $ pack . show $ invalidState
-                            Right moveResult -> Right (newGame moveResult)
+                            Right moveResult -> Right moveResult
 
-    {-
+            scanM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m [a]
+            scanM f q [] = return [q]
+            scanM f q (x:xs) =
+                do 
+                    q2 <- f q x
+                    qs <- scanM f q2 xs
+                    return (q:qs)
+
+    mapLeft :: (a -> c) -> Either a b -> Either c b
+    mapLeft func (Left err) = Left $ func err
+    mapLeft _ (Right r) = Right r
+
+                    {-
         Persists the original game state (before the game has begun) and
         then listens for game events and updates the game in storage as
         it is played
