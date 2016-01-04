@@ -53,7 +53,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                 runEitherT $ do
                     internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
                     tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
-                    let bag = makeBagUsingGenerator tiles (read (show bagSeed) :: StdGen)
+                    let bag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
                     game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers bag dictionary)
 
                     currentGame <- hoistEither $ playThroughGame game moveModels
@@ -211,7 +211,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
 
     dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
     dbTileRepresentationToTiles letterBag textRepresentation =
-            sequence $ fmap getTile (show textRepresentation)
+            sequence $ fmap getTile (unpack textRepresentation)
         where
             letterMap = bagLetters letterBag
             getTile :: Char -> Either Text Tile
