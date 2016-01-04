@@ -51,7 +51,8 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                     cachedGame <- lookup gameId <$> readTVar gameCache
                     case cachedGame of
                         Nothing -> do
-                            M.insert gameId serverGame <$> readTVar gameCache
+                            newCache <- M.insert gameId serverGame <$> readTVar gameCache
+                            writeTVar gameCache newCache
                             return $ Right serverGame
                         Just entry -> do
                             return $ Right entry
