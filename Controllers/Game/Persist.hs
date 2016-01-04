@@ -56,7 +56,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                     let bag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
                     game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers bag dictionary)
 
-                    currentGameTransitions <- hoistEither $ playThroughGame game moveModels
+                    currentGameTransitions <- hoistEither $ playThroughGame game bag moveModels
                     let currentGame = if (L.length currentGameTransitions) > 0 then newGame (L.last currentGameTransitions) else game
                     let summaries = L.map transitionToSummary currentGameTransitions
 
@@ -65,8 +65,8 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
 
             Left err -> return $ Left err
 
-    playThroughGame :: Game -> [M.Move] -> Either Text [GameTransition]
-    playThroughGame game moves = do
+    playThroughGame :: Game -> LetterBag -> [M.Move] -> Either Text [GameTransition]
+    playThroughGame game initialBag moves = do
         case moves of
             [] -> Right []
             (x:xs) -> do
@@ -74,7 +74,6 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                 firstTransition <- mapLeft (pack . show) $ makeMove game firstMove
                 scanM playNextMove firstTransition xs
         where
-            initialBag = bag game
             playNextMove :: GameTransition -> M.Move -> Either Text GameTransition
             playNextMove gameTransition moveModel = 
                 case moveFromEntity (board (newGame gameTransition)) initialBag moveModel of
