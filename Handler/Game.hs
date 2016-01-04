@@ -55,9 +55,13 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                             return $ Right serverGame
                         Just entry -> do
                             return $ Right entry
-                            
-        
-        
+
+getDictionaryAndLetterBag :: App -> (Dictionary, LetterBag)
+getDictionaryAndLetterBag app = do
+            let setups = localisedGameSetups app
+            -- Don't taze me bro, will fix later
+            let Just setup = M.lookup "en" setups
+            (localisedDictionary setup, localisedLetterBag setup)
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -66,11 +70,13 @@ getGameR gameId = do
     let cookies = reqCookies request
     let maybePlayerId = L.lookup "id" cookies
     let gamesInProgress = games app
-    maybeGame <- atomically $ lookup gameId <$> readTVar gamesInProgress
+
+    let (dictionary, letterBag) = getDictionaryAndLetterBag app
+    maybeGame <- liftIO $ loadGame (appConnPool app) dictionary letterBag gameId gamesInProgress
 
     case maybeGame of
-        Nothing -> notFound
-        Just gameInProgress ->
+        Left err -> invalidArgs [err]
+        Right gameInProgress ->
             do
                 (serverGame, messageChannel) <- atomically $ setupPrerequisets gameInProgress
                 let currentGame = game serverGame
