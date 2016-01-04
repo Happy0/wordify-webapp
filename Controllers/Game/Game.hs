@@ -111,6 +111,7 @@ module Controllers.Game.Game(
         do
             serverGame <- readTVarIO sharedServerGame
             let gameState = game serverGame
+            let channel = broadcastChannel serverGame
 
             if (playerNumber gameState) /= playerNo
                 then return $ InvalidCommand "Not your move"
@@ -120,15 +121,20 @@ module Controllers.Game.Game(
                         Left err -> return $ InvalidCommand $ (pack . show) err
                         Right (PassTransition newGame) ->
                             do
-                                let channel = broadcastChannel serverGame
                                 let summary = PassMoveSummary
                                 let newSummaries = (moveSummaries serverGame ++ [summary])
                                 atomically $ do
                                     writeTVar sharedServerGame (serverGame {game = newGame, moveSummaries = newSummaries})
                                     writeTChan channel $ PlayerPassMove (moveNumber newGame) (playerNumber newGame) summary
                                 return PassMoveSuccess
-                        Right (GameFinished game maybeWords players ) ->
-                            return $ InvalidCommand "game finish not handled yet."
+                        Right gameFinishedTransition@(GameFinished newGame maybeWords players ) ->
+                                atomically $ do
+                                    let summaries = (moveSummaries serverGame) ++ [transitionToSummary gameFinishedTransition]
+                                    writeTVar sharedServerGame serverGame { game = newGame, moveSummaries = summaries}
+                                    writeTChan channel $ GameEnd (transitionToSummary gameFinishedTransition)
+                                    return PassMoveSuccess
+
+    
 
     handleChatMessage :: TVar ServerGame -> Maybe Int -> Text -> IO ServerResponse
     handleChatMessage _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
