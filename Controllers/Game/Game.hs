@@ -54,18 +54,21 @@ module Controllers.Game.Game(
                 then return $ InvalidCommand "Not your move"
                 else do
                     let moveOutcome = makeMove gameState (PlaceTiles (M.fromList placed))
+                    let channel = broadcastChannel serverGame
 
                     case moveOutcome of
-                        Right (GameFinished newGame maybeWords players ) -> do
-                            atomically $ writeTVar sharedServerGame serverGame { game = newGame}
-                            return $ InvalidCommand "game finish not handled yet."
+                        Right gameFinishedTransition@(GameFinished newGame maybeWords players ) -> do
+                            let summaries = moveSummaries serverGame ++ [transitionToSummary gameFinishedTransition]
+                            atomically $ do
+                                         writeTVar sharedServerGame serverGame { game = newGame, moveSummaries = summaries}
+                                         writeTChan channel $ GameEnd (transitionToSummary gameFinishedTransition)
+                            return $ BoardMoveSuccess []
 
                         Right (MoveTransition newPlayerState newGame wordsFormed) ->
                             do
                                 let moveSummary = toMoveSummary wordsFormed
                                 let newSummaries = moveSummaries serverGame ++ [moveSummary]
                                 let updatedServerGame = serverGame {game = newGame, moveSummaries = newSummaries}
-                                let channel = broadcastChannel updatedServerGame
                                 atomically $ do
                                      writeTChan channel $ (PlayerBoardMove (moveNumber newGame) placed moveSummary (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
                                      writeTVar sharedServerGame updatedServerGame

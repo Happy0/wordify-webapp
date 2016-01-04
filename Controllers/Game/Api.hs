@@ -1,7 +1,7 @@
 module Controllers.Game.Api (
                              ChatMessage(ChatMessage),
                              ClientMessage(AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
-                             GameMessage(PlayerBoardMove, PlayerPassMove, PlayerExchangeMove, PlayerChat),
+                             GameMessage(PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat),
                              ServerResponse(PotentialScore, BoardMoveSuccess, ExchangeMoveSuccess,
                                 PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary, transitionToSummary) where
 
@@ -48,6 +48,7 @@ module Controllers.Game.Api (
                                         players :: [Player],
                                          nowPlaying :: Int,
                                         tilesRemaining :: Int} |
+                                     GameEnd MoveSummary |
                                      PlayerPassMove Int Int MoveSummary |
                                      PlayerExchangeMove Int Int [Tile] MoveSummary |
                                      PlayerChat ChatMessage
@@ -59,16 +60,19 @@ module Controllers.Game.Api (
         toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
         toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
         toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
+        toJSON (GameEndSummary ) = object ["type" .= gameEndSummaryType]
 
     wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
     boardSummaryType = ("board" :: Text)
     passSummaryType = ("pass" :: Text)
     exchangeSummaryType = ("exchange" :: Text)
+    gameEndSummaryType = ("gameEnd" :: Text)
 
     instance ServerMessage GameMessage where
         commandName PlayerBoardMove{}  = "playerBoardMove"
         commandName (PlayerPassMove {}) = "playerPassMove"
         commandName (PlayerExchangeMove {}) = "playerExchangeMove"
+        commandName (GameEnd {}) = "gameFinished"
         commandName (PlayerChat {}) = "playerChat"
 
     instance ToJSON GameMessage where
@@ -79,6 +83,7 @@ module Controllers.Game.Api (
                     "players" .= toJSON players,
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]
+        toJSON (GameEnd summary) = object ["summary" .= summary]
         toJSON (PlayerExchangeMove moveNumber nowPlaying _ summary) =
             -- We do not tell clients what tiles the player exchanged
             object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
