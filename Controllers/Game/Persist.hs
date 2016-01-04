@@ -233,7 +233,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
             letterMap = bagLetters letterBag
             getTile :: Char -> Either Text Tile
             getTile character
-                | (C.isLower character) =  Right $ Blank (Just character)
+                | (C.isLower character) =  Right $ Blank (Just $ C.toUpper character)
                 | character == '_' =  Right $ Blank Nothing
                 | otherwise = case Mp.lookup character letterMap of
                                 Just tile -> Right tile
