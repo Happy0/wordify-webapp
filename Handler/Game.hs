@@ -23,9 +23,41 @@ import qualified Data.List.NonEmpty as NE
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
+import Wordify.Rules.Dictionary
 import Data.Aeson
 import Wordify.Rules.Player
 import Controllers.Game.Game
+import Controllers.Game.Persist
+import qualified Data.Map as M
+
+loadGame :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text (TVar ServerGame)) -> IO (Either Text (TVar ServerGame))
+loadGame pool dictionary letterBag gameId gameCache =
+    do
+        maybeGame <- atomically $ (lookup gameId <$> readTVar gameCache)
+        case maybeGame of
+            Nothing -> loadFromDatabase pool dictionary letterBag gameId gameCache
+            Just game -> return $ Right game
+
+loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text (TVar ServerGame)) -> IO (Either Text (TVar ServerGame))
+loadFromDatabase pool dictionary letterBag gameId gameCache =
+    do
+        eitherGame <- getGame pool letterBag dictionary gameId
+        case eitherGame of
+            Left err -> return $ Left err
+            Right serverGame ->
+                -- Add the game to the cache of active games
+                atomically $ do
+                    -- Check another client didn't race us to the database
+                    cachedGame <- lookup gameId <$> readTVar gameCache
+                    case cachedGame of
+                        Nothing -> do
+                            M.insert gameId serverGame <$> readTVar gameCache
+                            return $ Right serverGame
+                        Just entry -> do
+                            return $ Right entry
+                            
+        
+        
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do

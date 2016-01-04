@@ -35,7 +35,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
                     $= chatMessageFromEntity
 
-    getGame :: Pool SqlBackend -> LetterBag -> Dictionary -> Text -> IO (Either Text ServerGame)
+    getGame :: Pool SqlBackend -> LetterBag -> Dictionary -> Text -> IO (Either Text (TVar ServerGame))
     getGame pool bag dictionary gameId = do
         dbEntries <- withPool pool $ do
             maybeGame <- selectFirst [M.GameGameId ==. gameId] []
@@ -58,7 +58,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
 
                     currentGame <- hoistEither $ playThroughGame game moveModels
                     channel <- liftIO $ newBroadcastTChanIO
-                    return $ ServerGame game serverPlayers channel []
+                    liftIO $ newTVarIO $ ServerGame game serverPlayers channel []
 
             Left err -> return $ Left err
         where
