@@ -57,7 +57,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
                 removeGameLobby app gameId
                 serverGame <- (createGame app gameId lobby)
                 return $ Just serverGame
-        else 
+        else
             return Nothing
 
     removeGameLobby :: App -> T.Text -> STM ()
@@ -70,7 +70,7 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
         do
             let gamesInProgress = games app
             newChannel <- newBroadcastTChan
-            let serverGame = ServerGame newGame players newChannel []
+            let serverGame = ServerGame newGame players newChannel
             gameRef <- newTVar serverGame
             modifyTVar gamesInProgress $ M.insert gameId gameRef
             return serverGame

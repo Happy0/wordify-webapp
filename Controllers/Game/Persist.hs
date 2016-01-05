@@ -56,38 +56,30 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                     let bag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
                     game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers bag dictionary)
 
-                    currentGameTransitions <- hoistEither $ playThroughGame game bag moveModels
-                    let currentGame = if (L.length currentGameTransitions) > 0 then newGame (L.last currentGameTransitions) else game
-                    let summaries = L.map transitionToSummary currentGameTransitions
+                    currentGame <- hoistEither $ playThroughGame game bag moveModels
 
                     channel <- liftIO $ newBroadcastTChanIO
-                    liftIO $ newTVarIO $ ServerGame currentGame serverPlayers channel summaries
+                    liftIO $ newTVarIO $ ServerGame currentGame serverPlayers channel
 
             Left err -> return $ Left err
 
-    playThroughGame :: Game -> LetterBag -> [M.Move] -> Either Text [GameTransition]
-    playThroughGame game initialBag moves = do
-        case moves of
-            [] -> Right []
-            (x:xs) -> do
-                firstMove <- moveFromEntity (board game) initialBag x
-                firstTransition <- mapLeft (pack . show) $ makeMove game firstMove
-                scanM playNextMove firstTransition xs
+    playThroughGame :: Game -> LetterBag -> [M.Move] -> Either Text Game
+    playThroughGame game initialBag moves = foldM playNextMove game moves
         where
-            playNextMove :: GameTransition -> M.Move -> Either Text GameTransition
-            playNextMove gameTransition moveModel = 
-                case moveFromEntity (board (newGame gameTransition)) initialBag moveModel of
+            playNextMove :: Game -> M.Move -> Either Text Game
+            playNextMove game moveModel =
+                case moveFromEntity (board game) initialBag moveModel of
                     Left err ->  Left err
                     Right move ->
-                        let moveResult = makeMove (newGame gameTransition) move
+                        let moveResult = makeMove game move
                         in case moveResult of
                             Left invalidState -> Left $ pack . show $ invalidState
-                            Right moveResult -> Right moveResult
+                            Right moveResult -> Right (newGame moveResult)
 
             scanM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m [a]
             scanM f q [] = return [q]
             scanM f q (x:xs) =
-                do 
+                do
                     q2 <- f q x
                     qs <- scanM f q2 xs
                     return (q:qs)
@@ -214,7 +206,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
             do
                 let direction = if isHorizontal then Horizontal else Vertical
                 let startPos = posAt (startx, starty)
- 
+
                 positions <- case startPos of
                     Nothing -> Left $ "u dun goofed. Start position stored for the move is invalid "
                     Just pos -> Right $ emptySquaresFrom board pos (T.length tiles) direction

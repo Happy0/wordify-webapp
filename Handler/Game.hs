@@ -20,7 +20,7 @@ import qualified Data.Conduit.List as CL
 import Model.Api
 import Control.Concurrent
 import qualified Data.List.NonEmpty as NE
-import Wordify.Rules.Game
+import qualified Wordify.Rules.Game as G
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
 import Wordify.Rules.Dictionary
@@ -83,8 +83,7 @@ getGameR gameId = do
                 let currentGame = game serverGame
 
                 let maybePlayerNumber = (maybePlayerId >>= getPlayerNumber serverGame)
-                let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= getPlayer currentGame)
-                let moveHistory = moveSummaries serverGame
+                let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer currentGame)
 
                 webSockets $ gameApp app gameId gameInProgress messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
@@ -110,16 +109,15 @@ getGameR gameId = do
 
                             var opts = {element: document.getElementById("scrabbleground")};
                             opts.ground = {}
-                            opts.ground.board = #{toJSON (board currentGame)};
+                            opts.ground.board = #{toJSON (G.board currentGame)};
                             opts.send = send;
                             var round = Round(opts);
 
-                            round.controller.setPlayers( #{toJSON (players currentGame)});
+                            round.controller.setPlayers( #{toJSON (G.players currentGame)});
                             round.controller.setRackTiles(#{toJSON (maybePlayerRack)});
                             round.controller.setPlayerNumber(#{toJSON maybePlayerNumber});
-                            round.controller.setPlayerToMove(#{toJSON (playerNumber currentGame)});
-                            round.controller.setTilesRemaining(#{toJSON (bagSize (bag currentGame))});
-                            round.controller.setMoveHistory(#{toJSON moveHistory});
+                            round.controller.setPlayerToMove(#{toJSON (G.playerNumber currentGame)});
+                            round.controller.setTilesRemaining(#{toJSON (bagSize (G.bag currentGame))});
 
                             conn.onmessage = function (e) {
                                 var data = JSON.parse(e.data);
@@ -156,6 +154,19 @@ gameApp app gameId game channel maybePlayerId playerNumber = do
                             response <- liftIO $ performRequest game playerNumber parsedCommand
                             sendTextData . toJSONResponse $ response
             )
+
+sendPreviousMoves :: G.Game -> WebSocketsT Handler ()
+sendPreviousMoves game =
+    do
+        let moves = G.movesMade game
+        let gameTransitions = restoreGameLazy game moves
+
+        flip mapM_ gameTransitions $
+            \transition ->
+                case transition of
+                    Left _ -> return ()
+                    Right transition -> sendTextData $ toJSONResponse (transitionToSummary transition)
+    where
 
 {-
     Send the chat log history to the client

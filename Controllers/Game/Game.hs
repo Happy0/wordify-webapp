@@ -58,17 +58,15 @@ module Controllers.Game.Game(
 
                     case moveOutcome of
                         Right gameFinishedTransition@(GameFinished newGame maybeWords players ) -> do
-                            let summaries = moveSummaries serverGame ++ [transitionToSummary gameFinishedTransition]
                             atomically $ do
-                                         writeTVar sharedServerGame serverGame { game = newGame, moveSummaries = summaries}
+                                         writeTVar sharedServerGame serverGame { game = newGame}
                                          writeTChan channel $ GameEnd (transitionToSummary gameFinishedTransition)
                             return $ BoardMoveSuccess []
 
                         Right (MoveTransition newPlayerState newGame wordsFormed) ->
                             do
                                 let moveSummary = toMoveSummary wordsFormed
-                                let newSummaries = moveSummaries serverGame ++ [moveSummary]
-                                let updatedServerGame = serverGame {game = newGame, moveSummaries = newSummaries}
+                                let updatedServerGame = serverGame {game = newGame}
                                 atomically $ do
                                      writeTChan channel $ (PlayerBoardMove (moveNumber newGame) placed moveSummary (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
                                      writeTVar sharedServerGame updatedServerGame
@@ -90,12 +88,11 @@ module Controllers.Game.Game(
                 else do
                     let moveOutcome = makeMove gameState (Exchange exchanged)
                     case moveOutcome of
-                        Right (ExchangeTransition newGameState beforeExchangePlayer afterExchangePlayer) ->
+                        Right et@(ExchangeTransition newGameState beforeExchangePlayer afterExchangePlayer) ->
                             do
-                                let summary = ExchangeMoveSummary
-                                let newSummaries = (moveSummaries serverGame ++ [summary])
-                                let updatedServerGame = serverGame {game = newGameState, moveSummaries = newSummaries}
+                                let updatedServerGame = serverGame {game = newGameState}
                                 let channel = broadcastChannel updatedServerGame
+                                let summary = transitionToSummary et
                                 atomically $ do
                                     writeTChan channel (PlayerExchangeMove (moveNumber newGameState) (playerNumber newGameState) exchanged summary)
                                     writeTVar sharedServerGame updatedServerGame
@@ -119,22 +116,20 @@ module Controllers.Game.Game(
                     let moveOutcome = makeMove gameState Pass
                     case moveOutcome of
                         Left err -> return $ InvalidCommand $ (pack . show) err
-                        Right (PassTransition newGame) ->
+                        Right pt@(PassTransition newGame) ->
                             do
-                                let summary = PassMoveSummary
-                                let newSummaries = (moveSummaries serverGame ++ [summary])
                                 atomically $ do
-                                    writeTVar sharedServerGame (serverGame {game = newGame, moveSummaries = newSummaries})
+                                    let summary = transitionToSummary pt
+                                    writeTVar sharedServerGame (serverGame {game = newGame})
                                     writeTChan channel $ PlayerPassMove (moveNumber newGame) (playerNumber newGame) summary
                                 return PassMoveSuccess
                         Right gameFinishedTransition@(GameFinished newGame maybeWords players ) ->
                                 atomically $ do
-                                    let summaries = (moveSummaries serverGame) ++ [transitionToSummary gameFinishedTransition]
-                                    writeTVar sharedServerGame serverGame { game = newGame, moveSummaries = summaries}
+                                    writeTVar sharedServerGame serverGame { game = newGame}
                                     writeTChan channel $ GameEnd (transitionToSummary gameFinishedTransition)
                                     return PassMoveSuccess
 
-    
+
 
     handleChatMessage :: TVar ServerGame -> Maybe Int -> Text -> IO ServerResponse
     handleChatMessage _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
