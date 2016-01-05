@@ -29,6 +29,7 @@ import Wordify.Rules.Player
 import Controllers.Game.Game
 import Controllers.Game.Persist
 import qualified Data.Map as M
+import qualified Data.List.NonEmpty as NE
 
 loadGame :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text (TVar ServerGame)) -> IO (Either Text (TVar ServerGame))
 loadGame pool dictionary letterBag gameId gameCache =
@@ -140,8 +141,10 @@ setupPrerequisets serverGame =
 
 
 gameApp :: App -> Text -> TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
-gameApp app gameId game channel maybePlayerId playerNumber = do
+gameApp app gameId sharedGame channel maybePlayerId playerNumber = do
        connection <- ask
+       gameState <- liftIO $ (game <$> readTVarIO sharedGame)
+       sendPreviousTransitions gameState
        liftIO $ sendPreviousChatMessages (appConnPool app) gameId connection
        race_
             (forever $ atomically (readTChan channel) >>= sendTextData . toJSONResponse)
@@ -151,22 +154,33 @@ gameApp app gameId game channel maybePlayerId playerNumber = do
                     case eitherDecode msg of
                         Left err -> sendTextData $ toJSONResponse (InvalidCommand (pack err))
                         Right parsedCommand -> do
-                            response <- liftIO $ performRequest game playerNumber parsedCommand
+                            response <- liftIO $ performRequest sharedGame playerNumber parsedCommand
                             sendTextData . toJSONResponse $ response
             )
 
-sendPreviousMoves :: G.Game -> WebSocketsT Handler ()
-sendPreviousMoves game =
+sendPreviousTransitions :: G.Game -> WebSocketsT Handler ()
+sendPreviousTransitions game =
     do
         let moves = G.movesMade game
-        let gameTransitions = restoreGameLazy game moves
 
-        flip mapM_ gameTransitions $
-            \transition ->
-                case transition of
-                    Left _ -> return ()
-                    Right transition -> sendTextData $ toJSONResponse (transitionToSummary transition)
-    where
+        -- TODO: Add function to make a new empty game from a game history to
+        -- haskellscrabble
+
+        let Right playersState = makeGameStatePlayers (L.length $ G.players game)
+
+        let Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
+        if (length moves == 0) then
+            return ()
+            else do
+                let gameTransitions = restoreGameLazy emptyGame $ NE.fromList moves
+
+                flip mapM_ gameTransitions $
+                    \transition ->
+                        case transition of
+                            Left err -> liftIO $ putStrLn . pack . show $ err
+                            Right transition -> sendTextData $ toJSONResponse (transitionToMessage transition)
+        where
+            (G.History originalBag moves) = G.history game
 
 {-
     Send the chat log history to the client

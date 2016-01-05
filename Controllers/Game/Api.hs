@@ -3,18 +3,21 @@ module Controllers.Game.Api (
                              ClientMessage(AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
                              GameMessage(PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat),
                              ServerResponse(PotentialScore, BoardMoveSuccess, ExchangeMoveSuccess,
-                                PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary, transitionToSummary) where
+                                PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary, transitionToMessage, transitionToSummary) where
 
     import Data.Aeson
     import Data.Aeson.Types
     import qualified Data.Vector as V
     import Control.Applicative
     import Data.Text
+    import qualified Data.Maybe as Mb
     import Prelude
     import qualified Data.HashMap.Strict as HM
     import Model.Api
     import Wordify.Rules.Board
     import Wordify.Rules.FormedWord
+    import qualified Wordify.Rules.Game as G
+    import Wordify.Rules.LetterBag
     import Wordify.Rules.Move
     import Wordify.Rules.Player
     import Wordify.Rules.Pos
@@ -150,6 +153,28 @@ module Controllers.Game.Api (
             tile <-  val .: "tile" >>= parseJSON
             return (pos, tile)
     getPosAndTile _ = fail "expected object payload with pos and tile"
+
+    transitionToMessage :: GameTransition -> GameMessage
+    transitionToMessage et@(ExchangeTransition newGameState beforeExchange afterExchange) =
+         PlayerExchangeMove
+            (G.moveNumber newGameState)
+            (G.playerNumber newGameState)
+            (tilesOnRack beforeExchange L.\\ tilesOnRack afterExchange)
+            (transitionToSummary et)
+    transitionToMessage pt@(MoveTransition _ newGame wordsFormed) =
+        PlayerBoardMove
+            (G.moveNumber newGame)
+            (Mb.mapMaybe (\(pos, square) ->
+                (pos,) <$> (tileIfOccupied square)) $ playerPlaced wordsFormed)
+            (transitionToSummary pt)
+            (G.players newGame)
+            (G.playerNumber newGame)
+            ((bagSize . G.bag) newGame)
+    transitionToMessage passTransition@(PassTransition newGame) =
+        PlayerPassMove (G.moveNumber newGame)
+                       (G.playerNumber newGame)
+                       (transitionToSummary passTransition)
+    transitionToMessage gf@(GameFinished game maybeWords players) = GameEnd (transitionToSummary gf)
 
     transitionToSummary :: GameTransition -> MoveSummary
     transitionToSummary (MoveTransition player game formed) = toMoveSummary formed
