@@ -50,21 +50,25 @@ module Controllers.Game.Game(
         an error to the client and writes nothing to the channel.
     -}
     handleMove :: TVar ServerGame ->
+                Int ->
                 Move ->
                 (Either ScrabbleError GameTransition -> ServerResponse) ->
                 IO ServerResponse
-    handleMove sharedGame move moveOutcomeHandler=
+    handleMove sharedGame playerMoving move moveOutcomeHandler=
         do
             serverGame <- readTVarIO sharedGame
-            let channel = broadcastChannel serverGame
-            let moveOutcome = makeMove (game serverGame) move
-            case moveOutcome of
-                Left err -> return $ moveOutcomeHandler $ Left err
-                Right transition -> do
-                    atomically $ do
-                        writeTChan channel (transitionToMessage transition)
-                        writeTVar sharedGame $ serverGame {game = newGame transition}
-                    return $ moveOutcomeHandler moveOutcome
+            if (playerNumber . game $ serverGame) /= playerMoving
+                then return $ InvalidCommand "Not your move"
+                else do
+                    let channel = broadcastChannel serverGame
+                    let moveOutcome = makeMove (game serverGame) move
+                    case moveOutcome of
+                        Left err -> return $ moveOutcomeHandler $ Left err
+                        Right transition -> do
+                            atomically $ do
+                                writeTChan channel (transitionToMessage transition)
+                                writeTVar sharedGame $ serverGame {game = newGame transition}
+                            return $ moveOutcomeHandler moveOutcome
 
     handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
     handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
