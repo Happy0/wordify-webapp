@@ -20,6 +20,7 @@ module Controllers.Game.Game(
     import Wordify.Rules.Pos
     import Wordify.Rules.Player
     import Wordify.Rules.Move
+    import Wordify.Rules.ScrabbleError
     import Wordify.Rules.Tile
 
     performRequest :: TVar ServerGame -> Maybe Int -> ClientMessage -> IO ServerResponse
@@ -42,6 +43,26 @@ module Controllers.Game.Game(
             return $ case formedWords of
                 Left _ -> PotentialScore 0
                 Right formed -> PotentialScore (overallScore formed)
+
+    {-
+        If the move is successful, writes an update onto the broadcast channel and
+        returns a server response to send to the moving client. Otherwise, returns
+        an error to the client and writes nothing to the channel.
+    -}
+    handleMove :: TVar ServerGame ->
+                Move ->
+                (Either ScrabbleError GameTransition -> ServerResponse) ->
+                IO ServerResponse
+    handleMove sharedGame move moveOutcomeHandler=
+        do
+            serverGame <- readTVarIO sharedGame
+            let channel = broadcastChannel serverGame
+            let moveOutcome = makeMove (game serverGame) move
+            case moveOutcome of
+                Left err -> return $ moveOutcomeHandler $ Left err
+                Right transition -> do
+                    atomically $ writeTChan channel (transitionToMessage transition)
+                    return $ moveOutcomeHandler moveOutcome
 
     handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
     handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
@@ -128,8 +149,6 @@ module Controllers.Game.Game(
                                     writeTVar sharedServerGame serverGame { game = newGame}
                                     writeTChan channel $ GameEnd (transitionToSummary gameFinishedTransition)
                                     return PassMoveSuccess
-
-
 
     handleChatMessage :: TVar ServerGame -> Maybe Int -> Text -> IO ServerResponse
     handleChatMessage _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
