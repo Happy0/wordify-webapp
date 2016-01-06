@@ -98,30 +98,10 @@ module Controllers.Game.Game(
 
     handlePassMove :: TVar ServerGame ->  Maybe Int -> IO ServerResponse
     handlePassMove _ Nothing = return $ InvalidCommand "Observers cannot move"
-    handlePassMove sharedServerGame (Just playerNo) =
-        do
-            serverGame <- readTVarIO sharedServerGame
-            let gameState = game serverGame
-            let channel = broadcastChannel serverGame
-
-            if (playerNumber gameState) /= playerNo
-                then return $ InvalidCommand "Not your move"
-                else do
-                    let moveOutcome = makeMove gameState Pass
-                    case moveOutcome of
-                        Left err -> return $ InvalidCommand $ (pack . show) err
-                        Right pt@(PassTransition newGame) ->
-                            do
-                                atomically $ do
-                                    let summary = transitionToSummary pt
-                                    writeTVar sharedServerGame (serverGame {game = newGame})
-                                    writeTChan channel $ PlayerPassMove (moveNumber newGame) (playerNumber newGame) summary
-                                return PassMoveSuccess
-                        Right gameFinishedTransition@(GameFinished newGame maybeWords players ) ->
-                                atomically $ do
-                                    writeTVar sharedServerGame serverGame { game = newGame}
-                                    writeTChan channel $ GameEnd (transitionToSummary gameFinishedTransition)
-                                    return PassMoveSuccess
+    handlePassMove sharedServerGame (Just playerNo) = handleMove sharedServerGame playerNo Pass moveOutcomeHandler
+        where
+            moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+            moveOutcomeHandler (Right _) = PassMoveSuccess
 
     handleChatMessage :: TVar ServerGame -> Maybe Int -> Text -> IO ServerResponse
     handleChatMessage _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
