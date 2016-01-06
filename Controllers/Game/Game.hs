@@ -73,35 +73,15 @@ module Controllers.Game.Game(
     handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
     handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
     handleBoardMove sharedServerGame (Just playerNo) placed =
-        do
-            serverGame <- readTVarIO sharedServerGame
-            let gameState = game serverGame
-
-            if (playerNumber gameState) /= playerNo
-                then return $ InvalidCommand "Not your move"
-                else do
-                    let moveOutcome = makeMove gameState (PlaceTiles (M.fromList placed))
-                    let channel = broadcastChannel serverGame
-
-                    case moveOutcome of
-                        Right gameFinishedTransition@(GameFinished newGame maybeWords players ) -> do
-                            atomically $ do
-                                         writeTVar sharedServerGame serverGame { game = newGame}
-                                         writeTChan channel $ GameEnd (transitionToSummary gameFinishedTransition)
-                            return $ BoardMoveSuccess []
-
-                        Right (MoveTransition newPlayerState newGame wordsFormed) ->
-                            do
-                                let moveSummary = toMoveSummary wordsFormed
-                                let updatedServerGame = serverGame {game = newGame}
-                                atomically $ do
-                                     writeTChan channel $ (PlayerBoardMove (moveNumber newGame) placed moveSummary (players newGame) (playerNumber newGame) (bagSize (bag newGame)))
-                                     writeTVar sharedServerGame updatedServerGame
-
-                                return $ BoardMoveSuccess (tilesOnRack newPlayerState)
-
-                        Left err -> return $ InvalidCommand $ (pack . show) err
-                        _ -> return $ InvalidCommand "Internal server error. Expected board move"
+        handleMove
+            sharedServerGame
+            playerNo
+            (PlaceTiles $ M.fromList (placed))
+            moveOutcomeHandler
+        where
+            moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+            moveOutcomeHandler (Right (MoveTransition newPlayer _ _ )) = BoardMoveSuccess (tilesOnRack newPlayer)
+            moveOutcomeHandler (Right _) = BoardMoveSuccess []
 
     handleExchangeMove :: TVar ServerGame -> Maybe Int -> [Tile] -> IO ServerResponse
     handleExchangeMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
