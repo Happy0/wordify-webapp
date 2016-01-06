@@ -86,28 +86,15 @@ module Controllers.Game.Game(
     handleExchangeMove :: TVar ServerGame -> Maybe Int -> [Tile] -> IO ServerResponse
     handleExchangeMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
     handleExchangeMove sharedServerGame (Just playerNo) exchanged =
-        do
-            serverGame <- readTVarIO sharedServerGame
-            let gameState = game serverGame
-
-            if (playerNumber gameState) /= playerNo
-                then return $ InvalidCommand "Not your move"
-                else do
-                    let moveOutcome = makeMove gameState (Exchange exchanged)
-                    case moveOutcome of
-                        Right et@(ExchangeTransition newGameState beforeExchangePlayer afterExchangePlayer) ->
-                            do
-                                let updatedServerGame = serverGame {game = newGameState}
-                                let channel = broadcastChannel updatedServerGame
-                                let summary = transitionToSummary et
-                                atomically $ do
-                                    writeTChan channel (PlayerExchangeMove (moveNumber newGameState) (playerNumber newGameState) exchanged summary)
-                                    writeTVar sharedServerGame updatedServerGame
-
-                                return $ ExchangeMoveSuccess (tilesOnRack afterExchangePlayer)
-
-                        Left err -> return $ InvalidCommand $ (pack . show) err
-
+        handleMove
+             sharedServerGame
+             playerNo
+             (Exchange exchanged)
+             moveOutcomeHandler
+        where
+            moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+            moveOutcomeHandler (Right (ExchangeTransition _ beforePlayer afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
+            moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
     handlePassMove :: TVar ServerGame ->  Maybe Int -> IO ServerResponse
     handlePassMove _ Nothing = return $ InvalidCommand "Observers cannot move"
