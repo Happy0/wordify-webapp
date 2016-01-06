@@ -61,7 +61,9 @@ module Controllers.Game.Game(
             case moveOutcome of
                 Left err -> return $ moveOutcomeHandler $ Left err
                 Right transition -> do
-                    atomically $ writeTChan channel (transitionToMessage transition)
+                    atomically $ do
+                        writeTChan channel (transitionToMessage transition)
+                        writeTVar sharedGame $ serverGame {game = newGame transition}
                     return $ moveOutcomeHandler moveOutcome
 
     handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
