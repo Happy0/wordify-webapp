@@ -23,18 +23,17 @@ module Controllers.Game.Game(
     import Wordify.Rules.ScrabbleError
     import Wordify.Rules.Tile
 
-    performRequest :: TVar ServerGame -> Maybe Int -> ClientMessage -> IO ServerResponse
+    performRequest :: ServerGame -> Maybe Int -> ClientMessage -> IO ServerResponse
     performRequest serverGame player (BoardMove placed) = handleBoardMove serverGame player placed
     performRequest serverGame player (ExchangeMove exchanged) = handleExchangeMove serverGame player exchanged
     performRequest serverGame player PassMove = handlePassMove serverGame player
     performRequest serverGame player (SendChatMessage msg) = handleChatMessage serverGame player msg
     performRequest serverGame player (AskPotentialScore placed) = handlePotentialScore serverGame placed
 
-    handlePotentialScore :: TVar ServerGame -> [(Pos,Tile)] -> IO ServerResponse
-    handlePotentialScore sharedServerGame placedTiles =
+    handlePotentialScore :: ServerGame -> [(Pos,Tile)] -> IO ServerResponse
+    handlePotentialScore serverGame placedTiles =
         do
-            serverGame <- readTVarIO sharedServerGame
-            let gameState = game serverGame
+            gameState <- readTVarIO $ game serverGame
             let gameBoard = board gameState
             let formedWords = if (moveNumber gameState) > 1
                     then wordsFormedMidGame gameBoard (M.fromList placedTiles)
@@ -49,28 +48,28 @@ module Controllers.Game.Game(
         returns a server response to send to the moving client. Otherwise, returns
         an error to the client and writes nothing to the channel.
     -}
-    handleMove :: TVar ServerGame ->
+    handleMove :: ServerGame ->
                 Int ->
                 Move ->
                 (Either ScrabbleError GameTransition -> ServerResponse) ->
                 IO ServerResponse
-    handleMove sharedGame playerMoving move moveOutcomeHandler=
+    handleMove serverGame playerMoving move moveOutcomeHandler=
         do
-            serverGame <- readTVarIO sharedGame
-            if (playerNumber . game $ serverGame) /= playerMoving
+            gameState <- readTVarIO (game serverGame)
+            if (playerNumber gameState) /= playerMoving
                 then return $ InvalidCommand "Not your move"
                 else do
                     let channel = broadcastChannel serverGame
-                    let moveOutcome = makeMove (game serverGame) move
+                    let moveOutcome = makeMove gameState move
                     case moveOutcome of
                         Left err -> return $ moveOutcomeHandler $ Left err
                         Right transition -> do
                             atomically $ do
                                 writeTChan channel (transitionToMessage transition)
-                                writeTVar sharedGame $ serverGame {game = newGame transition}
+                                writeTVar (game serverGame) $ newGame transition
                             return $ moveOutcomeHandler moveOutcome
 
-    handleBoardMove :: TVar ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
+    handleBoardMove :: ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
     handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
     handleBoardMove sharedServerGame (Just playerNo) placed =
         handleMove
@@ -83,7 +82,7 @@ module Controllers.Game.Game(
             moveOutcomeHandler (Right (MoveTransition newPlayer _ _ )) = BoardMoveSuccess (tilesOnRack newPlayer)
             moveOutcomeHandler (Right _) = BoardMoveSuccess []
 
-    handleExchangeMove :: TVar ServerGame -> Maybe Int -> [Tile] -> IO ServerResponse
+    handleExchangeMove :: ServerGame -> Maybe Int -> [Tile] -> IO ServerResponse
     handleExchangeMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
     handleExchangeMove sharedServerGame (Just playerNo) exchanged =
         handleMove
@@ -96,18 +95,17 @@ module Controllers.Game.Game(
             moveOutcomeHandler (Right (ExchangeTransition _ beforePlayer afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
             moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
-    handlePassMove :: TVar ServerGame ->  Maybe Int -> IO ServerResponse
+    handlePassMove :: ServerGame ->  Maybe Int -> IO ServerResponse
     handlePassMove _ Nothing = return $ InvalidCommand "Observers cannot move"
     handlePassMove sharedServerGame (Just playerNo) = handleMove sharedServerGame playerNo Pass moveOutcomeHandler
         where
             moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
             moveOutcomeHandler (Right _) = PassMoveSuccess
 
-    handleChatMessage :: TVar ServerGame -> Maybe Int -> Text -> IO ServerResponse
+    handleChatMessage :: ServerGame -> Maybe Int -> Text -> IO ServerResponse
     handleChatMessage _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-    handleChatMessage sharedServerGame (Just playerNumber) message =
+    handleChatMessage serverGame (Just playerNumber) message =
         do
-            serverGame <- readTVarIO sharedServerGame
             let playerName = SP.name <$> (getServerPlayer serverGame playerNumber)
 
             case playerName of

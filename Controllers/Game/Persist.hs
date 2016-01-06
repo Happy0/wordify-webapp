@@ -35,7 +35,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
                     $= chatMessageFromEntity
 
-    getGame :: Pool SqlBackend -> LetterBag -> Dictionary -> Text -> IO (Either Text (TVar ServerGame))
+    getGame :: Pool SqlBackend -> LetterBag -> Dictionary -> Text -> IO (Either Text ServerGame)
     getGame pool bag dictionary gameId = do
         dbEntries <- withPool pool $ do
             maybeGame <- selectFirst [M.GameGameId ==. gameId] []
@@ -57,9 +57,10 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                     game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers bag dictionary)
 
                     currentGame <- hoistEither $ playThroughGame game bag moveModels
+                    currentGameVar <- liftIO $ newTVarIO currentGame
 
                     channel <- liftIO $ newBroadcastTChanIO
-                    liftIO $ newTVarIO $ ServerGame currentGame serverPlayers channel
+                    return $ ServerGame currentGameVar serverPlayers channel
 
             Left err -> return $ Left err
 
@@ -106,6 +107,8 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
 
     persistGameState :: Pool SqlBackend -> Text -> ServerGame -> IO (Key M.Game)
     persistGameState pool gameId serverGame = do
+        gameState <- readTVarIO (game serverGame)
+        let History letterBag _ = history gameState
         withPool pool $ do
             gameDbId <- insert $
                 (M.Game
@@ -116,8 +119,6 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
             persistPlayers gameId (playing serverGame)
             return gameDbId
         where
-                gameState = game serverGame
-                History letterBag _ = history gameState
 
     persistPlayers gameId players =
         let playersWithNumbers = L.zip [1 .. 4] players

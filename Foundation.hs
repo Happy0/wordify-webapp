@@ -30,7 +30,7 @@ data App = App
     , appLogger      :: Logger
     , localisedGameSetups :: LocalisedGameSetups
     , gameLobbies :: TVar (Map Text (TVar GameLobby))
-    , games :: TVar (Map Text (TVar ServerGame))
+    , games :: TVar (Map Text ServerGame)
     }
 
 instance HasHttpManager App where

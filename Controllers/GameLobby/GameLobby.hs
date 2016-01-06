@@ -70,10 +70,9 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
         do
             let gamesInProgress = games app
             newChannel <- newBroadcastTChan
+            newGame <- newTVar (pendingGame lobby)
             let serverGame = ServerGame newGame players newChannel
-            gameRef <- newTVar serverGame
-            modifyTVar gamesInProgress $ M.insert gameId gameRef
+            modifyTVar gamesInProgress $ M.insert gameId serverGame
             return serverGame
         where
             players = lobbyPlayers lobby
-            newGame = pendingGame lobby

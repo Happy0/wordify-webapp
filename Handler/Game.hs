@@ -31,7 +31,7 @@ import Controllers.Game.Persist
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
-loadGame :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text (TVar ServerGame)) -> IO (Either Text (TVar ServerGame))
+loadGame :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text ServerGame)
 loadGame pool dictionary letterBag gameId gameCache =
     do
         maybeGame <- atomically $ (lookup gameId <$> readTVar gameCache)
@@ -39,7 +39,7 @@ loadGame pool dictionary letterBag gameId gameCache =
             Nothing -> loadFromDatabase pool dictionary letterBag gameId gameCache
             Just game -> return $ Right game
 
-loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text (TVar ServerGame)) -> IO (Either Text (TVar ServerGame))
+loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text ServerGame)
 loadFromDatabase pool dictionary letterBag gameId gameCache =
     do
         eitherGame <- getGame pool letterBag dictionary gameId
@@ -78,15 +78,18 @@ getGameR gameId = do
 
     case maybeGame of
         Left err -> invalidArgs [err]
-        Right gameInProgress ->
+        Right serverGame ->
             do
-                (serverGame, messageChannel) <- atomically $ setupPrerequisets gameInProgress
-                let currentGame = game serverGame
+                (currentGame, messageChannel) <-
+                     atomically $ do
+                        channel <- duplicateGameChannel serverGame
+                        currentGame <- readTVar $ game serverGame
+                        return (currentGame, channel)
 
                 let maybePlayerNumber = (maybePlayerId >>= getPlayerNumber serverGame)
                 let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer currentGame)
 
-                webSockets $ gameApp app gameId gameInProgress messageChannel maybePlayerId maybePlayerNumber
+                webSockets $ gameApp app gameId currentGame serverGame messageChannel maybePlayerId maybePlayerNumber
                 defaultLayout $ do
                     addStylesheet $ (StaticR css_scrabble_css)
                     addStylesheet $ (StaticR css_round_css)
@@ -132,19 +135,13 @@ getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerI
     where
         players = playing serverGame
 
-setupPrerequisets :: TVar ServerGame -> STM (ServerGame, TChan GameMessage)
-setupPrerequisets serverGame =
-    do
-        game <- readTVar serverGame
-        channel <- dupTChan $ broadcastChannel game
-        return (game, channel)
+duplicateGameChannel :: ServerGame -> STM (TChan GameMessage)
+duplicateGameChannel serverGame = dupTChan $ broadcastChannel serverGame
 
-
-gameApp :: App -> Text -> TVar ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
-gameApp app gameId sharedGame channel maybePlayerId playerNumber = do
+gameApp :: App -> Text -> G.Game -> ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
+gameApp app gameId initialGame sharedGame channel maybePlayerId playerNumber = do
        connection <- ask
-       gameState <- liftIO $ (game <$> readTVarIO sharedGame)
-       sendPreviousTransitions gameState
+       sendPreviousTransitions initialGame
        liftIO $ sendPreviousChatMessages (appConnPool app) gameId connection
        race_
             (forever $ atomically (readTChan channel) >>= sendTextData . toJSONResponse)
