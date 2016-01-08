@@ -1,4 +1,4 @@
-module Controllers.Game.Model.ServerGame (ServerGame(ServerGame), game, playing, broadcastChannel, getServerPlayer) where
+module Controllers.Game.Model.ServerGame (ServerGame(ServerGame), game, playing, broadcastChannel, numConnections, getServerPlayer) where
 
     import Prelude
     import Data.Text
@@ -10,7 +10,7 @@ module Controllers.Game.Model.ServerGame (ServerGame(ServerGame), game, playing,
     import qualified Data.List.Safe as SL
     import Control.Concurrent.STM.TVar
 
-    data ServerGame = ServerGame {game :: TVar Game, playing :: [ServerPlayer], broadcastChannel :: (TChan GameMessage)}
+    data ServerGame = ServerGame {game :: TVar Game, playing :: [ServerPlayer], broadcastChannel :: (TChan GameMessage), numConnections :: TVar Int}
 
     getServerPlayer :: ServerGame -> Int -> Maybe ServerPlayer
     getServerPlayer serverGame playerNumber = playing serverGame SL.!! (playerNumber - 1)

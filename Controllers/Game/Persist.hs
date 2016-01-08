@@ -60,7 +60,8 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
                     currentGameVar <- liftIO $ newTVarIO currentGame
 
                     channel <- liftIO $ newBroadcastTChanIO
-                    return $ ServerGame currentGameVar serverPlayers channel
+                    connections <- liftIO $ newTVarIO 0
+                    return $ ServerGame currentGameVar serverPlayers channel connections
 
             Left err -> return $ Left err
 

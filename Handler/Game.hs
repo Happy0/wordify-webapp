@@ -35,8 +35,14 @@ import qualified Data.List.NonEmpty as NE
 loadGame :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text ServerGame)
 loadGame pool dictionary letterBag gameId gameCache =
     do
-        maybeGame <- atomically $ (lookup gameId <$> readTVar gameCache)
-        case maybeGame of
+       maybeGame <- atomically $ do
+            game <- (lookup gameId <$> readTVar gameCache)
+            case game of
+                Just cachedGame ->
+                    modifyTVar (numConnections cachedGame) (+1) >> return game
+                _ -> return game
+
+       case maybeGame of
             Nothing -> loadFromDatabase pool dictionary letterBag gameId gameCache
             Just game -> return $ Right game
 
@@ -54,9 +60,11 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                     case cachedGame of
                         Nothing -> do
                             newCache <- M.insert gameId serverGame <$> readTVar gameCache
+                            modifyTVar (numConnections serverGame) (+1)
                             writeTVar gameCache newCache
                             return $ Right serverGame
                         Just entry -> do
+                            modifyTVar (numConnections entry) (+1)
                             return $ Right entry
 
 getDictionaryAndLetterBag :: App -> (Dictionary, LetterBag)
@@ -127,7 +135,17 @@ gameApp app gameId maybePlayerId = do
 
     where
         releaseGame :: Either Text ServerGame -> IO ()
-        releaseGame _ = putStrLn "releasing game"
+        releaseGame g =
+            case g of
+                Right g ->
+                    atomically $ do
+                        modifyTVar (numConnections g) (\connections -> connections - 1)
+                        connections <- readTVar $ numConnections g
+
+                        if connections == 0
+                            then modifyTVar (games app) (M.delete gameId)
+                            else return ()
+                Left _ -> return ()
 
 getGameDefaultLocale :: App -> Text -> IO (Either Text ServerGame)
 getGameDefaultLocale app gameId = do
