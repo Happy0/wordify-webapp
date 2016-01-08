@@ -43,7 +43,15 @@ loadGame pool dictionary letterBag gameId gameCache =
                 _ -> return game
 
        case maybeGame of
-            Nothing -> loadFromDatabase pool dictionary letterBag gameId gameCache
+            Nothing -> do
+                dbResult <- loadFromDatabase pool dictionary letterBag gameId gameCache
+                case dbResult of
+                    Left err -> return $ Left err
+                    Right gm -> do
+                        channel <- atomically $ duplicateGameChannel gm
+                        forkIO $ persistNewGame pool gameId gm channel
+                        return $ Right gm
+
             Just game -> return $ Right game
 
 loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text ServerGame)

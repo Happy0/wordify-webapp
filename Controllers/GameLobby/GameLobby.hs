@@ -73,7 +73,6 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
             newGame <- newTVar (pendingGame lobby)
             numConnections <- newTVar 0
             let serverGame = ServerGame newGame players newChannel numConnections
-            modifyTVar gamesInProgress $ M.insert gameId serverGame
             return serverGame
         where
             players = lobbyPlayers lobby

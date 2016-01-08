@@ -1,7 +1,7 @@
 module Controllers.Game.Api (
                              ChatMessage(ChatMessage),
                              ClientMessage(AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
-                             GameMessage(PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat),
+                             GameMessage(PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat, GameIdle),
                              ServerResponse(PotentialScore, BoardMoveSuccess, ExchangeMoveSuccess,
                                 PassMoveSuccess, ChatSuccess, InitialiseGame, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary, transitionToMessage, transitionToSummary) where
 
@@ -59,7 +59,8 @@ module Controllers.Game.Api (
                                      GameEnd MoveSummary |
                                      PlayerPassMove Int Int MoveSummary |
                                      PlayerExchangeMove Int Int [Tile] MoveSummary |
-                                     PlayerChat ChatMessage
+                                     PlayerChat ChatMessage |
+                                     GameIdle
 
     instance ToJSON ChatMessage where
         toJSON (ChatMessage user message) = object ["player" .= user, "message" .= message]
@@ -82,6 +83,7 @@ module Controllers.Game.Api (
         commandName (PlayerExchangeMove {}) = "playerExchangeMove"
         commandName (GameEnd {}) = "gameFinished"
         commandName (PlayerChat {}) = "playerChat"
+        commandName (GameIdle {}) = "gameIdle"
 
     instance ToJSON GameMessage where
         toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
@@ -98,6 +100,7 @@ module Controllers.Game.Api (
         toJSON (PlayerPassMove moveNumber nowPlaying summary) =
             object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
         toJSON (PlayerChat chatMessage) = toJSON chatMessage
+        toJSON (GameIdle) = object []
 
     instance FromJSON ClientMessage where
         parseJSON (Object request) =

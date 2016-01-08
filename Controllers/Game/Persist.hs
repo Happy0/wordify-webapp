@@ -130,7 +130,13 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
 
     watchForUpdates :: Pool SqlBackend -> Text -> TChan GameMessage -> IO ()
     watchForUpdates pool gameId messageChannel =
-        forever $ (atomically . readTChan) messageChannel >>= persistUpdate pool gameId
+        do
+            message <- atomically . readTChan $ messageChannel
+            case message of
+                GameIdle -> return ()
+                updateMessage -> do
+                    persistUpdate pool gameId updateMessage
+                    watchForUpdates pool gameId messageChannel
 
     persistUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
     persistUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
