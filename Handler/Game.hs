@@ -49,7 +49,7 @@ loadGame pool dictionary letterBag gameId gameCache =
                     Left err -> return $ Left err
                     Right gm -> do
                         channel <- atomically $ duplicateGameChannel gm
-                        forkIO $ persistNewGame pool gameId gm channel
+                        forkIO $ watchForUpdates pool gameId channel
                         return $ Right gm
 
             Just game -> return $ Right game

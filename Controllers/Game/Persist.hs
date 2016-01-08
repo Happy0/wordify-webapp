@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
+module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watchForUpdates) where
 
     import Prelude
     import Control.Concurrent
@@ -99,7 +99,6 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame) where
     persistNewGame pool gameId serverGame messageChannel = do
         forkIO $ do
              key <- persistGameState pool gameId serverGame
-             watchForUpdates pool gameId  messageChannel
              return ()
 
         return ()
