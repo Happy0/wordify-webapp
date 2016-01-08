@@ -138,7 +138,7 @@ module Handler.GameLobby where
                     do
                         let pool = appConnPool app
                         liftIO $ case maybeGameSetup of
-                            Just (game, gameChannel) -> persistNewGame pool gameId game gameChannel
+                            Just (game, gameChannel) -> persistNewGame pool gameId game
                             _ -> return ()
 
                         sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)

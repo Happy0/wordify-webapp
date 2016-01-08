@@ -95,8 +95,8 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
         then listens for game events and updates the game in storage as
         it is played
     -}
-    persistNewGame :: Pool SqlBackend -> Text -> ServerGame -> TChan GameMessage -> IO ()
-    persistNewGame pool gameId serverGame messageChannel = do
+    persistNewGame :: Pool SqlBackend -> Text -> ServerGame -> IO ()
+    persistNewGame pool gameId serverGame = do
         forkIO $ do
              key <- persistGameState pool gameId serverGame
              return ()
