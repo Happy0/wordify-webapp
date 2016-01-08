@@ -3,7 +3,7 @@ module Controllers.Game.Api (
                              ClientMessage(AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
                              GameMessage(PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat),
                              ServerResponse(PotentialScore, BoardMoveSuccess, ExchangeMoveSuccess,
-                                PassMoveSuccess, ChatSuccess, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary, transitionToMessage, transitionToSummary) where
+                                PassMoveSuccess, ChatSuccess, InitialiseGame, InvalidCommand), MoveSummary(BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary), toMoveSummary, transitionToMessage, transitionToSummary) where
 
     import Data.Aeson
     import Data.Aeson.Types
@@ -35,8 +35,13 @@ module Controllers.Game.Api (
                          ExchangeMove [Tile] |
                          PassMove
 
-    -- Response messages to a client request over the websocket
-    data ServerResponse = PotentialScore Int |
+    {-
+       Messages sent directly from the server to a client request over the websocket.
+       The messages are not broadcasted to all clients.
+    -}
+
+    data ServerResponse = InitialiseGame (Maybe [Tile]) [Player] (Maybe Int) Int Int |
+                          PotentialScore Int |
                           BoardMoveSuccess [Tile] |
                           ExchangeMoveSuccess [Tile] |
                           PassMoveSuccess |
@@ -110,6 +115,10 @@ module Controllers.Game.Api (
         toJSON (ChatSuccess) = object []
         toJSON (InvalidCommand msg) = object ["error" .= msg]
         toJSON (PotentialScore score) = object ["potentialScore" .= score]
+        toJSON (InitialiseGame rack players playerNumber toMove tilesRemaining) =
+            object ["rack" .= rack, "players" .= players,
+                   "playerNumber" .= playerNumber, "playerMove" .= toMove,
+                   "tilesRemaining" .= tilesRemaining]
 
     instance ServerMessage ServerResponse where
         commandName (BoardMoveSuccess _) = "boardMoveSuccess"
@@ -118,6 +127,7 @@ module Controllers.Game.Api (
         commandName ChatSuccess = "chatSuccess"
         commandName (PotentialScore _) = "potentialScore"
         commandName (InvalidCommand _) = "error"
+        commandName (InitialiseGame {}) = "initialise"
 
     writePosAndTile :: (Pos, Tile) -> Value
     writePosAndTile (pos, tile) = object ["pos" .= toJSON pos, "tile" .= toJSON tile]

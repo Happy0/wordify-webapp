@@ -21,6 +21,7 @@ import Model.Api
 import Control.Concurrent
 import qualified Data.List.NonEmpty as NE
 import qualified Wordify.Rules.Game as G
+import Wordify.Rules.Board
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
 import Wordify.Rules.Dictionary
@@ -71,64 +72,42 @@ getGameR gameId = do
     app <- getYesod
     let cookies = reqCookies request
     let maybePlayerId = L.lookup "id" cookies
-    let gamesInProgress = games app
 
-    let (dictionary, letterBag) = getDictionaryAndLetterBag app
-    maybeGame <- liftIO $ loadGame (appConnPool app) dictionary letterBag gameId gamesInProgress
+    webSockets $ gameApp app gameId maybePlayerId
 
-    case maybeGame of
-        Left err -> invalidArgs [err]
-        Right serverGame ->
-            do
-                (currentGame, messageChannel) <-
-                     atomically $ do
-                        channel <- duplicateGameChannel serverGame
-                        currentGame <- readTVar $ game serverGame
-                        return (currentGame, channel)
+    defaultLayout $ do
+        addStylesheet $ (StaticR css_scrabble_css)
+        addStylesheet $ (StaticR css_round_css)
+        addStylesheet $ (StaticR css_bootstrap_css)
+        addScript $ (StaticR js_round_js)
 
-                let maybePlayerNumber = (maybePlayerId >>= getPlayerNumber serverGame)
-                let maybePlayerRack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer currentGame)
+        [whamlet|
+            <div #scrabbleground>
+        |]
+        toWidget
+            [julius|
+                var url = document.URL,
 
-                webSockets $ gameApp app gameId currentGame serverGame messageChannel maybePlayerId maybePlayerNumber
-                defaultLayout $ do
-                    addStylesheet $ (StaticR css_scrabble_css)
-                    addStylesheet $ (StaticR css_round_css)
-                    addStylesheet $ (StaticR css_bootstrap_css)
-                    addScript $ (StaticR js_round_js)
+                url = url.replace("http:", "ws:").replace("https:", "wss:");
+                var conn = new WebSocket(url);
 
-                    [whamlet|
-                        <div #scrabbleground>
-                    |]
-                    toWidget
-                        [julius|
-                            var url = document.URL,
+                var send = function(objectPayload) {
+                    var json = JSON.stringify(objectPayload);
+                    conn.send(json);
+                }
 
-                            url = url.replace("http:", "ws:").replace("https:", "wss:");
-                            var conn = new WebSocket(url);
+                var opts = {element: document.getElementById("scrabbleground")};
+                opts.ground = {}
+                opts.ground.board = #{toJSON emptyBoard};
+                opts.send = send;
+                var round = Round(opts);
 
-                            var send = function(objectPayload) {
-                                var json = JSON.stringify(objectPayload);
-                                conn.send(json);
-                            }
+                conn.onmessage = function (e) {
+                    var data = JSON.parse(e.data);
+                    round.socketReceive(data);
+                }
 
-                            var opts = {element: document.getElementById("scrabbleground")};
-                            opts.ground = {}
-                            opts.ground.board = #{toJSON (G.board currentGame)};
-                            opts.send = send;
-                            var round = Round(opts);
-
-                            round.controller.setPlayers( #{toJSON (G.players currentGame)});
-                            round.controller.setRackTiles(#{toJSON (maybePlayerRack)});
-                            round.controller.setPlayerNumber(#{toJSON maybePlayerNumber});
-                            round.controller.setPlayerToMove(#{toJSON (G.playerNumber currentGame)});
-                            round.controller.setTilesRemaining(#{toJSON (bagSize (G.bag currentGame))});
-
-                            conn.onmessage = function (e) {
-                                var data = JSON.parse(e.data);
-                                round.socketReceive(data);
-                            }
-
-                        |]
+            |]
 
 getPlayerNumber :: ServerGame -> Text -> Maybe Int
 getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerId == identifier player) $ zip [1 .. 4] players)
@@ -138,25 +117,78 @@ getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerI
 duplicateGameChannel :: ServerGame -> STM (TChan GameMessage)
 duplicateGameChannel serverGame = dupTChan $ broadcastChannel serverGame
 
-gameApp :: App -> Text -> G.Game -> ServerGame -> TChan GameMessage -> Maybe Text -> Maybe Int -> WebSocketsT Handler ()
-gameApp app gameId initialGame sharedGame channel maybePlayerId playerNumber = do
-       connection <- ask
-       sendPreviousTransitions initialGame
-       liftIO $ sendPreviousChatMessages (appConnPool app) gameId connection
-       race_
-            (forever $ atomically (readTChan channel) >>= sendTextData . toJSONResponse)
-            (forever $
-                do
-                    msg <- receiveData
-                    case eitherDecode msg of
-                        Left err -> sendTextData $ toJSONResponse (InvalidCommand (pack err))
-                        Right parsedCommand -> do
-                            response <- liftIO $ performRequest sharedGame playerNumber parsedCommand
-                            sendTextData . toJSONResponse $ response
-            )
+gameApp :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
+gameApp app gameId maybePlayerId = do
+    connection <- ask
+    liftIO $ bracket
+        (getGameDefaultLocale app gameId)
+        releaseGame
+        (keepClientUpdated app gameId connection maybePlayerId)
 
-sendPreviousTransitions :: G.Game -> WebSocketsT Handler ()
-sendPreviousTransitions game =
+    where
+        releaseGame :: Either Text ServerGame -> IO ()
+        releaseGame _ = putStrLn "releasing game"
+
+getGameDefaultLocale :: App -> Text -> IO (Either Text ServerGame)
+getGameDefaultLocale app gameId = do
+    let (dictionary, letterBag) = getDictionaryAndLetterBag app
+    game <- loadGame (appConnPool app) dictionary letterBag gameId (games app)
+    return game
+
+keepClientUpdated :: App -> Text -> C.Connection -> Maybe Text -> Either Text ServerGame -> IO ()
+keepClientUpdated app gameId connection maybePlayerId g = do
+       case g of
+            Left initError ->
+                C.sendTextData connection $ toJSONResponse (InvalidCommand initError)
+            Right serverGame -> do
+                (channel, gameSoFar) <- atomically $ do
+                        channel <- duplicateGameChannel serverGame
+                        gameSoFar <- readTVar (game serverGame)
+                        return (channel, gameSoFar)
+
+                let playerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+
+                sendOriginalGameState connection playerNumber gameSoFar
+                sendPreviousTransitions connection gameSoFar
+                sendPreviousChatMessages (appConnPool app) gameId connection
+
+                race_
+                        (forever $
+                            atomically (readTChan channel) >>= \message -> (C.sendTextData connection $ toJSONResponse message))
+                        (forever $
+                            do
+                                msg <- C.receiveData connection
+                                case eitherDecode msg of
+                                    Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
+                                    Right parsedCommand -> do
+                                        response <- liftIO $ performRequest serverGame playerNumber parsedCommand
+                                        C.sendTextData connection $ toJSONResponse $ response
+                        )
+{-
+    case maybeGame of
+        Left err -> invalidArgs [err]
+        Right serverGame ->
+            do
+                (currentGame, messageChannel) <-
+                     atomically $ do
+                        channel <- duplicateGameChannel serverGame
+                        currentGame <- readTVar $ game serverGame
+                        return (currentGame, channel)
+-}
+
+sendOriginalGameState :: C.Connection -> Maybe Int -> G.Game -> IO ()
+sendOriginalGameState connection maybePlayerNumber game =
+    do
+        let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer game)
+        let players = G.players game
+        let playing = G.playerNumber game
+        let numTilesRemaining = (bagSize (G.bag game))
+        C.sendTextData connection $
+            toJSONResponse $ InitialiseGame rack players (maybePlayerNumber) playing numTilesRemaining
+
+
+sendPreviousTransitions :: C.Connection -> G.Game -> IO ()
+sendPreviousTransitions connection game =
     do
         let moves = G.movesMade game
 
@@ -175,7 +207,7 @@ sendPreviousTransitions game =
                     \transition ->
                         case transition of
                             Left err -> liftIO $ putStrLn . pack . show $ err
-                            Right transition -> sendTextData $ toJSONResponse (transitionToMessage transition)
+                            Right transition -> C.sendTextData connection $ toJSONResponse (transitionToMessage transition)
         where
             (G.History originalBag moves) = G.history game
 
@@ -186,8 +218,3 @@ sendPreviousChatMessages :: Pool SqlBackend -> Text -> C.Connection -> IO ()
 sendPreviousChatMessages pool gameId connection = do
     liftIO $ flip runSqlPersistMPool pool $
         getChatMessages gameId $$ CL.map toJSONResponse $= (CL.mapM_ (liftIO . C.sendTextData connection))
-
-
-
-
-

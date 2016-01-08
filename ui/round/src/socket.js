@@ -4,6 +4,13 @@ module.exports = function(opts) {
     var controller = opts.ctrl;
 
     var handlers = {
+        "initialise" : function(data) {
+            controller.updateRack(data.rack);
+            controller.setPlayers(data.players);
+            controller.setPlayerNumber(data.playerNumber);
+            controller.setPlayerToMove(data.playerMove);
+            controller.setTilesRemaining(data.tilesRemaining);
+        },
         "playerBoardMove" : function(data) {
             var placed = data.placed;
             var players = data.players;
