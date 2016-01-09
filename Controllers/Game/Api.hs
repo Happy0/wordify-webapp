@@ -101,7 +101,7 @@ module Controllers.Game.Api (
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]
         toJSON (GameEnd moveNumber maybePlaced summary) =
-             object ["moveNumber" .= moveNumber, "placed" .= maybePlaced, "summary" .= summary]
+             object ["moveNumber" .= moveNumber, "placed" .= (fmap . fmap) writePosAndTile maybePlaced, "summary" .= summary]
         toJSON (PlayerExchangeMove moveNumber nowPlaying _ summary) =
             -- We do not tell clients what tiles the player exchanged
             object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
