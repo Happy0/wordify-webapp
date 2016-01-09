@@ -53,7 +53,17 @@ loadGame pool dictionary letterBag gameId gameCache =
                             return $ Right gm
             Just game -> return $ Right game
 
-loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text (IO (), ServerGame))
+{-
+    Loads a game from the database into the game cache. Returns the loaded game and
+    an action which spawns a thread to listen to game events and write them to the database.
+    If the game has already been loaded into the cache, the returned action does nothing.
+-}
+loadFromDatabase :: Pool SqlBackend -> 
+                    Dictionary ->
+                    LetterBag ->
+                    Text ->
+                    TVar (Map Text ServerGame) ->
+                    IO (Either Text (IO (), ServerGame))
 loadFromDatabase pool dictionary letterBag gameId gameCache =
     do
         eitherGame <- getGame pool letterBag dictionary gameId
