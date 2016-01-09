@@ -23,6 +23,7 @@ module Controllers.Home.Home(performRequest) where
     import Control.Monad.Trans.Class
     import Control.Concurrent.STM
     import Controllers.Game.Model.GameLobby
+    import Data.Time.Clock
 
     performRequest :: App -> ClientRequest -> IO (Either Text ServerResponse)
     performRequest app (CreateGameRequest players) = createGame app players "en"
@@ -40,11 +41,12 @@ module Controllers.Home.Home(performRequest) where
     addGameLobby app gameId game numPlayers = 
         do
             generator <- getStdGen
+            timeCreated <- getCurrentTime
             atomically $ do
                 let lobbies = gameLobbies app
                 broadcastChan <- newBroadcastTChan
                 newGenerator <- newTVar generator
-                gameLobby <- newTVar (GameLobby game [] numPlayers broadcastChan newGenerator)
+                gameLobby <- newTVar (GameLobby game [] numPlayers broadcastChan newGenerator timeCreated)
                 modifyTVar lobbies $ M.insert gameId gameLobby
 
     setupGame :: App -> Locale -> Int -> (EitherT Text IO Game)

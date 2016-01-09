@@ -39,6 +39,10 @@ import qualified Data.Map as M
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 import Data.FileEmbed
+import Control.Concurrent.Timer
+import Controllers.Game.Model.GameLobby
+import Control.Concurrent.Suspend
+import Data.Time.Clock
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -63,6 +67,8 @@ makeFoundation appSettings = do
     gameLobbies <- newTVarIO M.empty
     games <- newTVarIO M.empty
 
+    repeatedTimer (cleanIdleLobbies gameLobbies) (hDelay 1)
+
     -- We need a log function to create a connection pool. We need a connection
     -- pool to create our foundation. And we need our foundation to get a
     -- logging function. To get out of this loop, we initially create a
@@ -82,6 +88,26 @@ makeFoundation appSettings = do
 
     -- Return the foundation
     return $ mkFoundation pool
+
+cleanIdleLobbies :: TVar (Map Text (TVar GameLobby)) -> IO ()
+cleanIdleLobbies lobbies = do
+    lobbiesMap <- readTVarIO lobbies
+    let keyVals = M.assocs lobbiesMap
+    timeNow <- getCurrentTime    
+
+    flip mapM_ keyVals $
+         \(key, val) ->
+            do
+                lobby <- readTVarIO val
+                let opened = openedAt lobby
+                let diff = diffUTCTime timeNow opened
+               
+                -- If the lobby hasn't resulted in a created game after an hour,
+                -- remove it 
+                when (diff >= (60 * 60)) $
+                    atomically $
+                        modifyTVar lobbies (M.delete key)
+               
 
 loadGameBundles :: IO LocalisedGameSetups
 loadGameBundles =
