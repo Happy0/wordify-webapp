@@ -47,9 +47,9 @@ loadGame pool dictionary letterBag gameId gameCache =
                 dbResult <- loadFromDatabase pool dictionary letterBag gameId gameCache
                 case dbResult of
                     Left err -> return $ Left err
-                    Right gm -> do
-                        channel <- atomically $ duplicateGameChannel gm
+                    Right (channel, gm) -> do
                         forkIO $ do
+                            -- If we are the first client, spawn the db persistence thread
                             connections <- readTVarIO $ (numConnections gm) 
                             when (connections == 1) $ 
                                 watchForUpdates pool gameId channel
@@ -58,7 +58,7 @@ loadGame pool dictionary letterBag gameId gameCache =
 
             Just game -> return $ Right game
 
-loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text ServerGame)
+loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text (TChan GameMessage, ServerGame))
 loadFromDatabase pool dictionary letterBag gameId gameCache =
     do
         eitherGame <- getGame pool letterBag dictionary gameId
@@ -74,10 +74,12 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                             newCache <- M.insert gameId serverGame <$> readTVar gameCache
                             modifyTVar (numConnections serverGame) (+1)
                             writeTVar gameCache newCache
-                            return $ Right serverGame
+                            channel <- duplicateGameChannel serverGame
+                            return $ Right (channel, serverGame)
                         Just entry -> do
                             modifyTVar (numConnections entry) (+1)
-                            return $ Right entry
+                            channel <- duplicateGameChannel entry
+                            return $ Right (channel, entry)
 
 getDictionaryAndLetterBag :: App -> (Dictionary, LetterBag)
 getDictionaryAndLetterBag app = do
