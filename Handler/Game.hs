@@ -47,18 +47,13 @@ loadGame pool dictionary letterBag gameId gameCache =
                 dbResult <- loadFromDatabase pool dictionary letterBag gameId gameCache
                 case dbResult of
                     Left err -> return $ Left err
-                    Right (channel, gm) -> do
-                        forkIO $ do
-                            -- If we are the first client, spawn the db persistence thread
-                            connections <- readTVarIO $ (numConnections gm) 
-                            when (connections == 1) $ 
-                                watchForUpdates pool gameId channel
-
-                        return $ Right gm
-
+                    Right (spawnDbListener, gm) -> 
+                        do 
+                            spawnDbListener
+                            return $ Right gm
             Just game -> return $ Right game
 
-loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text (TChan GameMessage, ServerGame))
+loadFromDatabase :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text (IO (), ServerGame))
 loadFromDatabase pool dictionary letterBag gameId gameCache =
     do
         eitherGame <- getGame pool letterBag dictionary gameId
@@ -75,11 +70,14 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                             modifyTVar (numConnections serverGame) (+1)
                             writeTVar gameCache newCache
                             channel <- duplicateGameChannel serverGame
-                            return $ Right (channel, serverGame)
+                            let spawnDbListener = (forkIO $ watchForUpdates pool gameId channel) >> return ()
+
+                            return $ Right (spawnDbListener, serverGame)
                         Just entry -> do
                             modifyTVar (numConnections entry) (+1)
                             channel <- duplicateGameChannel entry
-                            return $ Right (channel, entry)
+                            let spawnDbListener = return ()
+                            return $ Right (spawnDbListener, entry)
 
 getDictionaryAndLetterBag :: App -> (Dictionary, LetterBag)
 getDictionaryAndLetterBag app = do
