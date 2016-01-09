@@ -143,7 +143,12 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
         persistBoardMove pool gameId moveNumber placed
     persistUpdate pool gameId (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId moveNumber
     persistUpdate pool gameId (PlayerExchangeMove moveNumber _ exchanged _) =
-        persistExchangeMove pool gameId moveNumber exchanged
+       persistExchangeMove pool gameId moveNumber exchanged
+    persistUpdate pool gameId (GameEnd moveNumber placed moveSummary) =
+        case placed of
+             Nothing -> persistPassMove pool gameId moveNumber
+             Just placed -> persistBoardMove pool gameId moveNumber placed
+
     persistUpdate _ _ _ = return ()
 
     persistBoardMove :: Pool SqlBackend -> Text -> Int -> [(Pos, Tile)] -> IO ()

@@ -9,6 +9,7 @@ module Controllers.Game.Api (
     import Data.Aeson.Types
     import qualified Data.Vector as V
     import Control.Applicative
+    import qualified Data.Map as M
     import Data.Text
     import qualified Data.Maybe as Mb
     import Prelude
@@ -27,7 +28,7 @@ module Controllers.Game.Api (
 
     data ChatMessage = ChatMessage {user :: Text, message :: Text}
 
-    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary | GameEndSummary
+    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary | GameEndSummary (Maybe [(Text, Int)]) [(Player, Int)]
 
     data ClientMessage = AskPotentialScore [(Pos, Tile)] |
                          SendChatMessage Text |
@@ -56,7 +57,7 @@ module Controllers.Game.Api (
                                         players :: [Player],
                                          nowPlaying :: Int,
                                         tilesRemaining :: Int} |
-                                     GameEnd MoveSummary |
+                                     GameEnd Int (Maybe [(Pos, Tile)]) MoveSummary |
                                      PlayerPassMove Int Int MoveSummary |
                                      PlayerExchangeMove Int Int [Tile] MoveSummary |
                                      PlayerChat ChatMessage |
@@ -69,7 +70,13 @@ module Controllers.Game.Api (
         toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
         toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
         toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
-        toJSON (GameEndSummary ) = object ["type" .= gameEndSummaryType]
+        toJSON (GameEndSummary maybeWords players) = 
+            object ["type" .= gameEndSummaryType,
+                  "wordsMade" .= 
+                    case
+                        maybeWords of
+                            Nothing -> []
+                            Just wordsWithScores -> fmap wordSummaryJSON wordsWithScores]
 
     wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
     boardSummaryType = ("board" :: Text)
@@ -93,7 +100,8 @@ module Controllers.Game.Api (
                     "players" .= toJSON players,
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]
-        toJSON (GameEnd summary) = object ["summary" .= summary]
+        toJSON (GameEnd moveNumber maybePlaced summary) =
+             object ["moveNumber" .= moveNumber, "placed" .= maybePlaced, "summary" .= summary]
         toJSON (PlayerExchangeMove moveNumber nowPlaying _ summary) =
             -- We do not tell clients what tiles the player exchanged
             object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
@@ -187,21 +195,35 @@ module Controllers.Game.Api (
         PlayerPassMove (G.moveNumber newGame)
                        (G.playerNumber newGame)
                        (transitionToSummary passTransition)
-    transitionToMessage gf@(GameFinished game maybeWords players) = GameEnd (transitionToSummary gf)
+    transitionToMessage gf@(GameFinished game maybeWords players) = 
+        GameEnd (G.moveNumber game) lastPlaced (transitionToSummary gf)
+        where
+            movesMade = G.movesMade game
+            lastMove = L.last movesMade
+            lastPlaced = case lastMove of
+                PlaceTiles tiles -> Just $ M.toList tiles
+                _ -> Nothing 
+            
 
     transitionToSummary :: GameTransition -> MoveSummary
     transitionToSummary (MoveTransition player game formed) = toMoveSummary formed
     transitionToSummary (PassTransition _) = PassMoveSummary
     transitionToSummary (ExchangeTransition _ _ _ ) = ExchangeMoveSummary
-    transitionToSummary _ = GameEndSummary
+    transitionToSummary (GameFinished game maybeWords players) = 
+        let beforeAndAfter = L.zip players (G.players game)
+        in let playersWithPenalties = fmap toPenaltyAndPlayer beforeAndAfter
+        in GameEndSummary ((toTextScores . snd . wordsWithScores) <$> maybeWords) playersWithPenalties
+        where
+            toPenaltyAndPlayer (before, after) = (after, (score before - score after) :: Int)
+
+    
 
     toMoveSummary :: FormedWords -> MoveSummary
     toMoveSummary formedWords =
         let (overall, wordsAndScores) = wordsWithScores formedWords
         in BoardMoveSummary overall (toTextScores wordsAndScores)
-        where
-            toTextScores = fmap (\(word, score) -> (pack word, score))
 
+    toTextScores = fmap (\(word, score) -> (pack word, score))
 
     instance ToJSON Board where
         toJSON = toJSON . groupSquaresByColumn . allSquares
