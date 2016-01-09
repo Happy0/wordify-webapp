@@ -29,6 +29,21 @@ module.exports = function(opts) {
             controller.setPlayerToMove(data.nowPlaying);
             controller.addPassMoveToHistory();
         },
+        "gameFinished" : function(data) {
+            if (data.placed) {
+                controller.boardMoveMade(data.placed)
+            }
+
+            controller.setPlayers(data.summary.players);
+
+            var boardMoveSummary = {
+                "type" : board,
+                "overallScore" : data.summary.lastMoveScore,
+                "wordsMade" : data.summary.wordsMade
+            };
+
+            controller.addBoardMoveToHistory(boardMoveSummary);
+        },
         "boardMoveSuccess" : function(data) {
             var rack = data.rack;
             controller.updateRack(rack);

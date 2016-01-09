@@ -28,7 +28,7 @@ module Controllers.Game.Api (
 
     data ChatMessage = ChatMessage {user :: Text, message :: Text}
 
-    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary | GameEndSummary (Maybe [(Text, Int)]) [(Player, Int)]
+    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} | PassMoveSummary | ExchangeMoveSummary | GameEndSummary (Maybe [(Text, Int)]) [Player] [Int]
 
     data ClientMessage = AskPotentialScore [(Pos, Tile)] |
                          SendChatMessage Text |
@@ -70,13 +70,16 @@ module Controllers.Game.Api (
         toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
         toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
         toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
-        toJSON (GameEndSummary maybeWords players) = 
+        toJSON (GameEndSummary maybeWords players penalties) = 
             object ["type" .= gameEndSummaryType,
-                  "wordsMade" .= 
-                    case
-                        maybeWords of
-                            Nothing -> []
-                            Just wordsWithScores -> fmap wordSummaryJSON wordsWithScores]
+                    "players" .= players,
+                    "penalties" .= penalties,
+                    "lastMoveScore" .= (fmap sum $ (fmap . fmap) snd maybeWords),
+                    "wordsMade" .= 
+                        case
+                            maybeWords of
+                                Nothing -> []
+                                Just wordsWithScores -> fmap wordSummaryJSON wordsWithScores]
 
     wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
     boardSummaryType = ("board" :: Text)
@@ -101,7 +104,9 @@ module Controllers.Game.Api (
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]
         toJSON (GameEnd moveNumber maybePlaced summary) =
-             object ["moveNumber" .= moveNumber, "placed" .= (fmap . fmap) writePosAndTile maybePlaced, "summary" .= summary]
+             object ["moveNumber" .= moveNumber, 
+                    "placed" .= (fmap . fmap) writePosAndTile maybePlaced,
+                    "summary" .= summary]
         toJSON (PlayerExchangeMove moveNumber nowPlaying _ summary) =
             -- We do not tell clients what tiles the player exchanged
             object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
@@ -210,13 +215,10 @@ module Controllers.Game.Api (
     transitionToSummary (PassTransition _) = PassMoveSummary
     transitionToSummary (ExchangeTransition _ _ _ ) = ExchangeMoveSummary
     transitionToSummary (GameFinished game maybeWords players) = 
-        let beforeAndAfter = L.zip players (G.players game)
-        in let playersWithPenalties = fmap toPenaltyAndPlayer beforeAndAfter
-        in GameEndSummary ((toTextScores . snd . wordsWithScores) <$> maybeWords) playersWithPenalties
+        let penalties = L.zipWith getPenalty players (G.players game)
+        in GameEndSummary ((toTextScores . snd . wordsWithScores) <$> maybeWords) (G.players game) penalties
         where
-            toPenaltyAndPlayer (before, after) = (after, (score before - score after) :: Int)
-
-    
+            getPenalty before after = (score before - score after)
 
     toMoveSummary :: FormedWords -> MoveSummary
     toMoveSummary formedWords =
