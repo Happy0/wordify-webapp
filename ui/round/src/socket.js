@@ -37,7 +37,7 @@ module.exports = function(opts) {
             controller.setPlayers(data.summary.players);
 
             var boardMoveSummary = {
-                "type" : board,
+                "type" : "board",
                 "overallScore" : data.summary.lastMoveScore,
                 "wordsMade" : data.summary.wordsMade
             };

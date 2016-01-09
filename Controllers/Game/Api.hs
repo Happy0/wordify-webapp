@@ -218,7 +218,7 @@ module Controllers.Game.Api (
         let penalties = L.zipWith getPenalty players (G.players game)
         in GameEndSummary ((toTextScores . snd . wordsWithScores) <$> maybeWords) (G.players game) penalties
         where
-            getPenalty before after = (score before - score after)
+            getPenalty before after = (score after - score before)
 
     toMoveSummary :: FormedWords -> MoveSummary
     toMoveSummary formedWords =
