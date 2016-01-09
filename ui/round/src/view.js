@@ -3,6 +3,14 @@ var m = require('mithril');
 
 module.exports = function(ctrl) {
 
+    var scrollToBottomOnRender =  function(element, initialised, context) {
+            var scrollHeight = $(element)[0].scrollHeight;
+
+            $(element).scrollTop(scrollHeight);
+        }
+
+
+
     var renderButton = function (text, buttonClickHandler) {
 
         var buttonAttrs = {
@@ -119,9 +127,7 @@ module.exports = function(ctrl) {
         };
 
         var messagesConfig = function(element, initialised, context) {
-            var scrollHeight = $(element)[0].scrollHeight;
-
-            $(element).scrollTop(scrollHeight);
+            scrollToBottomOnRender(element, initialised, context);
         }
 
         return m('span', {class: 'chat-box'},
@@ -147,6 +153,10 @@ module.exports = function(ctrl) {
     var renderMoveHistory = function() {
         var history = ctrl.data.moveHistory;
 
+        var historyConfig = function(element, initialised, context) {
+            scrollToBottomOnRender(element, initialised, context);
+        };
+
         var renderBoardMoveRow = function(boardMove) {
             var wordsAndScore = boardMove.wordsMade.map(function(word) {
                 return m('p', {}, word.word + " (" + word.score + ")");
@@ -171,7 +181,7 @@ module.exports = function(ctrl) {
                 }
         }));
 
-        return m('div', {class : "history"}, historyTable);
+        return m('div', {config: historyConfig, class : "history"}, historyTable);
     };
 
     var renderScoreBoard = function() {
