@@ -187,10 +187,10 @@ module.exports = function(ctrl) {
     var renderScoreBoard = function() {
         var players = ctrl.data.players;
 
-        var renderPlayerRow = function(player) {
+        var renderPlayerRow = function(player, idx) {
             return m('tr', {},
                      [m('td', {class : "score-table-border"}, player.name),
-                         m('td', {class: "score-table-border"}, player.score)]);
+                         m('td', {class: "score-table-border"}, !ctrl.data.penalties[idx] ? player.score : player.score + '(' + ctrl.data.penalties[idx] + ')')]);
         }
 
         return m('table', {class: "score-table" }, [players.map(renderPlayerRow),

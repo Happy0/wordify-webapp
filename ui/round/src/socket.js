@@ -43,6 +43,7 @@ module.exports = function(opts) {
             };
 
             controller.addBoardMoveToHistory(boardMoveSummary);
+            controller.setPenalties(data.summary.penalties);
         },
         "boardMoveSuccess" : function(data) {
             var rack = data.rack;

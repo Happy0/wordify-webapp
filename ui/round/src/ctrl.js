@@ -191,6 +191,10 @@ module.exports = function(opts) {
         data.chatMessages = messages;
     };
 
+    var setPenalties = function(penalties) {
+        data.penalties = penalties;
+    }
+
     var addBoardMoveToHistory = function(summary) {
         m.startComputation();
 
@@ -337,6 +341,7 @@ module.exports = function(opts) {
         sendChatMessage : sendChatMessage,
         showErrorMessage : showErrorMessage,
         setPlayers : setPlayers,
+        setPenalties : setPenalties,
         setPlayerToMove : setPlayerToMove,
         setPlayerNumber: setPlayerNumber,
         setRackTiles : setRackTiles,
