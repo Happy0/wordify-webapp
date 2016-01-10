@@ -5,5 +5,8 @@
 /robots.txt RobotsR GET
 
 / HomeR GET
+
+/games/debug GameDebugR GET
+
 /game/#Text/lobby GameLobbyR GET
 /game/#Text GameR GET

@@ -238,6 +238,8 @@ module.exports = function(opts) {
      * the player.
      */
     var updateRack = function(fullNewRack) {
+        if (!fullNewRack) return;
+
         // Just write over the old tiles for now... Will do a diff once main
         // functionality is there
         m.startComputation();

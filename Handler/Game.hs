@@ -96,6 +96,17 @@ getDictionaryAndLetterBag app = do
             let Just setup = M.lookup "en" setups
             (localisedDictionary setup, localisedLetterBag setup)
 
+getGameDebugR :: Handler Html
+getGameDebugR = do
+    app <- getYesod
+    gameSize <- liftIO $ M.size <$> (readTVarIO $ games app)
+    lobbiesSize <- liftIO $ M.size <$> (readTVarIO $ gameLobbies app)
+    defaultLayout $ do 
+        [whamlet|
+            <div> Games: #{gameSize}
+            <div> Lobbies: #{lobbiesSize}
+        |]
+
 getGameR :: Text -> Handler Html
 getGameR gameId = do
     request <- getRequest
@@ -204,17 +215,6 @@ keepClientUpdated app gameId connection maybePlayerId g = do
                                         response <- liftIO $ performRequest serverGame playerNumber parsedCommand
                                         C.sendTextData connection $ toJSONResponse $ response
                         )
-{-
-    case maybeGame of
-        Left err -> invalidArgs [err]
-        Right serverGame ->
-            do
-                (currentGame, messageChannel) <-
-                     atomically $ do
-                        channel <- duplicateGameChannel serverGame
-                        currentGame <- readTVar $ game serverGame
-                        return (currentGame, channel)
--}
 
 sendOriginalGameState :: C.Connection -> Maybe Int -> G.Game -> IO ()
 sendOriginalGameState connection maybePlayerNumber game =
