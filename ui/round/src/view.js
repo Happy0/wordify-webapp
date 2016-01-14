@@ -92,14 +92,15 @@ module.exports = function(ctrl) {
 
         var renderedSlots = rack.map(putTileOnRack);
 
-        return  m('div', {class : "rack"},
-              [
+        var renderRackButton = function(callback, classes) {
+            return m('span', {class: 'rack-button'}, m('button', {onclick: callback, class: "btn btn-success btn-large ".concat(classes)}));
+        };
+
+        return  m('div', {class : "rack"}, [
+                  renderRackButton(ctrl.recallTilesToRack, 'icon-white glyphicon glyphicon-arrow-down'),
                   m("span", {}, renderedSlots),
-                  m("span", {class: 'shuffle-rack-button'},
-                    m('button', {onclick: ctrl.shuffleRack, class: "btn btn-success btn-large"},
-                        m('span', {'class' : 'icon-white glyphicon glyphicon-refresh'} ))
-                  )
-              ]);
+                  renderRackButton(ctrl.shuffleRack, 'icon-white glyphicon glyphicon-refresh')
+                ]);
     };
 
     var renderChatBox = function() {

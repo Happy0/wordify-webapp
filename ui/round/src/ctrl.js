@@ -363,6 +363,7 @@ module.exports = function(opts) {
         setPotentialScore : setPotentialScore,
         setChatMessages : setChatMessages,
         shuffleRack : shuffleRack,
+        recallTilesToRack : recallTilesToRack,
         addBoardMoveToHistory : addBoardMoveToHistory,
         addPassMoveToHistory: addPassMoveToHistory,
         addExchangeMoveToHistory : addExchangeMoveToHistory,
