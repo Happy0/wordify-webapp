@@ -73,6 +73,7 @@ module.exports = function(opts) {
             payload : {}
         }
 
+        recallTilesToRack();
         socketOpts.send(data);
     };
 
@@ -101,6 +102,7 @@ module.exports = function(opts) {
             }
         }
 
+        recallTilesToRack();
         data.exchangeMode = !data.exchangeMode;
     };
 
@@ -138,6 +140,11 @@ module.exports = function(opts) {
 
     var setPlayers = function(players) {
         data.players = players;
+    };
+
+    var recallTilesToRack = function () {
+        var tilesOnBoard = scrabbleGroundCtrl.removeCandidateTiles();
+        tilesOnBoard.forEach(putTileOnFirstEmptySlot);
     };
 
     var setRackTiles = function(rackTiles) {
@@ -261,10 +268,11 @@ module.exports = function(opts) {
     };
 
     var putTileOnFirstEmptySlot = function (tile) {
-        //TODO: This won't work. Fix later.
-        data.rack.forEach(function (rackSlot, i) {
+        data.rack.some(function (rackSlot, i) {
             if (!rackSlot.tile) {
                 data.rack[i].tile = tile;
+                tile.slotNumber = i;
+                return true;
             }
         });
     };
@@ -309,7 +317,7 @@ module.exports = function(opts) {
         m.endComputation();
     }
 
-    var tileDroppedOffBoardFunction = function(tile, tileElement) {
+    var putTileBackOnRack = function(tile, tileElement) {
         var fromSlot = tile.slotNumber;
 
         if (data.rack[fromSlot].tile == tile)
@@ -320,9 +328,12 @@ module.exports = function(opts) {
 
         if (!data.rack[fromSlot].tile) {
             data.rack[fromSlot].tile = tile;
-            $(tileElement).detach();
-            $(data.rack[fromSlot].element).append(tileElement);
-            $(tileElement).attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
+
+            if (tileElement) {
+                $(tileElement).detach();
+                $(data.rack[fromSlot].element).append(tileElement);
+                $(tileElement).attr("style", "position: relative; left: 0px; top: 0px; z-index: 10;");
+            }
         }
         else
         {
@@ -332,7 +343,7 @@ module.exports = function(opts) {
         askPotentialScore();
     };
 
-    scrabbleGroundCtrl.setCustomRevertFunction(tileDroppedOffBoardFunction);
+    scrabbleGroundCtrl.setCustomRevertFunction(putTileBackOnRack);
 
     var controllerFunctions = {
         data: data,
