@@ -142,13 +142,9 @@ module.exports = function(ctrl) {
     }
 
     var renderBoard = function() {
-        var attrs = {
-            class : ["liscrabble-board-wrap"]
-        }
-
         var scrabblegroundView = scrabbleground.view(ctrl.scrabbleGroundCtrl);
 
-        return m('div', attrs, scrabblegroundView);
+        return m('div', {}, scrabblegroundView);
     };
 
     var renderMoveHistory = function() {
@@ -203,6 +199,10 @@ module.exports = function(ctrl) {
         return m('div', {class: 'potential-score'}, "potential score: " + ctrl.data.potentialScore) ;
     }
 
+    var renderMiddleColumn = function() {
+        return m('div', {class: ["liscrabble-board-wrap"]}, [renderBoard(), renderTileRack(), renderActionButtons()]);
+
+    }
 
     return m('div', {class: 'round'},
         [
@@ -210,7 +210,7 @@ module.exports = function(ctrl) {
             m('div', {class: 'main'},
                  [
                         m('span', {class: 'left'}, [renderScoreBoard(), renderMoveHistory()]),
-                        m('span', {class: 'mid'}, [renderBoard(), renderTileRack(), renderActionButtons()]),
+                        m('span', {class: 'mid'},  [renderMiddleColumn()]),
                         m('span', {class: 'right'}, [renderChatBox()])
                  ])
         ]);
