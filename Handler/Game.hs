@@ -47,8 +47,8 @@ loadGame pool dictionary letterBag gameId gameCache =
                 dbResult <- loadFromDatabase pool dictionary letterBag gameId gameCache
                 case dbResult of
                     Left err -> return $ Left err
-                    Right (spawnDbListener, gm) -> 
-                        do 
+                    Right (spawnDbListener, gm) ->
+                        do
                             spawnDbListener
                             return $ Right gm
             Just game -> return $ Right game
@@ -58,7 +58,7 @@ loadGame pool dictionary letterBag gameId gameCache =
     an action which spawns a thread to listen to game events and write them to the database.
     If the game has already been loaded into the cache, the returned action does nothing.
 -}
-loadFromDatabase :: Pool SqlBackend -> 
+loadFromDatabase :: Pool SqlBackend ->
                     Dictionary ->
                     LetterBag ->
                     Text ->
@@ -79,7 +79,7 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                             newCache <- M.insert gameId serverGame <$> readTVar gameCache
                             modifyTVar (numConnections serverGame) (+1)
                             writeTVar gameCache newCache
-                            channel <- duplicateGameChannel serverGame
+                            channel <- broadcastChannel serverGame
                             let spawnDbListener = (forkIO $ watchForUpdates pool gameId channel) >> return ()
 
                             return $ Right (spawnDbListener, serverGame)
@@ -101,7 +101,7 @@ getGameDebugR = do
     app <- getYesod
     gameSize <- liftIO $ M.size <$> (readTVarIO $ games app)
     lobbiesSize <- liftIO $ M.size <$> (readTVarIO $ gameLobbies app)
-    defaultLayout $ do 
+    defaultLayout $ do
         [whamlet|
             <div> Games: #{gameSize}
             <div> Lobbies: #{lobbiesSize}
@@ -156,7 +156,7 @@ getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerI
         players = playing serverGame
 
 duplicateGameChannel :: ServerGame -> STM (TChan GameMessage)
-duplicateGameChannel serverGame = dupTChan $ broadcastChannel serverGame
+duplicateGameChannel serverGame = cloneTChan $ broadcastChannel serverGame
 
 gameApp :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
 gameApp app gameId maybePlayerId = do
