@@ -233,7 +233,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
     dbTileRepresentationToTiles letterBag textRepresentation =
             sequence $ fmap getTile (unpack textRepresentation)
         where
-            letterMap = bagLetters letterBag
+            letterMap = validLetters letterBag
             getTile :: Char -> Either Text Tile
             getTile character
                 | (C.isLower character) =  Right $ Blank (Just $ C.toUpper character)
