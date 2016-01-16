@@ -79,7 +79,7 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                             newCache <- M.insert gameId serverGame <$> readTVar gameCache
                             modifyTVar (numConnections serverGame) (+1)
                             writeTVar gameCache newCache
-                            channel <- broadcastChannel serverGame
+                            let channel = broadcastChannel serverGame
                             let spawnDbListener = (forkIO $ watchForUpdates pool gameId channel) >> return ()
 
                             return $ Right (spawnDbListener, serverGame)

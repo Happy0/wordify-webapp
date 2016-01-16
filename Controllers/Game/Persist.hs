@@ -135,11 +135,11 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
                 GameIdle -> return ()
                 updateMessage -> do
                     persistUpdate pool gameId updateMessage
-                    watchForUpdates pool gameId messageChannel
 
-            -- We only remove the message from the message channel once it has been persisted to the database
-            -- so that clients don't miss any messages
-            atomically . readTChan $ messageChannel
+                    -- We only remove the message from the message channel once it has been persisted to the database
+                    -- so that clients don't miss any messages
+                    atomically . readTChan $ messageChannel
+                    watchForUpdates pool gameId messageChannel
 
     persistUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
     persistUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage

@@ -10,7 +10,8 @@ module.exports = function(opts) {
         exchangeMode : false, // Player is selecting tiles to exchange,
         chatMessages : [],
         tilesRemaining : 0,
-        potentialScore : 0
+        potentialScore : 0,
+        lastMoveReceived: 0
     }
 
     return defaults;

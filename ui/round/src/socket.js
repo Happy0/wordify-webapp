@@ -12,6 +12,13 @@ module.exports = function(opts) {
             controller.setTilesRemaining(data.tilesRemaining);
         },
         "playerBoardMove" : function(data) {
+            var moveNumber = data.moveNumber;
+
+            // If we've already been sent this move (e.g. while
+            // initialising), ignore it
+            if (moveNumber <= controller.data.lastMoveReceived)
+                return;
+
             var placed = data.placed;
             var players = data.players;
             var tilesRemaining = data.tilesRemaining;
@@ -20,14 +27,34 @@ module.exports = function(opts) {
             controller.setPlayers(players);
             controller.setTilesRemaining(tilesRemaining);
             controller.addBoardMoveToHistory(data.summary);
+
+            controller.data.lastMoveReceived = moveNumber;
         },
         "playerExchangeMove" : function(data) {
+            var moveNumber = data.moveNumber;
+
+            // If we've already been sent this move (e.g. while
+            // initialising), ignore it
+            if (moveNumber <= controller.data.lastMoveReceived)
+                return;
+
             controller.setPlayerToMove(data.nowPlaying);
             controller.addExchangeMoveToHistory();
+
+            controller.data.lastMoveReceived = moveNumber;
         },
         "playerPassMove" : function(data) {
+            var moveNumber = data.moveNumber;
+
+            // If we've already been sent this move (e.g. while
+            // initialising), ignore it
+            if (moveNumber <= controller.data.lastMoveReceived)
+                return;
+
             controller.setPlayerToMove(data.nowPlaying);
             controller.addPassMoveToHistory();
+
+            controller.data.lastMoveReceived = moveNumber;
         },
         "gameFinished" : function(data) {
             if (data.placed) {
