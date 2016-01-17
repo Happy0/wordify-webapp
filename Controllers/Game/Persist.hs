@@ -91,7 +91,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
     mapLeft func (Left err) = Left $ func err
     mapLeft _ (Right r) = Right r
 
-                    {-
+    {-
         Persists the original game state (before the game has begun) and
         then listens for game events and updates the game in storage as
         it is played
