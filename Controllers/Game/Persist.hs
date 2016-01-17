@@ -90,7 +90,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
     mapLeft func (Left err) = Left $ func err
     mapLeft _ (Right r) = Right r
 
-                    {-
+    {-
         Persists the original game state (before the game has begun) and
         then listens for game events and updates the game in storage as
         it is played
@@ -137,7 +137,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
                     persistUpdate pool gameId updateMessage
 
                     -- We only remove the message from the message channel once it has been persisted to the database
-                    -- so that clients don't miss any messages
+                    -- so that new clients don't miss any messages
                     atomically . readTChan $ messageChannel
                     watchForUpdates pool gameId messageChannel
 
