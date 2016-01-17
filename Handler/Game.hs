@@ -178,6 +178,9 @@ gameApp app gameId maybePlayerId = do
                         connections <- readTVar $ numConnections g
 
                         if connections == 0
+                            -- Tell the thread which writes updates to the database to finish writing
+                            -- the messages and then remove the game from the cache if there are still
+                            -- no connected players
                             then writeTChan (broadcastChannel g) GameIdle
                             else return ()
                 Left _ -> return ()
