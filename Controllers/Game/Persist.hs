@@ -21,6 +21,7 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
     import Database.Persist.Sql
     import Data.Text
     import Data.Time.Clock
+    import Foundation
     import qualified Model as M
     import System.Random
     import Wordify.Rules.Board
@@ -127,19 +128,41 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
                         insert $
                             M.Player gameId playerName identifier playerNumber
 
-    watchForUpdates :: Pool SqlBackend -> Text -> TChan GameMessage -> IO ()
-    watchForUpdates pool gameId messageChannel =
+    watchForUpdates :: App -> Text -> TChan GameMessage -> IO ()
+    watchForUpdates app gameId messageChannel =
         do
+            let pool = appConnPool app 
+            -- We only remove the message from the message channel once it has been persisted to the database
+            -- so that clients don't miss any messages
             message <- atomically . peekTChan $ messageChannel
             case message of
-                GameIdle -> return ()
+                GameIdle -> do
+                    noNewClients <- atomically $ do
+                        serverGames <- readTVar $ games app
+                        let maybeGame = Mp.lookup gameId serverGames
+                        case maybeGame of
+                            Nothing -> return False -- TODO: Log this
+                            Just serverGame -> do
+                                connections <- readTVar (numConnections serverGame)
+                                if connections == 0 then
+                                    do
+                                        modifyTVar (games app) $ Mp.delete gameId
+                                        return True
+                                    else
+                                        -- If a new client connected before we'd written all the messages to
+                                        -- the database, keep the game in the cache
+                                        return False
+
+                    atomically . readTChan $ messageChannel
+
+                    if noNewClients
+                        then return ()
+                        else watchForUpdates app gameId messageChannel 
+
                 updateMessage -> do
                     persistUpdate pool gameId updateMessage
-
-                    -- We only remove the message from the message channel once it has been persisted to the database
-                    -- so that clients don't miss any messages
                     atomically . readTChan $ messageChannel
-                    watchForUpdates pool gameId messageChannel
+                    watchForUpdates app gameId messageChannel
 
     persistUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
     persistUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage

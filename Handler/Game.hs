@@ -32,9 +32,10 @@ import Controllers.Game.Persist
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
-loadGame :: Pool SqlBackend -> Dictionary -> LetterBag -> Text -> TVar (Map Text ServerGame) -> IO (Either Text ServerGame)
-loadGame pool dictionary letterBag gameId gameCache =
+loadGame :: App -> Dictionary -> LetterBag -> Text -> IO (Either Text ServerGame)
+loadGame app dictionary letterBag gameId =
     do
+       let gameCache = games app
        maybeGame <- atomically $ do
             game <- (lookup gameId <$> readTVar gameCache)
             case game of
@@ -44,7 +45,7 @@ loadGame pool dictionary letterBag gameId gameCache =
 
        case maybeGame of
             Nothing -> do
-                dbResult <- loadFromDatabase pool dictionary letterBag gameId gameCache
+                dbResult <- loadFromDatabase app dictionary letterBag gameId gameCache
                 case dbResult of
                     Left err -> return $ Left err
                     Right (spawnDbListener, gm) ->
@@ -58,14 +59,15 @@ loadGame pool dictionary letterBag gameId gameCache =
     an action which spawns a thread to listen to game events and write them to the database.
     If the game has already been loaded into the cache, the returned action does nothing.
 -}
-loadFromDatabase :: Pool SqlBackend ->
+loadFromDatabase :: App ->
                     Dictionary ->
                     LetterBag ->
                     Text ->
                     TVar (Map Text ServerGame) ->
                     IO (Either Text (IO (), ServerGame))
-loadFromDatabase pool dictionary letterBag gameId gameCache =
+loadFromDatabase app dictionary letterBag gameId gameCache =
     do
+        let pool = appConnPool app
         eitherGame <- getGame pool letterBag dictionary gameId
         case eitherGame of
             Left err -> return $ Left err
@@ -80,7 +82,7 @@ loadFromDatabase pool dictionary letterBag gameId gameCache =
                             modifyTVar (numConnections serverGame) (+1)
                             writeTVar gameCache newCache
                             let channel = broadcastChannel serverGame
-                            let spawnDbListener = (forkIO $ watchForUpdates pool gameId channel) >> return ()
+                            let spawnDbListener = (forkIO $ watchForUpdates app gameId channel) >> return ()
 
                             return $ Right (spawnDbListener, serverGame)
                         Just entry -> do
@@ -176,14 +178,14 @@ gameApp app gameId maybePlayerId = do
                         connections <- readTVar $ numConnections g
 
                         if connections == 0
-                            then modifyTVar (games app) (M.delete gameId)
+                            then writeTChan (broadcastChannel g) GameIdle
                             else return ()
                 Left _ -> return ()
 
 getGameDefaultLocale :: App -> Text -> IO (Either Text ServerGame)
 getGameDefaultLocale app gameId = do
     let (dictionary, letterBag) = getDictionaryAndLetterBag app
-    game <- loadGame (appConnPool app) dictionary letterBag gameId (games app)
+    game <- loadGame app dictionary letterBag gameId
     return game
 
 keepClientUpdated :: App -> Text -> C.Connection -> Maybe Text -> Either Text ServerGame -> IO ()
