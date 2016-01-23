@@ -30,14 +30,41 @@ module Handler.GameLobby where
 
             webSockets $ lobbyWebSocketHandler app gameId maybePlayerId
             defaultLayout $ do
+                addStylesheet $ (StaticR css_lobby_css)
                 [whamlet|
-                    <div .lobby>
-                        <p> To play, send your opponent(s) the following URL:
-                        <input #lobby-url style="width: 500px;" readonly='true'>
-                        <p> The game will begin once enough players have visited the URL.
+                    <div #lobby>
+                        <div #url-box>
+                            <p .url-box-text> To play, send your opponent(s) the following URL:
+                            <div>
+                                <span>
+                                    <input .url-box-text #lobby-url readonly='true'>
+                                <span>
+                                    <button .copy data-rel="lobby-url" > copy
+                            <p .url-box-text> The game will begin once enough players have visited the URL.
                 |]
                 toWidget
                     [julius|
+                        // Copied from: https://github.com/ornicar/lila/blob/67c1fc62b6c8d3041af15cf25bdf7a38fff5c383/public/javascripts/big.js#L687
+                        $('#lobby').on('click', 'button.copy', function() {
+                            var prev = $('#' + $(this).data('rel'));
+                            if (!prev) return;
+                            var usePrompt = function() {
+                            prompt('Your browser does not support automatic copying. Copy this text manually with Ctrl + C:', prev.val());
+                            };
+                        try {
+                        if (document.queryCommandSupported('copy')) {
+                            // Awesome! Done in five seconds, can go home.
+                            prev.select();
+                            document.execCommand('copy');
+                        } else if (window.clipboardData) {
+                            // For a certain specific Internet Explorer version *cough cough IE8*
+                            window.clipboardData.setData('Text', prev.val());
+                        } else throw 'nope';
+                        $(this).attr('data-icon', 'E');
+                        } catch (e) {
+                        usePrompt();
+                        }
+                    });
 
                         var url = document.URL;
                         $('#lobby-url').val(url);
