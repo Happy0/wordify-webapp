@@ -32,12 +32,15 @@ module Handler.GameLobby where
             defaultLayout $ do
                 [whamlet|
                     <div .lobby>
-
+                        <p> To play, send your opponent(s) the following URL:
+                        <input #lobby-url style="width: 500px;" readonly='true'>
+                        <p> The game will begin once enough players have visited the URL.
                 |]
                 toWidget
                     [julius|
 
                         var url = document.URL;
+                        $('#lobby-url').val(url);
                         url = url.replace("http:", "ws:").replace("https:", "wss:");
                         var conn = new WebSocket(url);
 

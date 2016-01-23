@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (loadGame, getChatMessages, getGame, persistNewGame, watchForUpdates) where
+module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watchForUpdates) where
 
     import Prelude
     import Control.Concurrent
