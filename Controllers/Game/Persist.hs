@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watchForUpdates) where
+module Controllers.Game.Persist (loadGame, getChatMessages, getGame, persistNewGame, watchForUpdates) where
 
     import Prelude
     import Control.Concurrent
@@ -31,6 +31,74 @@ module Controllers.Game.Persist (getChatMessages, getGame, persistNewGame, watch
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
     import Wordify.Rules.Game
+
+    {-
+        Loads a game either from the game cache or the database. If the game is loaded
+        from the database, it is put into the game cache and a thread is spawned to
+        read game messages to store moves in the database.
+
+        The messages are read from the ServerGame's message channel and only removed from
+        the channel once they have been written to the database. This means that new clients
+        can clone the channel with any messages that have not yet been written to the database.  
+    -}
+    loadGame :: App -> Dictionary -> LetterBag -> Text -> IO (Either Text ServerGame)
+    loadGame app dictionary letterBag gameId =
+        do
+        let gameCache = games app
+        maybeGame <- atomically $ do
+                game <- (Mp.lookup gameId <$> readTVar gameCache)
+                case game of
+                    Just cachedGame ->
+                        modifyTVar (numConnections cachedGame) (+1) >> return game
+                    _ -> return game
+
+        case maybeGame of
+                Nothing -> do
+                    dbResult <- loadFromDatabase app dictionary letterBag gameId gameCache
+                    case dbResult of
+                        Left err -> return $ Left err
+                        Right (spawnDbListener, gm) ->
+                            do
+                                spawnDbListener
+                                return $ Right gm
+                Just game -> return $ Right game
+
+    {-
+        Loads a game from the database into the game cache. Returns the loaded game and
+        an action which spawns a thread to listen to game events and write them to the database.
+        If the game has already been loaded into the cache, the returned action does nothing.
+    -}
+    loadFromDatabase :: App ->
+                        Dictionary ->
+                        LetterBag ->
+                        Text ->
+                        TVar (Mp.Map Text ServerGame) ->
+                        IO (Either Text (IO (), ServerGame))
+    loadFromDatabase app dictionary letterBag gameId gameCache =
+        do
+            let pool = appConnPool app
+            eitherGame <- getGame pool letterBag dictionary gameId
+            case eitherGame of
+                Left err -> return $ Left err
+                Right serverGame ->
+                    -- Add the game to the cache of active games
+                    atomically $ do
+                        -- Check another client didn't race us to the database
+                        cachedGame <- Mp.lookup gameId <$> readTVar gameCache
+                        case cachedGame of
+                            Nothing -> do
+                                newCache <- Mp.insert gameId serverGame <$> readTVar gameCache
+                                modifyTVar (numConnections serverGame) (+1)
+                                writeTVar gameCache newCache
+                                let channel = broadcastChannel serverGame
+                                let spawnDbListener = (forkIO $ watchForUpdates app gameId channel) >> return ()
+
+                                return $ Right (spawnDbListener, serverGame)
+                            Just entry -> do
+                                modifyTVar (numConnections entry) (+1)
+                                let spawnDbListener = return ()
+                                return $ Right (spawnDbListener, entry)
+
 
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
