@@ -7,20 +7,17 @@ body {
 }
 
 .left {
-    width: 25%;
-    position: absolute;
+    float: left;
 }
 
 .mid {
     width: 50%;
-    left: 25%;
+    left: 20%;
     position: absolute;
 }
 
 .right {
-    left: 75%;
-    width: 25%;
-    position: absolute;
+    float: right;
 }
 
 .liscrabble-board-wrap {
@@ -32,7 +29,8 @@ body {
 }
 
 .main {
-    margin-top: 20px;
+    margin: 20px auto 10px auto;
+    width: 1100px;
 }
 
 .rack {
@@ -75,17 +73,12 @@ body {
 .history {
     position:relative;
     padding-top: 15px;
-    margin:auto;
     overflow: auto;
     max-height: 500px;
 }
 
 .submit-move-button {
     margin-right: 10px;
-}
-
-.score-table {
-    margin: auto;
 }
 
 .score-table-border {
