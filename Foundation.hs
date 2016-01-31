@@ -48,6 +48,15 @@ mkYesodData "App" $(parseRoutesFile "config/routes")
 -- | A convenient synonym for creating forms.
 type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
 
+appHeader =
+    toWidget [hamlet|
+      <div style="margin-bottom: 30px;">
+        <span>
+          <a href=@{HomeR}> Home |
+        <span>
+          <a href="http://www.github.com/happy0/liscrabble"> Source Code
+      |]
+
 -- Please see the documentation for the Yesod typeclass. There are a number
 -- of settings which can be configured by overriding methods here.
 instance Yesod App where
@@ -72,6 +81,7 @@ instance Yesod App where
         -- you to use normal widget features in default-layout.
 
         pc <- widgetToPageContent $ do
+            appHeader
             addScriptRemote "http://code.jquery.com/jquery-1.10.2.js"
             addScriptRemote "http://code.jquery.com/ui/1.11.4/jquery-ui.js"
             addScriptRemote "http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"
