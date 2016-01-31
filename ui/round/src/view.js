@@ -159,9 +159,9 @@ module.exports = function(ctrl) {
                 return m('p', {}, word.word + " (" + word.score + ")");
             });
 
-            return m('tr', {class: ''}, [
-                m('td', {class: ''}, wordsAndScore),
-                m('td', {class: ''}, boardMove.overallScore)
+            return m('tr', {}, [
+                m('td', {}, wordsAndScore),
+                m('td', {}, boardMove.overallScore)
                 ]);
         }
 
@@ -197,13 +197,13 @@ module.exports = function(ctrl) {
         var renderPlayerRow = function(player, idx) {
             return m('tr', {},
                      [m('td', {class : ""}, player.name),
-                         m('td', {class: ""}, !ctrl.data.penalties[idx] ? player.score : player.score + '(' + ctrl.data.penalties[idx] + ')')]);
+                         m('td', {}, !ctrl.data.penalties[idx] ? player.score : player.score + ' (' + ctrl.data.penalties[idx] + ')')]);
         }
 
         return m('table', {},
                 m('tbody',{}, [players.map(renderPlayerRow),
                   m('tr',
-                    m('td', {class: ""}, 'Tiles Remaining'),
+                    m('td', {}, 'Tiles Remaining'),
                     m('td', {}, ctrl.data.tilesRemaining))
                   ]));
     };
