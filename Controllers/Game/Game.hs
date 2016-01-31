@@ -39,7 +39,8 @@ module Controllers.Game.Game(
                     then wordsFormedMidGame gameBoard (M.fromList placedTiles)
                         else wordFormedFirstMove gameBoard (M.fromList placedTiles)
 
-            return $ case formedWords of
+            return $
+              case formedWords of
                 Left _ -> PotentialScore 0
                 Right formed -> PotentialScore (overallScore formed)
 

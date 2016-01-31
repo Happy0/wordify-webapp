@@ -159,26 +159,36 @@ module.exports = function(ctrl) {
                 return m('p', {}, word.word + " (" + word.score + ")");
             });
 
-            return m('tr', {class: 'score-table-border'}, [
-                m('td', {class: 'score-table-border'}, wordsAndScore),
-                m('td', {class: 'score-table-border'}, boardMove.overallScore)
+            return m('tr', {class: ''}, [
+                m('td', {class: ''}, wordsAndScore),
+                m('td', {class: ''}, boardMove.overallScore)
                 ]);
         }
 
-        var historyTable = m('table', {class: 'history score-table-border'},
+        var historyTable = m('table', {}, m('tbody',
 
             history.map(function(move) {
                 if (move.type == "board") {
                     return renderBoardMoveRow(move);
                 } else if (move.type == "exchange") {
-                    return m('tr', {}, "exchange");
+                    return m('tr', {},
+                      [
+                        m('td', {}, m('p', {}, "Exchange")),
+                        m('td', {}, 0)
+
+                      ]);
                 }
                 else if (move.type == "pass") {
-                    return m('tr', {}, "pass");
-                }
-        }));
+                    return m('tr', {},
+                      [
+                        m('td', {}, m('p', {}, "Pass")),
+                        m('td', {}, 0)
 
-        return m('div', {config: historyConfig, class : "history"}, historyTable);
+                      ]);
+                }
+        })));
+
+        return m('div', {config: historyConfig, class : "round-table"}, historyTable);
     };
 
     var renderScoreBoard = function() {
@@ -186,12 +196,16 @@ module.exports = function(ctrl) {
 
         var renderPlayerRow = function(player, idx) {
             return m('tr', {},
-                     [m('td', {class : "score-table-border"}, player.name),
-                         m('td', {class: "score-table-border"}, !ctrl.data.penalties[idx] ? player.score : player.score + '(' + ctrl.data.penalties[idx] + ')')]);
+                     [m('td', {class : ""}, player.name),
+                         m('td', {class: ""}, !ctrl.data.penalties[idx] ? player.score : player.score + '(' + ctrl.data.penalties[idx] + ')')]);
         }
 
-        return m('table', {class: "score-table" }, [players.map(renderPlayerRow),
-                 m('tr', m('td', {class: "score-table-border"}, 'tiles remaining: ' + ctrl.data.tilesRemaining)) ]);
+        return m('table', {},
+                m('tbody',{}, [players.map(renderPlayerRow),
+                  m('tr',
+                    m('td', {class: ""}, 'Tiles Remaining'),
+                    m('td', {}, ctrl.data.tilesRemaining))
+                  ]));
     };
 
     var renderPotentialScore = function()
@@ -209,7 +223,7 @@ module.exports = function(ctrl) {
             m('div', {class: 'potential-score'}, renderPotentialScore()),
             m('div', {class: 'main'},
                  [
-                        m('span', {class: 'left'}, [renderScoreBoard(), renderMoveHistory()]),
+                        m('span', {class: 'left'}, [m('div', {class: 'score-board round-table'}, renderScoreBoard()), renderMoveHistory()]),
                         m('span', {class: 'mid'},  [renderMiddleColumn()]),
                         m('span', {class: 'right'}, [renderChatBox()])
                  ])

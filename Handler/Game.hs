@@ -89,57 +89,56 @@ getGameDebugR = do
 gameApp :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
 gameApp app gameId maybePlayerId = do
     connection <- ask
-    liftIO $ bracket
+    bracketLiftIO
         (getGameDefaultLocale app gameId)
         releaseGame
         (keepClientUpdated app gameId connection maybePlayerId)
-
     where
-        releaseGame :: Either Text ServerGame -> IO ()
-        releaseGame g =
-            case g of
-                Right g ->
-                    atomically $ do
-                        modifyTVar (numConnections g) (\connections -> connections - 1)
-                        connections <- readTVar $ numConnections g
+        bracketLiftIO acquire release run = liftIO (bracket acquire release run)
 
-                        if connections == 0
-                            -- Tell the thread which writes updates to the database to finish writing
-                            -- the messages and then remove the game from the cache if there are still
-                            -- no connected players
-                            then writeTChan (broadcastChannel g) GameIdle
-                            else return ()
-                Left _ -> return ()
+        releaseGame :: Either Text ServerGame -> IO ()
+        releaseGame (Left _) = return ()
+        releaseGame (Right game) =
+            atomically $ do
+                modifyTVar (numConnections game) (\connections -> connections - 1)
+                connections <- readTVar $ numConnections game
+
+                if connections == 0
+                    -- Tell the thread which writes updates to the database to finish writing
+                    -- the messages and then remove the game from the cache if there are still
+                    -- no connected players
+                    then writeTChan (broadcastChannel game) GameIdle
+                    else return ()
 
 keepClientUpdated :: App -> Text -> C.Connection -> Maybe Text -> Either Text ServerGame -> IO ()
-keepClientUpdated app gameId connection maybePlayerId g = do
-       case g of
-            Left initError ->
-                C.sendTextData connection $ toJSONResponse (InvalidCommand initError)
-            Right serverGame -> do
-                (channel, gameSoFar) <- atomically $ do
-                        channel <- duplicateGameChannel serverGame
-                        gameSoFar <- readTVar (game serverGame)
-                        return (channel, gameSoFar)
+keepClientUpdated _ _ connection _ (Left initialisationError) =
+    let errorResponseText = toJSONResponse (InvalidCommand initialisationError)
+    in C.sendTextData connection errorResponseText
 
-                let playerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+keepClientUpdated app gameId connection maybePlayerId (Right serverGame) = do
+    (channel, gameSoFar) <- atomically $ do
+            channel <- duplicateGameChannel serverGame
+            gameSoFar <- readTVar (game serverGame)
+            return (channel, gameSoFar)
 
-                sendOriginalGameState connection playerNumber gameSoFar
-                sendPreviousTransitions connection gameSoFar
-                sendPreviousChatMessages (appConnPool app) gameId connection
+    let playerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
 
-                race_
-                        (forever $
-                            atomically (readTChan channel) >>= \message -> (C.sendTextData connection $ toJSONResponse message))
-                        (forever $
-                            do
-                                msg <- C.receiveData connection
-                                case eitherDecode msg of
-                                    Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
-                                    Right parsedCommand -> do
-                                        response <- liftIO $ performRequest serverGame playerNumber parsedCommand
-                                        C.sendTextData connection $ toJSONResponse $ response
-                        )
+    sendOriginalGameState connection playerNumber gameSoFar
+    sendPreviousTransitions connection gameSoFar
+    sendPreviousChatMessages (appConnPool app) gameId connection
+
+    race_
+            (forever $
+                atomically (readTChan channel) >>= \message -> (C.sendTextData connection $ toJSONResponse message))
+            (forever $
+                do
+                    msg <- C.receiveData connection
+                    case eitherDecode msg of
+                        Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
+                        Right parsedCommand -> do
+                            response <- liftIO $ performRequest serverGame playerNumber parsedCommand
+                            C.sendTextData connection $ toJSONResponse $ response
+            )
 
 sendOriginalGameState :: C.Connection -> Maybe Int -> G.Game -> IO ()
 sendOriginalGameState connection maybePlayerNumber game =
@@ -203,5 +202,3 @@ getDictionaryAndLetterBag app = do
             -- Don't taze me bro, will fix later
             let Just setup = M.lookup "en" setups
             (localisedDictionary setup, localisedLetterBag setup)
-
-

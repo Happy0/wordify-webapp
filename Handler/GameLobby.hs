@@ -34,7 +34,7 @@ module Handler.GameLobby where
                 [whamlet|
                     <div #lobby>
                         <div #url-box>
-                            <p .url-box-text> To play, send your opponent(s) the following URL:
+                            <p .url-box-text> To invite players to the game, tell them to visit the following URL:
                             <div>
                                 <span>
                                     <input .url-box-text #lobby-url readonly='true'>

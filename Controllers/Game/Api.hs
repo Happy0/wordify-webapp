@@ -70,12 +70,12 @@ module Controllers.Game.Api (
         toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
         toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
         toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
-        toJSON (GameEndSummary maybeWords players penalties) = 
+        toJSON (GameEndSummary maybeWords players penalties) =
             object ["type" .= gameEndSummaryType,
                     "players" .= players,
                     "penalties" .= penalties,
                     "lastMoveScore" .= (fmap sum $ (fmap . fmap) snd maybeWords),
-                    "wordsMade" .= 
+                    "wordsMade" .=
                         case
                             maybeWords of
                                 Nothing -> []
@@ -104,7 +104,7 @@ module Controllers.Game.Api (
                     "nowPlaying" .= nowPlaying,
                     "tilesRemaining" .= tilesRemaining]
         toJSON (GameEnd moveNumber maybePlaced summary) =
-             object ["moveNumber" .= moveNumber, 
+             object ["moveNumber" .= moveNumber,
                     "placed" .= (fmap . fmap) writePosAndTile maybePlaced,
                     "summary" .= summary]
         toJSON (PlayerExchangeMove moveNumber nowPlaying _ summary) =
@@ -200,21 +200,21 @@ module Controllers.Game.Api (
         PlayerPassMove (G.moveNumber newGame)
                        (G.playerNumber newGame)
                        (transitionToSummary passTransition)
-    transitionToMessage gf@(GameFinished game maybeWords players) = 
+    transitionToMessage gf@(GameFinished game maybeWords players) =
         GameEnd (G.moveNumber game) lastPlaced (transitionToSummary gf)
         where
             movesMade = G.movesMade game
             lastMove = L.last movesMade
             lastPlaced = case lastMove of
                 PlaceTiles tiles -> Just $ M.toList tiles
-                _ -> Nothing 
-            
+                _ -> Nothing
+
 
     transitionToSummary :: GameTransition -> MoveSummary
     transitionToSummary (MoveTransition player game formed) = toMoveSummary formed
     transitionToSummary (PassTransition _) = PassMoveSummary
     transitionToSummary (ExchangeTransition _ _ _ ) = ExchangeMoveSummary
-    transitionToSummary (GameFinished game maybeWords players) = 
+    transitionToSummary (GameFinished game maybeWords players) =
         let penalties = L.zipWith getPenalty players (G.players game)
         in GameEndSummary ((toTextScores . snd . wordsWithScores) <$> maybeWords) (G.players game) penalties
         where
@@ -277,5 +277,3 @@ module Controllers.Game.Api (
         in (Prelude.map . Prelude.map) snd columns
         where
             sameColumn square1 square2 = xPos (fst square1) == xPos (fst square2)
-
-
