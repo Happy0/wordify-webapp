@@ -129,7 +129,7 @@ keepClientUpdated app gameId connection maybePlayerId (Right serverGame) = do
 
     race_
             (forever $
-                atomically (readTChan channel) >>= \message -> (C.sendTextData connection $ toJSONResponse message))
+                (atomically . readTChan) channel >>= C.sendTextData connection . toJSONResponse)
             (forever $
                 do
                     msg <- C.receiveData connection

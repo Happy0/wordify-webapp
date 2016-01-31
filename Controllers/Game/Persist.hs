@@ -39,7 +39,7 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
 
         The messages are read from the ServerGame's message channel and only removed from
         the channel once they have been written to the database. This means that new clients
-        can clone the channel with any messages that have not yet been written to the database.  
+        can clone the channel with any messages that have not yet been written to the database.
     -}
     loadGame :: App -> Dictionary -> LetterBag -> Text -> IO (Either Text ServerGame)
     loadGame app dictionary letterBag gameId =
@@ -199,7 +199,7 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
     watchForUpdates :: App -> Text -> TChan GameMessage -> IO ()
     watchForUpdates app gameId messageChannel =
         do
-            let pool = appConnPool app 
+            let pool = appConnPool app
             -- We only remove the message from the message channel once it has been persisted to the database
             -- so that clients don't miss any messages
             message <- atomically . peekTChan $ messageChannel
@@ -214,8 +214,18 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
                                 connections <- readTVar (numConnections serverGame)
                                 if connections == 0 then
                                     do
-                                        modifyTVar (games app) $ Mp.delete gameId
-                                        return True
+                                        _ <- readTChan messageChannel
+
+                                        -- If the TChan is not empty at this stage, it means that players connected
+                                        -- and resumed playing before we closed the game (perhaps because the DB write queue got busy).
+                                        --  Since there are 0 connections, the players subsequently disconnected again, and another GameIdle message will be
+                                        -- encountered later, allowing us to kill the thread. Very unlikely to happen, but I'm paranoid...
+                                        tChanNotEmpty <- not <$> isEmptyTChan messageChannel
+                                        if tChanNotEmpty
+                                          then return False
+                                          else do
+                                            modifyTVar (games app) $ Mp.delete gameId
+                                            return True
                                     else
                                         -- If a new client connected before we'd written all the messages to
                                         -- the database, keep the game in the cache
@@ -225,7 +235,7 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
 
                     if noNewClients
                         then return ()
-                        else watchForUpdates app gameId messageChannel 
+                        else watchForUpdates app gameId messageChannel
 
                 updateMessage -> do
                     persistUpdate pool gameId updateMessage
