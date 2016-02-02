@@ -24,29 +24,10 @@ getHomeR = do
     webSockets homeWebSocketHandler
     let cookie = def {setCookieName = "blah", setCookieValue = "test"}
     withCreateGameDialog <- isJust <$> (lookupGetParam "create")
-
     setCookie cookie
+    
     defaultLayout $ do
-        [whamlet|
-            <div style="width: 150px; height 50px; margin: auto; margin-bottom: 200px;">
-
-                <div .modal .fade #create-game-lobby role="dialog">
-                    <div .modal-dialog>
-                        <div .modal-content>
-                            <div .modal-header>
-                                <button .close type="button" data-dismiss="modal">&times;
-                                <h4 class="modal-title">Create Game
-                            <div .modal-body>
-                                <div>
-                                    <p> Number of Players
-                                    <select #num-players>
-                                        $forall i <- numPlayerOptions
-                                            <option value="#{show i}"> #{show i}
-
-                            <div .modal-footer>
-                                <button .btn .btn-default .create-game-button type="button">Create</button>
-
-        |]
+        $(widgetFile "game-dialog")
         toWidget
             [julius|
                 var createGameRequest = {
