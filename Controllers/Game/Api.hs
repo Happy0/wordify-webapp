@@ -41,7 +41,7 @@ module Controllers.Game.Api (
        The messages are not broadcasted to all clients.
     -}
 
-    data ServerResponse = InitialiseGame (Maybe [Tile]) [Player] (Maybe Int) Int Int |
+    data ServerResponse = InitialiseGame [GameMessage] (Maybe [Tile]) [Player] (Maybe Int) Int Int |
                           PotentialScore Int |
                           BoardMoveSuccess [Tile] |
                           ExchangeMoveSuccess [Tile] |
@@ -131,8 +131,10 @@ module Controllers.Game.Api (
         toJSON (ChatSuccess) = object []
         toJSON (InvalidCommand msg) = object ["error" .= msg]
         toJSON (PotentialScore score) = object ["potentialScore" .= score]
-        toJSON (InitialiseGame rack players playerNumber toMove tilesRemaining) =
-            object ["rack" .= rack, "players" .= players,
+        toJSON (InitialiseGame moves rack players playerNumber toMove tilesRemaining) =
+            object [
+                   "moveCommands" .= (fmap toJSONMessage moves),
+                   "rack" .= rack, "players" .= players,
                    "playerNumber" .= playerNumber, "playerMove" .= toMove,
                    "tilesRemaining" .= tilesRemaining]
 

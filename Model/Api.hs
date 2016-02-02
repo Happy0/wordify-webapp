@@ -1,4 +1,4 @@
-module Model.Api (ServerMessage, ClientError(ClientError), Locale, GameID, commandName, toJSONResponse) where
+module Model.Api (ServerMessage, ClientError(ClientError), Locale, GameID, commandName, toJSONMessage, toJSONResponse) where
 
     import Data.Aeson
     import Data.ByteString.Lazy
@@ -30,5 +30,8 @@ module Model.Api (ServerMessage, ClientError(ClientError), Locale, GameID, comma
     class (ToJSON a) => ServerMessage a where
         commandName :: a -> Text
 
+        toJSONMessage :: a -> Value
+        toJSONMessage command = object ["command" .= commandName command, "payload" .= toJSON command]
+
         toJSONResponse :: a -> ByteString
-        toJSONResponse command = encode (object ["command" .= commandName command, "payload" .= toJSON command])
+        toJSONResponse command = encode (toJSONMessage command)

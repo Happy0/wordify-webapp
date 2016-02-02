@@ -124,7 +124,6 @@ keepClientUpdated app gameId connection maybePlayerId (Right serverGame) = do
     let playerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
 
     sendOriginalGameState connection playerNumber gameSoFar
-    sendPreviousTransitions connection gameSoFar
     sendPreviousChatMessages (appConnPool app) gameId connection
 
     race_
@@ -147,32 +146,30 @@ sendOriginalGameState connection maybePlayerNumber game =
         let players = G.players game
         let playing = G.playerNumber game
         let numTilesRemaining = (bagSize (G.bag game))
-        C.sendTextData connection $
-            toJSONResponse $ InitialiseGame rack players (maybePlayerNumber) playing numTilesRemaining
+        let gameTransitionCommands = gameToTransitionCommands game
 
-sendPreviousTransitions :: C.Connection -> G.Game -> IO ()
-sendPreviousTransitions connection game =
-    do
-        let moves = G.movesMade game
+        case gameTransitionCommands of
+          Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
+          Right transitionCommands ->
+            C.sendTextData connection $
+                toJSONResponse $ InitialiseGame transitionCommands rack players (maybePlayerNumber) playing numTilesRemaining
 
-        -- TODO: Add function to make a new empty game from a game history to
-        -- haskellscrabble
+gameToTransitionCommands :: G.Game -> Either Text [GameMessage]
+gameToTransitionCommands game =
+      if (length moves /= 0) then do
+        let gameTransitions = restoreGameLazy emptyGame $ NE.fromList (toList moves)
+        let reconstructedGameSummaries = sequence . map (fmap transitionToMessage) $ NE.toList gameTransitions
+        case reconstructedGameSummaries of
+          Left err -> Left (pack (show err))
+          Right summaries -> Right summaries
+      else return []
+      where
 
-        let Right playersState = makeGameStatePlayers (L.length $ G.players game)
-
-        let Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
-        if (length moves == 0) then
-            return ()
-            else do
-                let gameTransitions = restoreGameLazy emptyGame $ NE.fromList moves
-
-                flip mapM_ gameTransitions $
-                    \transition ->
-                        case transition of
-                            Left err -> liftIO $ putStrLn . pack . show $ err
-                            Right transition -> C.sendTextData connection $ toJSONResponse (transitionToMessage transition)
-        where
-            (G.History originalBag moves) = G.history game
+          -- TODO: Add function to make a new empty game from a game history to
+          -- haskellscrabble
+          Right playersState = makeGameStatePlayers (L.length $ G.players game)
+          Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
+          (G.History originalBag moves) = G.history game
 
 {-
     Send the chat log history to the client

@@ -1,15 +1,24 @@
 module.exports = function(opts) {
 
+    var m = require('mithril');
+
     var send = opts.send;
     var controller = opts.ctrl;
 
     var handlers = {
         "initialise" : function(data) {
+            m.startComputation();
+            
             controller.updateRack(data.rack);
             controller.setPlayers(data.players);
             controller.setPlayerNumber(data.playerNumber);
             controller.setPlayerToMove(data.playerMove);
             controller.setTilesRemaining(data.tilesRemaining);
+
+            var commands = data.moveCommands;
+
+            commands.forEach(parseAndIssueCommand);
+            m.endComputation();
         },
         "playerBoardMove" : function(data) {
             var moveNumber = data.moveNumber;
