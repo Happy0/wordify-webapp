@@ -54,6 +54,8 @@ appHeader =
         <span>
           <a href=@{HomeR}> Home |
         <span>
+          <a href=@{HomeR}?create> Create Game |
+        <span>
           <a href="http://www.github.com/happy0/liscrabble"> Source Code
       |]
 

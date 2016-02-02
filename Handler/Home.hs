@@ -23,11 +23,12 @@ getHomeR :: Handler Html
 getHomeR = do
     webSockets homeWebSocketHandler
     let cookie = def {setCookieName = "blah", setCookieValue = "test"}
+    withCreateGameDialog <- isJust <$> (lookupGetParam "create")
+
     setCookie cookie
     defaultLayout $ do
         [whamlet|
-            <div>
-                <button .btn .btn-info .btn-lg data-toggle="modal" data-target="#create-game-lobby">Create Game
+            <div style="width: 150px; height 50px; margin: auto; margin-bottom: 200px;">
 
                 <div .modal .fade #create-game-lobby role="dialog">
                     <div .modal-dialog>
@@ -53,7 +54,10 @@ getHomeR = do
                     "payload" : {
                         "players" : null
                     }
+                }
 
+                if (#{withCreateGameDialog}) {
+                  $("#create-game-lobby").modal();
                 }
 
                 var getNumPlayersSelected = function() {
@@ -101,7 +105,7 @@ getHomeR = do
                     createGameRequest.payload.players = parseInt(playersSelected);
                     var commandText = JSON.stringify(createGameRequest);
                     conn.send(commandText);
-                    
+
                 };
 
                 $(".create-game-button").click(createGameClicked);
@@ -116,17 +120,16 @@ homeWebSocketHandler :: WebSocketsT Handler ()
 homeWebSocketHandler = do
         app <- getYesod
         requestText <- receiveData
-        
+
         let request = eitherDecode requestText :: Either String ClientRequest
         case request of
-            Right requestData -> 
+            Right requestData ->
                 do
                     result <- liftIO $ performRequest app requestData
                     case result of
-                            Left clientError -> 
+                            Left clientError ->
                                 sendTextData $ toJSONResponse $ ClientError clientError
                             Right requestResponse ->
                                 sendTextData $ toJSONResponse requestResponse
-            Left reason -> 
+            Left reason ->
                 sendTextData $ toJSONResponse (ClientError $ T.pack reason)
-
