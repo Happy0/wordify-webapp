@@ -19,17 +19,8 @@ import Web.Cookie
 
 getHomeR :: Handler Html
 getHomeR = do
-    let cookie = def {setCookieName = "blah", setCookieValue = "test"}
-    setCookie cookie
-
     defaultLayout $ do
-        $(widgetFile "game-dialog")
         toWidget
-            [julius|
-
+            [hamlet|
+              <p> Stuff, things
             |]
-    where
-        currentBoard = emptyBoard
-        currentPlayers = []
-        movesPlayed = []
-        numPlayerOptions = [2..4]

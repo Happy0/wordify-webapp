@@ -64,6 +64,9 @@ appHeader =
             $("#create-game-lobby").modal();
         };
       |]
+    $(widgetFile "game-dialog")
+    where
+      numPlayerOptions = [2..4]
 
 -- Please see the documentation for the Yesod typeclass. There are a number
 -- of settings which can be configured by overriding methods here.
