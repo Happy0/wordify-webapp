@@ -6,7 +6,8 @@
 
 / HomeR GET
 
-/games/debug GameDebugR GET
+/debug GameDebugR GET
+/games CreateGameR POST
 
-/game/#Text/lobby GameLobbyR GET
-/game/#Text GameR GET
+/games/#Text/lobby GameLobbyR GET
+/games/#Text GameR GET

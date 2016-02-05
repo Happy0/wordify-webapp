@@ -25,11 +25,10 @@ library
                      Controllers.Game.Model.ServerPlayer
                      Controllers.Game.Game
                      Controllers.Game.Persist
+                     Controllers.GameLobby.CreateGame
                      Controllers.GameLobby.GameLobby
                      Controllers.GameLobby.Api
                      Controllers.Game.Api
-                     Controllers.Home.Api
-                     Controllers.Home.Home
                      Handler.Common
                      Handler.Home
                      Handler.Game

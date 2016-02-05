@@ -1,0 +1,45 @@
+var createGameRequest = {
+      "num_players" : null,
+      "locale" : null
+}
+
+var handleGameCreated = function(gameId)
+{
+    window.location = "games" + "/" + gameId + "/lobby";
+};
+
+var getNumPlayersSelected = function() {
+    var optionElement = document.getElementById("num-players");
+    return optionElement.options[optionElement.selectedIndex].value;
+};
+
+var createGameClicked = function() {
+    var playersSelected = getNumPlayersSelected();
+
+    createGameRequest.num_players = parseInt(playersSelected);
+    createGameRequest.locale = "en";
+
+    var payload = JSON.stringify(createGameRequest);
+
+    $.ajax({
+      url: window.location.origin + "/games",
+      type: "POST",
+      data: payload,
+      dataType: "text",
+      contentType: "json",
+      success: function (result) {
+          if (result) {
+                  handleGameCreated(result);
+              }
+              else {
+                  alert("lolwut");
+              }
+          },
+      error: function (xhr, ajaxOptions, thrownError) {
+          alert(xhr.status);
+          alert(thrownError);
+        }
+      });
+};
+
+$(".create-game-button").click(createGameClicked);

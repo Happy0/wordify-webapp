@@ -1,15 +1,25 @@
-module Controllers.GameLobby.Api(LobbyMessage(PlayerJoined, LobbyFull), LobbyResponse(Joined, JoinSuccess, StartGame, GameAlreadyStarted, GameDoesNotExist, InvalidPlayerID)) where
+module Controllers.GameLobby.Api(CreateGameLobby(CreateGameLobby),
+                                 LobbyMessage(PlayerJoined, LobbyFull),
+                                 LobbyResponse(Joined, JoinSuccess, StartGame, GameAlreadyStarted, GameDoesNotExist, InvalidPlayerID)
+                                 ) where
 
     import Controllers.Game.Model.ServerPlayer
     import Model.Api
     import Data.Aeson
     import Control.Applicative
+    import Control.Monad
     import Data.Maybe
     import qualified Data.HashMap.Strict as HM
     import Data.Text
     import Prelude
     import Data.Aeson
     import Data.Aeson.Types
+
+    data CreateGameLobby = CreateGameLobby {numPlayers :: Int, locale :: Text}
+
+    instance FromJSON CreateGameLobby where
+      parseJSON (Object o) = CreateGameLobby <$> o.:"num_players" <*> o.:"locale"
+      parseJSON _ = mzero
 
     {-
         Messages sent over the lobby's broadcast channel.

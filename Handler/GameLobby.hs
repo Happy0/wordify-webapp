@@ -21,6 +21,18 @@ module Handler.GameLobby where
     import Control.Concurrent
     import Control.Monad.Loops
     import Controllers.Game.Api
+    import Controllers.GameLobby.Api
+    import Controllers.GameLobby.CreateGame
+
+    postCreateGameR ::  Handler Text
+    postCreateGameR =
+      do
+        CreateGameLobby numPlayers locale <- requireJsonBody :: Handler CreateGameLobby
+        app <- getYesod
+        gameCreateResult <- liftIO (createGame app numPlayers locale)
+        case gameCreateResult of
+          Left err -> invalidArgs [err]
+          Right gameId -> return gameId
 
     getGameLobbyR :: Text -> Handler Html
     getGameLobbyR gameId =
@@ -100,7 +112,7 @@ module Handler.GameLobby where
                         var handleGameStarted = function(gameId)
                         {
                             console.info("Game started");
-                            window.location = "/game" + "/" + gameId;
+                            window.location = "/games" + "/" + gameId;
                         };
 
                         var handleJoinSuccess = function(playerId, gameId)
@@ -108,7 +120,7 @@ module Handler.GameLobby where
                             if (playerId && gameId)
                             {
                                  var playerCookie = "id=".concat(playerId).concat(";");
-                                 var path = "path=/game/".concat(gameId);
+                                 var path = "path=/games/".concat(gameId);
 
                                  var cookie = playerCookie.concat(path);
                                  console.info("cookie: " + cookie);

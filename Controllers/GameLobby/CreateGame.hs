@@ -1,4 +1,4 @@
-module Controllers.Home.Home(performRequest) where
+module Controllers.GameLobby.CreateGame(createGame) where
 
     import Foundation
     import Control.Monad
@@ -7,7 +7,6 @@ module Controllers.Home.Home(performRequest) where
     import Prelude
     import System.IO
     import System.Random
-    import Controllers.Home.Api
     import Model.Api
     import Controllers.Game.Model.ServerGame
     import Wordify.Rules.Player
@@ -25,20 +24,17 @@ module Controllers.Home.Home(performRequest) where
     import Controllers.Game.Model.GameLobby
     import Data.Time.Clock
 
-    performRequest :: App -> ClientRequest -> IO (Either Text ServerResponse)
-    performRequest app (CreateGameRequest players) = createGame app players "en"
-
-    createGame :: App -> Int -> Locale -> IO (Either Text ServerResponse)
+    createGame :: App -> Int -> Locale -> IO (Either Text Text)
     createGame app numPlayers locale =
         runEitherT $
             do
                     newGameId <- lift $ T.pack . fst . randomString 8 <$> getStdGen
                     newGame <- setupGame app locale numPlayers
                     lift $ addGameLobby app newGameId newGame numPlayers
-                    return $ GameCreated newGameId
+                    return newGameId
 
     addGameLobby :: App -> Text -> Game -> Int -> IO ()
-    addGameLobby app gameId game numPlayers = 
+    addGameLobby app gameId game numPlayers =
         do
             generator <- getStdGen
             timeCreated <- getCurrentTime
@@ -52,7 +48,7 @@ module Controllers.Home.Home(performRequest) where
     setupGame :: App -> Locale -> Int -> (EitherT Text IO Game)
     setupGame app locale numPlayers =
             do
-                let gameSetups = localisedGameSetups app 
+                let gameSetups = localisedGameSetups app
                 players <- hoistEither $ createPlayers numPlayers
                 (dictionary, letterbag) <- hoistEither $ getLetterbagAndDictionary locale gameSetups
 
@@ -64,8 +60,8 @@ module Controllers.Home.Home(performRequest) where
                 hoistEither $ first (T.pack . show) $ makeGame players shuffledLetterbag dictionary
 
     getLetterbagAndDictionary :: Locale -> LocalisedGameSetups -> Either Text (Dictionary, LetterBag)
-    getLetterbagAndDictionary locale setups = 
-        do 
+    getLetterbagAndDictionary locale setups =
+        do
             setup <- note "Invalid locale" $ M.lookup locale setups
             return (localisedDictionary setup, localisedLetterBag setup)
 

@@ -49,14 +49,20 @@ mkYesodData "App" $(parseRoutesFile "config/routes")
 type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
 
 appHeader =
+  do
     toWidget [hamlet|
       <div style="margin: 5px 0px 15px 10px">
         <span>
           <a href=@{HomeR}> Home |
         <span>
-          <a href=@{HomeR}?create> Create Game |
+          <a href="javascript:gameGameLinkClicked()"> Create Game |
         <span>
           <a href="http://www.github.com/happy0/liscrabble"> Source Code
+      |]
+    toWidget [julius|
+        var gameGameLinkClicked = function() {
+            $("#create-game-lobby").modal();
+        };
       |]
 
 -- Please see the documentation for the Yesod typeclass. There are a number
