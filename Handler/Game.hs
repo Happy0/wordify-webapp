@@ -52,6 +52,8 @@ getGameR gameId = do
         |]
         toWidget
             [julius|
+                jQuery.noConflict();
+
                 var url = document.URL,
 
                 url = url.replace("http:", "ws:").replace("https:", "wss:");

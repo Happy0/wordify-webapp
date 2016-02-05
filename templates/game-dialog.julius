@@ -5,7 +5,7 @@ var createGameRequest = {
 
 var handleGameCreated = function(gameId)
 {
-    window.location = "games" + "/" + gameId + "/lobby";
+    window.location = location.origin + "/games" + "/" + gameId + "/lobby";
 };
 
 var getNumPlayersSelected = function() {
