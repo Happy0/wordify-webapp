@@ -7,9 +7,7 @@ module.exports = function(ctrl) {
             var scrollHeight = $(element)[0].scrollHeight;
 
             $(element).scrollTop(scrollHeight);
-        }
-
-
+    };
 
     var renderButton = function (text, buttonClickHandler) {
 
@@ -197,7 +195,7 @@ module.exports = function(ctrl) {
         var renderPlayerRow = function(player, idx) {
             return m('tr', {},
                      [m('td', {class : ""}, player.name),
-                         m('td', {}, !ctrl.data.penalties[idx] ? player.score : player.score + ' (' + ctrl.data.penalties[idx] + ')')]);
+                         m('td', {}, !ctrl.data.players[idx].endBonus ? player.score : player.score + ' (' + ctrl.data.players[idx].endBonus + ')')]);
         }
 
         return m('table', {},
