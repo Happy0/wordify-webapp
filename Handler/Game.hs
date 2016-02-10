@@ -32,6 +32,12 @@ import Controllers.Game.Persist
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
+getCurrentGameAndChannel :: ServerGame -> STM (TChan GameMessage, G.Game)
+getCurrentGameAndChannel serverGame = do
+    channel <- duplicateGameChannel serverGame
+    gameSoFar <- readTVar (game serverGame)
+    return (channel, gameSoFar)
+
 getGameR :: Text -> Handler Html
 getGameR gameId = do
     request <- getRequest
@@ -39,43 +45,68 @@ getGameR gameId = do
     let cookies = reqCookies request
     let maybePlayerId = L.lookup "id" cookies
 
-    webSockets $ gameApp app gameId maybePlayerId
+    gameResult <- liftIO (getGameDefaultLocale app gameId)
 
-    defaultLayout $ do
-        addStylesheet $ (StaticR css_scrabble_css)
-        addStylesheet $ (StaticR css_round_css)
-        addStylesheet $ (StaticR css_bootstrap_css)
-        addScript $ (StaticR js_round_js)
+    case gameResult of
+      Left err -> invalidArgs [err]
+      Right serverGame -> do
+        (channel, gameSoFar) <- atomically (getCurrentGameAndChannel serverGame)
 
-        [whamlet|
-            <div #scrabbleground>
-        |]
-        toWidget
-            [julius|
-                jQuery.noConflict();
+        let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+        webSockets $ gameApp (appConnPool app) gameId serverGame channel maybePlayerNumber
 
-                var url = document.URL,
+        let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
+        let players = G.players gameSoFar
+        let playing = G.playerNumber gameSoFar
+        let numTilesRemaining = (bagSize (G.bag gameSoFar))
+        let gameMoveSummaries = gameToMoveSummaries gameSoFar
 
-                url = url.replace("http:", "ws:").replace("https:", "wss:");
-                var conn = new WebSocket(url);
+        case gameMoveSummaries of
+          Left err -> invalidArgs [err]
+          Right _ -> liftIO (return ())
 
-                var send = function(objectPayload) {
-                    var json = JSON.stringify(objectPayload);
-                    conn.send(json);
-                }
+        let summaries = either (\_ -> []) id gameMoveSummaries
 
-                var opts = {element: document.getElementById("scrabbleground")};
-                opts.ground = {}
-                opts.ground.board = #{toJSON emptyBoard};
-                opts.send = send;
-                var round = Round(opts);
+        defaultLayout $ do
+            addStylesheet $ (StaticR css_scrabble_css)
+            addStylesheet $ (StaticR css_round_css)
+            addStylesheet $ (StaticR css_bootstrap_css)
+            addScript $ (StaticR js_round_js)
 
-                conn.onmessage = function (e) {
-                    var data = JSON.parse(e.data);
-                    round.socketReceive(data);
-                }
-
+            [whamlet|
+                <div #scrabbleground>
             |]
+            toWidget
+                [julius|
+                    jQuery.noConflict();
+
+                    var url = document.URL,
+
+                    url = url.replace("http:", "ws:").replace("https:", "wss:");
+                    var conn = new WebSocket(url);
+
+                    var send = function(objectPayload) {
+                        var json = JSON.stringify(objectPayload);
+                        conn.send(json);
+                    }
+
+                    var opts = {element: document.getElementById("scrabbleground")};
+                    opts.ground = {}
+                    opts.ground.board = #{toJSON (G.board gameSoFar)};
+                    opts.players = #{toJSON players}
+                    opts.playerToMove = #{toJSON playing}
+                    opts.tilesRemaining = #{toJSON numTilesRemaining}
+                    opts.moveHistory = #{toJSON summaries}
+
+                    opts.send = send;
+                    var round = Round(opts);
+
+                    conn.onmessage = function (e) {
+                        var data = JSON.parse(e.data);
+                        round.socketReceive(data);
+                    }
+
+                |]
 
 getGameDebugR :: Handler Html
 getGameDebugR = do
@@ -88,19 +119,17 @@ getGameDebugR = do
             <div> Lobbies: #{lobbiesSize}
         |]
 
-gameApp :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
-gameApp app gameId maybePlayerId = do
+gameApp :: ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> WebSocketsT Handler ()
+gameApp pool gameId serverGame channel maybePlayerNumber = do
     connection <- ask
-    bracketLiftIO
-        (getGameDefaultLocale app gameId)
-        releaseGame
-        (keepClientUpdated app gameId connection maybePlayerId)
+    finallyLiftIO
+        (keepClientUpdated connection pool gameId serverGame channel maybePlayerNumber)
+        (releaseGame serverGame)
     where
-        bracketLiftIO acquire release run = liftIO (bracket acquire release run)
+        finallyLiftIO run release = liftIO (finally run release)
 
-        releaseGame :: Either Text ServerGame -> IO ()
-        releaseGame (Left _) = return ()
-        releaseGame (Right game) =
+        releaseGame :: ServerGame -> IO ()
+        releaseGame game =
             atomically $ do
                 modifyTVar (numConnections game) (\connections -> connections - 1)
                 connections <- readTVar $ numConnections game
@@ -112,21 +141,9 @@ gameApp app gameId maybePlayerId = do
                     then writeTChan (broadcastChannel game) GameIdle
                     else return ()
 
-keepClientUpdated :: App -> Text -> C.Connection -> Maybe Text -> Either Text ServerGame -> IO ()
-keepClientUpdated _ _ connection _ (Left initialisationError) =
-    let errorResponseText = toJSONResponse (InvalidCommand initialisationError)
-    in C.sendTextData connection errorResponseText
-
-keepClientUpdated app gameId connection maybePlayerId (Right serverGame) = do
-    (channel, gameSoFar) <- atomically $ do
-            channel <- duplicateGameChannel serverGame
-            gameSoFar <- readTVar (game serverGame)
-            return (channel, gameSoFar)
-
-    let playerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
-
-    sendOriginalGameState connection playerNumber gameSoFar
-    sendPreviousChatMessages (appConnPool app) gameId connection
+keepClientUpdated :: C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
+keepClientUpdated connection pool gameId serverGame channel playerNumber = do
+    sendPreviousChatMessages pool gameId connection
 
     race_
             (forever $
@@ -141,26 +158,11 @@ keepClientUpdated app gameId connection maybePlayerId (Right serverGame) = do
                             C.sendTextData connection $ toJSONResponse $ response
             )
 
-sendOriginalGameState :: C.Connection -> Maybe Int -> G.Game -> IO ()
-sendOriginalGameState connection maybePlayerNumber game =
-    do
-        let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer game)
-        let players = G.players game
-        let playing = G.playerNumber game
-        let numTilesRemaining = (bagSize (G.bag game))
-        let gameTransitionCommands = gameToTransitionCommands game
-
-        case gameTransitionCommands of
-          Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
-          Right transitionCommands ->
-            C.sendTextData connection $
-                toJSONResponse $ InitialiseGame transitionCommands rack players (maybePlayerNumber) playing numTilesRemaining
-
-gameToTransitionCommands :: G.Game -> Either Text [GameMessage]
-gameToTransitionCommands game =
+gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]
+gameToMoveSummaries game =
       if (length moves /= 0) then do
         let gameTransitions = restoreGameLazy emptyGame $ NE.fromList (toList moves)
-        let reconstructedGameSummaries = sequence . map (fmap transitionToMessage) $ NE.toList gameTransitions
+        let reconstructedGameSummaries = sequence . map (fmap transitionToSummary) $ NE.toList gameTransitions
         case reconstructedGameSummaries of
           Left err -> Left (pack (show err))
           Right summaries -> Right summaries

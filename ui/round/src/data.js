@@ -1,3 +1,5 @@
+var merge = require('merge');
+
 module.exports = function(opts) {
 
     var defaults = {
@@ -13,6 +15,10 @@ module.exports = function(opts) {
         potentialScore : 0,
         lastMoveReceived: 0
     }
+
+    if(!opts) return defaults;
+
+    merge.recursive(defaults, opts);
 
     return defaults;
 }

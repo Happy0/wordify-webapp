@@ -195,7 +195,8 @@ module.exports = function(ctrl) {
         var renderPlayerRow = function(player, idx) {
             return m('tr', {},
                      [m('td', {class : ""}, player.name),
-                         m('td', {}, !ctrl.data.players[idx].endBonus ? player.score : player.score + ' (' + ctrl.data.players[idx].endBonus + ')')]);
+                         m('td', {}, !ctrl.data.players[idx].endBonus ? player.score :
+                          player.score + ' (' + ctrl.data.players[idx].endBonus + ')')]);
         }
 
         return m('table', {},
