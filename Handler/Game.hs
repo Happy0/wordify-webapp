@@ -72,10 +72,6 @@ getGameR gameId = do
             addStylesheet $ (StaticR css_round_css)
             addStylesheet $ (StaticR css_bootstrap_css)
             addScript $ (StaticR js_round_js)
-
-            [whamlet|
-                <div #scrabbleground>
-            |]
             toWidget
                 [julius|
                     jQuery.noConflict();
@@ -101,12 +97,17 @@ getGameR gameId = do
                     opts.send = send;
                     var round = Round(opts);
 
+                    //TODO: Make a rack be definable in the 'data' object
+                    round.controller.updateRack(#{toJSON rack});
+
                     conn.onmessage = function (e) {
                         var data = JSON.parse(e.data);
                         round.socketReceive(data);
                     }
-
                 |]
+            [whamlet|
+                <div #scrabbleground>
+            |]
 
 getGameDebugR :: Handler Html
 getGameDebugR = do
