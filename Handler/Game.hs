@@ -91,6 +91,7 @@ getGameR gameId = do
                     opts.ground.board = #{toJSON (G.board gameSoFar)};
                     opts.players = #{toJSON players}
                     opts.playerToMove = #{toJSON playing}
+                    opts.playerNumber = #{toJSON maybePlayerNumber}
                     opts.tilesRemaining = #{toJSON numTilesRemaining}
                     opts.moveHistory = #{toJSON summaries}
 
