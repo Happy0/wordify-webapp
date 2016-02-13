@@ -52,8 +52,6 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
             do
                 -- Broadcast that the game is ready to begin
                 let broadcastChannel = channel lobby
-                writeTChan broadcastChannel (LobbyFull gameId)
-
                 removeGameLobby app gameId
                 serverGame <- (createGame app gameId lobby)
                 return $ Just serverGame

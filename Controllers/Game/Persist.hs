@@ -166,11 +166,8 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
     -}
     persistNewGame :: Pool SqlBackend -> Text -> ServerGame -> IO ()
     persistNewGame pool gameId serverGame = do
-        forkIO $ do
-             key <- persistGameState pool gameId serverGame
-             return ()
-
-        return ()
+      _ <- persistGameState pool gameId serverGame
+      return ()
 
     withPool pool = flip runSqlPersistMPool pool
 

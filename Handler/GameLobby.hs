@@ -179,9 +179,12 @@ module Handler.GameLobby where
                 Right (maybeNewId, channel, maybeGameSetup) ->
                     do
                         let pool = appConnPool app
-                        liftIO $ case maybeGameSetup of
-                            Just (game, gameChannel) -> persistNewGame pool gameId game
-                            _ -> return ()
+                        liftIO . forM maybeGameSetup $ \(game, gameChannel) ->
+                          do
+                              -- Write the created game to the database and inform the clients that enough
+                              -- players have joined and that they should go to the game page
+                              persistNewGame pool gameId game
+                              atomically (writeTChan channel (LobbyFull gameId))
 
                         sendTextData $ toJSONResponse $ (JoinSuccess gameId maybeNewId)
                         {-
