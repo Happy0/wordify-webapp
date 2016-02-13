@@ -124,14 +124,22 @@ getGameDebugR = do
 gameApp :: ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> WebSocketsT Handler ()
 gameApp pool gameId serverGame channel maybePlayerNumber = do
     connection <- ask
-    finallyLiftIO
-        (keepClientUpdated connection pool gameId serverGame channel maybePlayerNumber)
-        (releaseGame serverGame)
+    bracketIO
+        (succGameConnectionCount serverGame)
+        (\_ -> maybeReleaseGame serverGame)
+        (\_ -> keepClientUpdated connection pool gameId serverGame channel maybePlayerNumber)
     where
-        finallyLiftIO run release = liftIO (finally run release)
+        bracketIO acquire release run = liftIO (bracket acquire release run)
 
-        releaseGame :: ServerGame -> IO ()
-        releaseGame game =
+        succGameConnectionCount :: ServerGame -> IO ()
+        succGameConnectionCount game = atomically $ modifyTVar (numConnections game) succ
+
+        {-
+          Removes game from the cache if there are no connected clients left
+        -}
+        maybeReleaseGame :: ServerGame -> IO ()
+        maybeReleaseGame game = do
+            connections <- readTVarIO (numConnections game)
             atomically $ do
                 modifyTVar (numConnections game) (\connections -> connections - 1)
                 connections <- readTVar $ numConnections game

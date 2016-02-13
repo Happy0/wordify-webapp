@@ -42,16 +42,9 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
         can clone the channel with any messages that have not yet been written to the database.
     -}
     loadGame :: App -> Dictionary -> LetterBag -> Text -> IO (Either Text ServerGame)
-    loadGame app dictionary letterBag gameId =
-        do
+    loadGame app dictionary letterBag gameId = do
         let gameCache = games app
-        maybeGame <- atomically $ do
-                game <- (Mp.lookup gameId <$> readTVar gameCache)
-                case game of
-                    Just cachedGame ->
-                        modifyTVar (numConnections cachedGame) (+1) >> return game
-                    _ -> return game
-
+        maybeGame <- atomically $ (Mp.lookup gameId <$> readTVar gameCache)
         case maybeGame of
                 Nothing -> do
                     dbResult <- loadFromDatabase app dictionary letterBag gameId gameCache
@@ -88,14 +81,12 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
                         case cachedGame of
                             Nothing -> do
                                 newCache <- Mp.insert gameId serverGame <$> readTVar gameCache
-                                modifyTVar (numConnections serverGame) (+1)
                                 writeTVar gameCache newCache
                                 let channel = broadcastChannel serverGame
                                 let spawnDbListener = (forkIO $ watchForUpdates app gameId channel) >> return ()
 
                                 return $ Right (spawnDbListener, serverGame)
                             Just entry -> do
-                                modifyTVar (numConnections entry) (+1)
                                 let spawnDbListener = return ()
                                 return $ Right (spawnDbListener, entry)
 
