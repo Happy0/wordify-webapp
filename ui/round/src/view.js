@@ -220,11 +220,12 @@ module.exports = function(ctrl) {
     return m('div', {class: 'round'},
         [
             m('div', {class: 'potential-score'}, renderPotentialScore()),
-            m('div', {class: 'main'},
+            m('div', {class: 'main row-fluid'},
+              m('div', {},
                  [
-                        m('span', {class: 'left'}, [m('div', {class: 'score-board round-table'}, renderScoreBoard()), renderMoveHistory()]),
-                        m('span', {class: 'mid'},  [renderMiddleColumn()]),
-                        m('span', {class: 'right'}, [renderChatBox()])
-                 ])
+                        m('span', {class: 'col-md-3'}, [m('div', {class: 'score-board round-table'}, renderScoreBoard()), renderMoveHistory()]),
+                        m('span', {class: 'col-md-6'},  [renderMiddleColumn()]),
+                        m('span', {class: 'col-md-3'}, [renderChatBox()])
+                 ]))
         ]);
 }

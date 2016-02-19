@@ -15,23 +15,6 @@ body {
     margin-top: 10px;
 }
 
-.left {
-    width: 25%;
-    position: absolute;
-}
-
-.mid {
-    width: 50%;
-    left: 25%;
-    position: absolute;
-}
-
-.right {
-    left: 75%;
-    width: 25%;
-    position: absolute;
-}
-
 .liscrabble-board-wrap {
     width: 600px;
     height: 600px;
