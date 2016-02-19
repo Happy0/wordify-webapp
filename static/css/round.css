@@ -1,3 +1,12 @@
+#scrabbleground {
+    position: absolute;
+    top: 30px;
+    width: 100%;
+    height: calc(100% - 30px);
+    overflow: auto;
+    z-index: 10;
+}
+
 body {
   font: 12px 'Noto Sans','Lucida Grande','Lucida Sans Unicode',Geneva,Verdana,Sans-Serif
 }
@@ -6,29 +15,14 @@ body {
     margin-top: 10px;
 }
 
-.left {
-    width: 25%;
-    position: absolute;
-}
-
-.mid {
-    width: 50%;
-    left: 25%;
-    position: absolute;
-}
-
-.right {
-    left: 75%;
-    width: 25%;
-    position: absolute;
-}
-
 .liscrabble-board-wrap {
-    width: 600px;
-    height: 600px;
-    padding-right: 50px;
+    width: 30vw;
+    height: 30vw;
+    min-width: 500px;
+    min-height: 500px;
+    margin-left: auto;
+    margin-right: auto;
     padding-bottom: 20px;
-    margin: auto;
 }
 
 .main {
@@ -45,10 +39,9 @@ body {
 }
 
 .potential-score {
-    position: relative;
-    width: 150px;
     margin: auto;
-
+    text-align: center;
+    text-transform: uppercase;
 }
 
 .rack-slot {
@@ -78,19 +71,26 @@ body {
     overflow: auto;
     max-height: 490px;
     width: 75%;
-    border:1px solid #000000;
+    border:1px solid lightgray;
 }
 
 .round-table table {
   width: 100%;
 }
 
-.round-table tr:nth-child(odd){ background-color:#ffaa56; }
+.round-table tr:nth-child(odd){ background: rgba(183,222,237,1);
+background: -moz-linear-gradient(top, rgba(183,222,237,1) 0%, rgba(113,206,239,1) 50%, rgba(33,180,226,1) 51%, rgba(183,222,237,1) 100%);
+background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(183,222,237,1)), color-stop(50%, rgba(113,206,239,1)), color-stop(51%, rgba(33,180,226,1)), color-stop(100%, rgba(183,222,237,1)));
+background: -webkit-linear-gradient(top, rgba(183,222,237,1) 0%, rgba(113,206,239,1) 50%, rgba(33,180,226,1) 51%, rgba(183,222,237,1) 100%);
+background: -o-linear-gradient(top, rgba(183,222,237,1) 0%, rgba(113,206,239,1) 50%, rgba(33,180,226,1) 51%, rgba(183,222,237,1) 100%);
+background: -ms-linear-gradient(top, rgba(183,222,237,1) 0%, rgba(113,206,239,1) 50%, rgba(33,180,226,1) 51%, rgba(183,222,237,1) 100%);
+background: linear-gradient(to bottom, rgba(183,222,237,1) 0%, rgba(113,206,239,1) 50%, rgba(33,180,226,1) 51%, rgba(183,222,237,1) 100%);
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b7deed', endColorstr='#b7deed', GradientType=0 );}
 .round-table tr:nth-child(even){ background-color:#ffffff; }
 
 .round-table td{
 	vertical-align:middle;
-	border:1px solid #000000;
+	border:1px solid lightgray;
 	border-width:0px 1px 1px 0px;
   padding: 5px;
 	text-align:left;
@@ -126,17 +126,19 @@ body {
 
 .chat-box {
     position: relative;
+    margin: auto;
 }
 
 .chat-messages {
     overflow: auto;
     height: 550px;
-    width: 300px;
+    width: 90%;
     list-style-type: none;
     padding: 0px;
     padding-left: 10px;
     padding-top: 10px;
-    border: 1px solid;
+    border: 1px solid lightgrey;
+    background-color: white;
 }
 
 .chat-message {
@@ -144,7 +146,8 @@ body {
 }
 
 .chat-input {
-    width: 300px;
+    width: 90%;
+    border: 1px solid lightgrey;
 }
 
 .chat-user {
