@@ -142,7 +142,7 @@ module.exports = function(ctrl) {
     var renderBoard = function() {
         var scrabblegroundView = scrabbleground.view(ctrl.scrabbleGroundCtrl);
 
-        return m('div', {}, scrabblegroundView);
+        return m('div', {style: "overflow: auto;"}, scrabblegroundView);
     };
 
     var renderMoveHistory = function() {
