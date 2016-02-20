@@ -29,12 +29,12 @@ module Controllers.GameLobby.Api(CreateGameLobby(CreateGameLobby),
     {-
         Messages sent to clients via their websocket connection.
     -}
-    data LobbyResponse = Joined ServerPlayer | JoinSuccess Text (Maybe Text) | StartGame Text | GameAlreadyStarted | GameDoesNotExist | InvalidPlayerID
+    data LobbyResponse = Joined ServerPlayer | JoinSuccess Text Text | StartGame Text | GameAlreadyStarted | GameDoesNotExist | InvalidPlayerID
 
     instance ToJSON LobbyResponse where
         toJSON (Joined player) = object ["name" .= name player]
         toJSON (StartGame gameId) = object ["gameId" .= gameId]
-        toJSON (JoinSuccess gameId newId) = object $ maybe [] (\playerId -> ["id" .= newId, "gameId" .= gameId]) newId
+        toJSON (JoinSuccess gameId newId) = object $ ["id" .= newId, "gameId" .= gameId]
         toJSON GameAlreadyStarted = object []
         toJSON GameDoesNotExist = object []
         toJSON InvalidPlayerID = object []

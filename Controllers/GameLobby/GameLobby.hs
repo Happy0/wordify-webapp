@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlayer, handleLobbyFull) where
+module Controllers.GameLobby.GameLobby (setupPrequisets, handleChannelMessage, handleJoinNewPlayer, handleLobbyFull) where
 
     import Prelude
     import Foundation
@@ -16,6 +16,31 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
     import qualified Data.Map as M
     import Controllers.Game.Model.ServerGame
     import Controllers.Game.Api
+    import Control.Monad.Trans.Either
+    import Control.Error.Util
+    import qualified Data.List as L
+    import Control.Monad.Trans.Class
+    import Data.Either
+
+    {-
+        Sets up the broadcast channel for servicing the websocket, returning:
+        * An ID for the new player if they have not joined the lobby before and received a cookie.
+        * A message channel for listening for people joining the lobby.
+        * If the lobby becomes full due to the player joining, the new server game
+    -}
+    setupPrequisets :: App -> T.Text -> Maybe T.Text -> STM (Either LobbyResponse (T.Text, TChan LobbyMessage, Maybe ServerGame))
+    setupPrequisets app gameId maybePlayerId =
+        runEitherT $ do
+                lobbyVar <- getGameLobby gameId (gameLobbies app)
+                currentLobby <- lift $ readTVar lobbyVar
+                broadcastChan <- lift . dupTChan . channel $ currentLobby
+                case maybePlayerId of
+                    Nothing -> do
+                            (newPlayer, maybeNewGame) <- lift $ handleJoinNewPlayer app gameId lobbyVar
+                            return (identifier newPlayer, broadcastChan, maybeNewGame)
+                    Just playerId -> do
+                        _ <- hoistEither (getExistingPlayer currentLobby playerId)
+                        return (playerId, broadcastChan, Nothing)
 
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
@@ -72,5 +97,13 @@ module Controllers.GameLobby.GameLobby (handleChannelMessage, handleJoinNewPlaye
             numConnections <- newTVar 0
             let serverGame = ServerGame newGame players newChannel numConnections
             return serverGame
+        where
+            players = lobbyPlayers lobby
+
+    getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> EitherT LobbyResponse STM (TVar GameLobby)
+    getGameLobby gameId lobbies = EitherT (note GameDoesNotExist . M.lookup gameId <$> readTVar lobbies)
+
+    getExistingPlayer :: GameLobby -> T.Text -> Either LobbyResponse ServerPlayer
+    getExistingPlayer lobby playerId = note InvalidPlayerID $ L.find (\player -> identifier player == playerId) players
         where
             players = lobbyPlayers lobby
