@@ -130,7 +130,9 @@ module.exports = function(opts) {
               body: "It's your move",
             });
 
-            setTimeout(notification.close.bind(notification), 5000);
+            if (Notification.permission === "granted") {
+                setTimeout(notification.close.bind(notification), 5000);
+            }
         }
         else
         {
