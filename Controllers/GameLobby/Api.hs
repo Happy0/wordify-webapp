@@ -34,7 +34,7 @@ module Controllers.GameLobby.Api(CreateGameLobby(CreateGameLobby),
     instance ToJSON LobbyResponse where
         toJSON (Joined player) = object ["name" .= name player]
         toJSON (StartGame gameId) = object ["gameId" .= gameId]
-        toJSON (JoinSuccess gameId newId) = object $ ["id" .= newId, "gameId" .= gameId]
+        toJSON (JoinSuccess gameId newId) = object $ ["gameId" .= gameId, "id" .= newId]
         toJSON GameAlreadyStarted = object []
         toJSON GameLobbyDoesNotExist = object []
         toJSON InvalidPlayerID = object []

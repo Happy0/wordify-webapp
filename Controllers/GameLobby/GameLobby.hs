@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (setupPrequisets, handleChannelMessage, handleJoinNewPlayer, handleLobbyFull) where
+module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChannelMessage, handleJoinNewPlayer, handleLobbyFull) where
 
     import Prelude
     import Foundation
@@ -21,6 +21,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, handleChannelMessage, h
     import qualified Data.List as L
     import Control.Monad.Trans.Class
     import Data.Either
+    import Controllers.Game.Persist
 
     {-
         Sets up the broadcast channel for servicing the websocket, returning:
@@ -41,6 +42,14 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, handleChannelMessage, h
                     Just playerId -> do
                         _ <- hoistEither (getExistingPlayer currentLobby playerId)
                         return (playerId, broadcastChan, Nothing)
+
+    startGame :: App -> T.Text -> TChan LobbyMessage -> ServerGame -> IO ()
+    startGame app gameId channel serverGame = do
+      do
+          let pool = appConnPool app
+          persistNewGame pool gameId serverGame
+          -- Inform the clients that the game has been started
+          atomically (writeTChan channel (LobbyFull gameId))
 
     handleChannelMessage :: LobbyMessage -> LobbyResponse
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer

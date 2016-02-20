@@ -5,7 +5,6 @@ module Handler.GameLobby where
     import Yesod.Core
     import Yesod.WebSockets
     import qualified Data.Map as M
-    import Controllers.Game.Persist
     import Controllers.Game.Model.GameLobby
     import Controllers.Game.Model.ServerPlayer
     import Controllers.Game.Model.ServerGame
@@ -22,6 +21,8 @@ module Handler.GameLobby where
     import Controllers.GameLobby.Api
     import Controllers.GameLobby.CreateGame
     import Data.Either
+    import Web.Cookie
+    import qualified Data.Text.Encoding as E
 
     {-
       Creates a new game lobby for inviting players to a game via a link.
@@ -56,115 +57,95 @@ module Handler.GameLobby where
               Left GameLobbyDoesNotExist -> redirect (GameR gameId)
               Left InvalidPlayerID -> invalidArgs ["Invalid player ID given by browser"]
               Right (playerId, channel, maybeGameSetup) -> do
-                webSockets $ lobbyWebSocketHandler channel gameId playerId
+                setCookie def {setCookieName = "id", setCookieValue = E.encodeUtf8 playerId}
 
-                liftIO . forM maybeGameSetup $ \game ->
-                  do
-                      -- If the game is full and ready to play, write the created game
-                      -- to the database and inform the clients that enough
-                      -- players have joined and that they should go to the game page
-                      let pool = appConnPool app
-                      persistNewGame pool gameId game
-                      atomically (writeTChan channel (LobbyFull gameId))
+                -- If the lobby is full, start the game
+                case maybeGameSetup of
+                  Nothing -> do
+                    -- Connect to the game lobby and wait for remaining players to connect
+                    webSockets $ lobbyWebSocketHandler channel gameId playerId
+                    defaultLayout renderLobbyPage
+                  Just serverGame -> do
+                    -- If we're last to join (the lobby is full), start the game and then
+                    -- go to the game page
+                    liftIO (startGame app gameId channel serverGame)
+                    redirect (GameR gameId)
 
-                defaultLayout $ do
-                    addStylesheet $ (StaticR css_lobby_css)
-                    [whamlet|
-                        <div #lobby>
-                            <div #url-box>
-                                <p .url-box-text> To invite players to the game, tell them to visit the following URL:
-                                <div>
-                                    <span>
-                                        <input .url-box-text #lobby-url readonly='true'>
-                                    <span>
-                                        <button .copy data-rel="lobby-url" > copy
-                                <p .url-box-text> The game will begin once enough players have visited the URL.
-                    |]
-                    toWidget
-                        [julius|
-                            // Copied from: https://github.com/ornicar/lila/blob/67c1fc62b6c8d3041af15cf25bdf7a38fff5c383/public/javascripts/big.js#L687
-                            $('#lobby').on('click', 'button.copy', function() {
-                                var prev = $('#' + $(this).data('rel'));
-                                if (!prev) return;
-                                var usePrompt = function() {
-                                prompt('Your browser does not support automatic copying. Copy this text manually with Ctrl + C:', prev.val());
-                                };
-                            try {
-                            if (document.queryCommandSupported('copy')) {
-                                // Awesome! Done in five seconds, can go home.
-                                prev.select();
-                                document.execCommand('copy');
-                            } else if (window.clipboardData) {
-                                // For a certain specific Internet Explorer version *cough cough IE8*
-                                window.clipboardData.setData('Text', prev.val());
-                            } else throw 'nope';
-                            $(this).attr('data-icon', 'E');
-                            } catch (e) {
-                            usePrompt();
-                            }
-                        });
+    renderLobbyPage = do
+      addStylesheet $ (StaticR css_lobby_css)
+      [whamlet|
+          <div #lobby>
+              <div #url-box>
+                  <p .url-box-text> To invite players to the game, tell them to visit the following URL:
+                  <div>
+                      <span>
+                          <input .url-box-text #lobby-url readonly='true'>
+                      <span>
+                          <button .copy data-rel="lobby-url" > copy
+                  <p .url-box-text> The game will begin once enough players have visited the URL.
+      |]
+      toWidget
+          [julius|
+              // Copied from: https://github.com/ornicar/lila/blob/67c1fc62b6c8d3041af15cf25bdf7a38fff5c383/public/javascripts/big.js#L687
+              $('#lobby').on('click', 'button.copy', function() {
+                  var prev = $('#' + $(this).data('rel'));
+                  if (!prev) return;
+                  var usePrompt = function() {
+                  prompt('Your browser does not support automatic copying. Copy this text manually with Ctrl + C:', prev.val());
+                  };
+              try {
+              if (document.queryCommandSupported('copy')) {
+                  // Awesome! Done in five seconds, can go home.
+                  prev.select();
+                  document.execCommand('copy');
+              } else if (window.clipboardData) {
+                  // For a certain specific Internet Explorer version *cough cough IE8*
+                  window.clipboardData.setData('Text', prev.val());
+              } else throw 'nope';
+              $(this).attr('data-icon', 'E');
+              } catch (e) {
+              usePrompt();
+              }
+          });
 
-                            var url = document.URL;
-                            $('#lobby-url').val(url);
-                            url = url.replace("http:", "ws:").replace("https:", "wss:");
-                            var conn = new WebSocket(url);
+              var url = document.URL;
+              $('#lobby-url').val(url);
+              url = url.replace("http:", "ws:").replace("https:", "wss:");
+              var conn = new WebSocket(url);
 
-                            conn.onmessage = function(e) {
-                                var data = JSON.parse(e.data);
-                                parseServerMessage(data);
-                            };
+              conn.onmessage = function(e) {
+                  var data = JSON.parse(e.data);
+                  parseServerMessage(data);
+              };
 
-                            var parseServerMessage = function(serverMessage)
-                            {
-                                console.dir(serverMessage);
+              var parseServerMessage = function(serverMessage)
+              {
+                  console.dir(serverMessage);
 
-                                if (serverMessage && serverMessage.command)
-                                {
+                  if (serverMessage && serverMessage.command)
+                  {
 
-                                    if (serverMessage.command === "startGame")
-                                    {
-                                        handleGameStarted(serverMessage.payload.gameId);
-                                    }
-                                    else if (serverMessage.command == "joinSuccess")
-                                    {
-                                        var playerId = serverMessage.payload.id;
-                                        var gameId = serverMessage.payload.gameId;
-                                        handleJoinSuccess(playerId, gameId);
-                                    }
+                      if (serverMessage.command === "startGame")
+                      {
+                          handleGameStarted(serverMessage.payload.gameId);
+                      }
+                  }
+              };
 
-                                }
-                            };
+              var handleGameStarted = function(gameId)
+              {
+                  console.info("Game started");
+                  window.location = "/games" + "/" + gameId;
+              };
 
-                            var handleGameStarted = function(gameId)
-                            {
-                                console.info("Game started");
-                                window.location = "/games" + "/" + gameId;
-                            };
-
-                            var handleJoinSuccess = function(playerId, gameId)
-                            {
-                                if (playerId && gameId)
-                                {
-                                     var playerCookie = "id=".concat(playerId).concat(";");
-                                     var path = "path=/games/".concat(gameId);
-
-                                     var cookie = playerCookie.concat(path);
-                                     console.info("cookie: " + cookie);
-                                     document.cookie = cookie;
-                                }
-                            };
-
-                        |]
+          |]
 
     lobbyWebSocketHandler :: TChan LobbyMessage -> T.Text -> T.Text -> WebSocketsT Handler ()
     lobbyWebSocketHandler channel gameId playerId = do
-          -- Tell the client their player Id
-          sendTextData $ toJSONResponse $ (JoinSuccess gameId playerId)
-
-          {-
-              We race a thread that sends pings to the client so that when the client closes its connection,
-              our loop which reads from the message channel is closed due to the thread being cancelled.
-          -}
-          race_
-              (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData)
-              (whileM_ (isRight <$> sendPingE ("hello~" :: Text)) $ liftIO $ threadDelay 60000000)
+        {-
+            We race a thread that sends pings to the client so that when the client closes its connection,
+            our loop which reads from the message channel is closed due to the thread being cancelled.
+        -}
+        race_
+            (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData)
+            (whileM_ (isRight <$> sendPingE ("hello~" :: Text)) $ liftIO $ threadDelay 60000000)
