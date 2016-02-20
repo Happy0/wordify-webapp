@@ -101,7 +101,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, handleChannelMessage, h
             players = lobbyPlayers lobby
 
     getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> EitherT LobbyResponse STM (TVar GameLobby)
-    getGameLobby gameId lobbies = EitherT (note GameDoesNotExist . M.lookup gameId <$> readTVar lobbies)
+    getGameLobby gameId lobbies = EitherT (note GameLobbyDoesNotExist . M.lookup gameId <$> readTVar lobbies)
 
     getExistingPlayer :: GameLobby -> T.Text -> Either LobbyResponse ServerPlayer
     getExistingPlayer lobby playerId = note InvalidPlayerID $ L.find (\player -> identifier player == playerId) players

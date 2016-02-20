@@ -53,7 +53,7 @@ module Handler.GameLobby where
 
             initialisationResult <- atomically (setupPrequisets app gameId maybePlayerId)
             case initialisationResult of
-              Left GameDoesNotExist -> redirect (GameR gameId)
+              Left GameLobbyDoesNotExist -> redirect (GameR gameId)
               Left InvalidPlayerID -> invalidArgs ["Invalid player ID given by browser"]
               Right (playerId, channel, maybeGameSetup) -> do
                 webSockets $ lobbyWebSocketHandler channel gameId playerId
