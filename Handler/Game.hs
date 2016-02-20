@@ -90,8 +90,8 @@ getGameR gameId = do
                     opts.ground = {}
                     opts.ground.board = #{toJSON (G.board gameSoFar)};
                     opts.players = #{toJSON players}
-                    opts.playerToMove = #{toJSON playing}
                     opts.playerNumber = #{toJSON maybePlayerNumber}
+                    opts.playerToMove = #{toJSON playing}
                     opts.tilesRemaining = #{toJSON numTilesRemaining}
                     opts.moveHistory = #{toJSON summaries}
 
@@ -104,7 +104,12 @@ getGameR gameId = do
                     conn.onmessage = function (e) {
                         var data = JSON.parse(e.data);
                         round.socketReceive(data);
-                    }
+                    };
+
+                    document.addEventListener('DOMContentLoaded', function () {
+                      if (Notification.permission !== "granted")
+                        Notification.requestPermission();
+                    });
                 |]
             [whamlet|
                 <div #scrabbleground>

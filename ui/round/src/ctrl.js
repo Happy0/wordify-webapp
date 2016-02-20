@@ -125,6 +125,12 @@ module.exports = function(opts) {
         if (data.playerToMove == data.playerNumber)
         {
             scrabbleGroundCtrl.setBoardViewOnly(false);
+
+            var notification = new Notification('Wordify', {
+              body: "It's your move",
+            });
+
+            setTimeout(notification.close.bind(notification), 5000);
         }
         else
         {
