@@ -9,6 +9,7 @@ Email
     verkey Text Maybe
     UniqueEmail email
 Game
+    -- TODO: Store the game local here
     gameId Text
     originalLetterBag Text
     letterBagSeed Text

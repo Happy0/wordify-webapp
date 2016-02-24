@@ -45,75 +45,78 @@ getGameR gameId = do
     let cookies = reqCookies request
     let maybePlayerId = L.lookup "id" cookies
 
-    gameResult <- liftIO (getGameDefaultLocale app gameId)
+    let (dictionary, letterBag) = getDictionaryAndLetterBag app
 
-    case gameResult of
-      Left err -> invalidArgs [err]
-      Right serverGame -> do
-        (channel, gameSoFar) <- atomically (getCurrentGameAndChannel serverGame)
+    withGame app gameId dictionary letterBag (handleGameResult app gameId maybePlayerId)
 
-        let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
-        webSockets $ gameApp (appConnPool app) gameId serverGame channel maybePlayerNumber
+handleGameResult :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
+handleGameResult _ _ _ (Left err) = invalidArgs [err]
+handleGameResult app gameId maybePlayerId (Right serverGame) = do
+  (channel, gameSoFar) <- atomically (getCurrentGameAndChannel serverGame)
 
-        let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
-        let players = G.players gameSoFar
-        let playing = G.playerNumber gameSoFar
-        let numTilesRemaining = (bagSize (G.bag gameSoFar))
-        let gameMoveSummaries = gameToMoveSummaries gameSoFar
+  let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+  webSockets $ gameApp (appConnPool app) gameId serverGame channel maybePlayerNumber
 
-        case gameMoveSummaries of
-          Left err -> invalidArgs [err]
-          Right _ -> liftIO (return ())
+  let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
+  let players = G.players gameSoFar
+  let playing = G.playerNumber gameSoFar
+  let numTilesRemaining = (bagSize (G.bag gameSoFar))
+  let gameMoveSummaries = gameToMoveSummaries gameSoFar
 
-        let summaries = either (\_ -> []) id gameMoveSummaries
+  case gameMoveSummaries of
+    Left err -> invalidArgs [err]
+    Right _ -> liftIO (return ())
 
-        defaultLayout $ do
-            addStylesheet $ (StaticR css_scrabble_css)
-            addStylesheet $ (StaticR css_round_css)
-            addStylesheet $ (StaticR css_bootstrap_css)
-            addScript $ (StaticR js_round_js)
-            toWidget
-                [julius|
-                    jQuery.noConflict();
+  let summaries = either (\_ -> []) id gameMoveSummaries
 
-                    var url = document.URL,
+  defaultLayout $ do
+      addStylesheet $ (StaticR css_scrabble_css)
+      addStylesheet $ (StaticR css_round_css)
+      addStylesheet $ (StaticR css_bootstrap_css)
+      addScript $ (StaticR js_round_js)
+      toWidget
+          [julius|
+              jQuery.noConflict();
 
-                    url = url.replace("http:", "ws:").replace("https:", "wss:");
-                    var conn = new WebSocket(url);
+              var url = document.URL,
 
-                    var send = function(objectPayload) {
-                        var json = JSON.stringify(objectPayload);
-                        conn.send(json);
-                    }
+              url = url.replace("http:", "ws:").replace("https:", "wss:");
+              var conn = new WebSocket(url);
 
-                    var opts = {element: document.getElementById("scrabbleground")};
-                    opts.ground = {}
-                    opts.ground.board = #{toJSON (G.board gameSoFar)};
-                    opts.players = #{toJSON players}
-                    opts.playerNumber = #{toJSON maybePlayerNumber}
-                    opts.playerToMove = #{toJSON playing}
-                    opts.tilesRemaining = #{toJSON numTilesRemaining}
-                    opts.moveHistory = #{toJSON summaries}
+              var send = function(objectPayload) {
+                  var json = JSON.stringify(objectPayload);
+                  conn.send(json);
+              }
 
-                    opts.send = send;
-                    var round = Round(opts);
+              var opts = {element: document.getElementById("scrabbleground")};
+              opts.ground = {}
+              opts.ground.board = #{toJSON (G.board gameSoFar)};
+              opts.players = #{toJSON players}
+              opts.playerNumber = #{toJSON maybePlayerNumber}
+              opts.playerToMove = #{toJSON playing}
+              opts.tilesRemaining = #{toJSON numTilesRemaining}
+              opts.moveHistory = #{toJSON summaries}
 
-                    //TODO: Make a rack be definable in the 'data' object
-                    round.controller.updateRack(#{toJSON rack});
+              opts.send = send;
+              var round = Round(opts);
 
-                    conn.onmessage = function (e) {
-                        var data = JSON.parse(e.data);
-                        round.socketReceive(data);
-                    };
+              //TODO: Make a rack be definable in the 'data' object
+              round.controller.updateRack(#{toJSON rack});
 
-                    document.addEventListener('DOMContentLoaded', function () {
-                      if (Notification.permission !== "granted")
-                        Notification.requestPermission();
-                    });
-                |]
-            [whamlet|
-                <div #scrabbleground>
-            |]
+              conn.onmessage = function (e) {
+                  var data = JSON.parse(e.data);
+                  round.socketReceive(data);
+              };
+
+              document.addEventListener('DOMContentLoaded', function () {
+                if (Notification.permission !== "granted")
+                  Notification.requestPermission();
+              });
+          |]
+      [whamlet|
+          <div #scrabbleground>
+      |]
+
 
 getGameDebugR :: Handler Html
 getGameDebugR = do
@@ -129,32 +132,7 @@ getGameDebugR = do
 gameApp :: ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> WebSocketsT Handler ()
 gameApp pool gameId serverGame channel maybePlayerNumber = do
     connection <- ask
-    bracketIO
-        (succGameConnectionCount serverGame)
-        (\_ -> maybeReleaseGame serverGame)
-        (\_ -> keepClientUpdated connection pool gameId serverGame channel maybePlayerNumber)
-    where
-        bracketIO acquire release run = liftIO (bracket acquire release run)
-
-        succGameConnectionCount :: ServerGame -> IO ()
-        succGameConnectionCount game = atomically $ modifyTVar (numConnections game) succ
-
-        {-
-          Removes game from the cache if there are no connected clients left
-        -}
-        maybeReleaseGame :: ServerGame -> IO ()
-        maybeReleaseGame game = do
-            connections <- readTVarIO (numConnections game)
-            atomically $ do
-                modifyTVar (numConnections game) (\connections -> connections - 1)
-                connections <- readTVar $ numConnections game
-
-                if connections == 0
-                    -- Tell the thread which writes updates to the database to finish writing
-                    -- the messages and then remove the game from the cache if there are still
-                    -- no connected players
-                    then writeTChan (broadcastChannel game) GameIdle
-                    else return ()
+    liftIO (keepClientUpdated connection pool gameId serverGame channel maybePlayerNumber)
 
 keepClientUpdated :: C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
 keepClientUpdated connection pool gameId serverGame channel playerNumber = do
@@ -205,12 +183,6 @@ getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerI
 
 duplicateGameChannel :: ServerGame -> STM (TChan GameMessage)
 duplicateGameChannel serverGame = cloneTChan $ broadcastChannel serverGame
-
-getGameDefaultLocale :: App -> Text -> IO (Either Text ServerGame)
-getGameDefaultLocale app gameId = do
-    let (dictionary, letterBag) = getDictionaryAndLetterBag app
-    game <- loadGame app dictionary letterBag gameId
-    return game
 
 getDictionaryAndLetterBag :: App -> (Dictionary, LetterBag)
 getDictionaryAndLetterBag app = do

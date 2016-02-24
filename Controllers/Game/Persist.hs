@@ -1,11 +1,11 @@
-module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watchForUpdates) where
+module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watchForUpdates) where
 
     import Prelude
     import Control.Concurrent
     import Control.Monad
     import Control.Monad.IO.Class
     import Control.Concurrent.STM
-    import Control.Concurrent.STM.TChan
+    import Control.Exception
     import Control.Monad.Trans.Either
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
@@ -31,6 +31,33 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
     import Wordify.Rules.Pos
     import Wordify.Rules.Tile
     import Wordify.Rules.Game
+    import Control.Monad.Trans.Resource
+    import Control.Monad.Trans.Class
+
+    withGame :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => App -> Text -> Dictionary -> LetterBag -> (Either Text ServerGame -> m c) -> m c
+    withGame app gameId dictionary letterBag withGameAction = runResourceT $ do
+      (releaseKey, maybeGame) <- allocate (loadGame app dictionary letterBag gameId) maybeReleaseGame
+      result <- lift $ withGameAction maybeGame
+      return result
+
+      -- allocate (loadGame app dictionary letterBag gameId) maybeReleaseGame withGameAction
+      -- TODO: Store the locale of the game in the database
+      where
+        maybeReleaseGame :: Either Text ServerGame -> IO ()
+        maybeReleaseGame (Left _) = putStrLn "release err" >> return ()
+        maybeReleaseGame (Right game) = do
+            connections <- readTVarIO (numConnections game)
+            putStrLn $ "Releasing! : " ++ (show connections)
+            atomically $ do
+                decreaseConnectionsByOne game
+                connections <- readTVar $ numConnections game
+
+                if connections == 0
+                    -- Tell the thread which writes updates to the database to finish writing
+                    -- the messages and then remove the game from the cache if there are still
+                    -- no connected players
+                    then writeTChan (broadcastChannel game) GameIdle
+                    else return ()
 
     {-
         Loads a game either from the game cache or the database. If the game is loaded
@@ -44,7 +71,10 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
     loadGame :: App -> Dictionary -> LetterBag -> Text -> IO (Either Text ServerGame)
     loadGame app dictionary letterBag gameId = do
         let gameCache = games app
-        maybeGame <- atomically $ (Mp.lookup gameId <$> readTVar gameCache)
+        maybeGame <- atomically $ do
+          mbGame <- (Mp.lookup gameId <$> readTVar gameCache)
+          mapM_ increaseConnectionsByOne mbGame
+          return mbGame
         case maybeGame of
                 Nothing -> do
                     dbResult <- loadFromDatabase app dictionary letterBag gameId gameCache
@@ -54,7 +84,8 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
                             do
                                 spawnDbListener
                                 return $ Right gm
-                Just game -> return $ Right game
+                Just game -> do
+                  return (Right game)
 
     {-
         Loads a game from the database into the game cache. Returns the loaded game and
@@ -84,12 +115,13 @@ module Controllers.Game.Persist (loadGame, getChatMessages, persistNewGame, watc
                                 writeTVar gameCache newCache
                                 let channel = broadcastChannel serverGame
                                 let spawnDbListener = (forkIO $ watchForUpdates app gameId channel) >> return ()
+                                (increaseConnectionsByOne serverGame)
 
                                 return $ Right (spawnDbListener, serverGame)
                             Just entry -> do
+                                (increaseConnectionsByOne serverGame)
                                 let spawnDbListener = return ()
                                 return $ Right (spawnDbListener, entry)
-
 
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
