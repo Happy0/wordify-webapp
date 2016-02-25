@@ -39,19 +39,17 @@ getGameR gameId = do
     let cookies = reqCookies request
     let maybePlayerId = L.lookup "id" cookies
 
-    let (dictionary, letterBag) = getDictionaryAndLetterBag app
+    withGame app gameId (handleGameResult app gameId maybePlayerId)
 
-    withGame app gameId dictionary letterBag (handleGameResult app dictionary letterBag gameId maybePlayerId)
-
-handleGameResult :: App -> Dictionary -> LetterBag -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
-handleGameResult _ _ _ _ _ (Left err) = invalidArgs [err]
-handleGameResult app dictionary letterBag gameId maybePlayerId (Right serverGame) = do
+handleGameResult :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
+handleGameResult _ _ _ (Left err) = invalidArgs [err]
+handleGameResult app gameId maybePlayerId (Right serverGame) = do
   let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
 
   {-- If this is a websocket request, the handler is short cutted here
       Once the client has loaded the page and javascript, the javascript for the page
       initiates the websocket request which arrives here -}
-  webSockets $ gameApp app gameId dictionary letterBag maybePlayerNumber
+  webSockets $ gameApp app gameId maybePlayerNumber
 
   gameSoFar <- liftIO (readTVarIO (game serverGame))
   let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
@@ -126,10 +124,10 @@ getGameDebugR = do
             <div> Lobbies: #{lobbiesSize}
         |]
 
-gameApp :: App -> Text -> Dictionary -> LetterBag -> Maybe Int -> WebSocketsT Handler ()
-gameApp app gameId dictionary letterBag maybePlayerNumber = do
+gameApp :: App -> Text -> Maybe Int -> WebSocketsT Handler ()
+gameApp app gameId maybePlayerNumber = do
     connection <- ask
-    withGame app gameId dictionary letterBag $ \result ->
+    withGame app gameId $ \result ->
       case result of
         Left err -> sendTextData (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
@@ -209,10 +207,3 @@ getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerI
 
 duplicateGameChannel :: ServerGame -> STM (TChan GameMessage)
 duplicateGameChannel serverGame = cloneTChan $ broadcastChannel serverGame
-
-getDictionaryAndLetterBag :: App -> (Dictionary, LetterBag)
-getDictionaryAndLetterBag app = do
-            let setups = localisedGameSetups app
-            -- Don't taze me bro, will fix later
-            let Just setup = M.lookup "en" setups
-            (localisedDictionary setup, localisedLetterBag setup)

@@ -34,9 +34,13 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
     import Control.Monad.Trans.Resource
     import Control.Monad.Trans.Class
 
-    withGame :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) => App -> Text -> Dictionary -> LetterBag -> (Either Text ServerGame -> m c) -> m c
-    withGame app gameId dictionary letterBag withGameAction = runResourceT $ do
-      (releaseKey, maybeGame) <- allocate (loadGame app dictionary letterBag gameId) maybeReleaseGame
+    withGame :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) =>
+                App ->
+                Text ->
+                (Either Text ServerGame -> m c) ->
+                m c
+    withGame app gameId withGameAction = runResourceT $ do
+      (releaseKey, maybeGame) <- allocate (loadGame app gameId) maybeReleaseGame
       result <- lift $ withGameAction maybeGame
       return result
 
@@ -68,8 +72,8 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
         the channel once they have been written to the database. This means that new clients
         can clone the channel with any messages that have not yet been written to the database.
     -}
-    loadGame :: App -> Dictionary -> LetterBag -> Text -> IO (Either Text ServerGame)
-    loadGame app dictionary letterBag gameId = do
+    loadGame :: App -> Text -> IO (Either Text ServerGame)
+    loadGame app gameId = do
         let gameCache = games app
         maybeGame <- atomically $ do
           mbGame <- (Mp.lookup gameId <$> readTVar gameCache)
@@ -77,7 +81,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
           return mbGame
         case maybeGame of
                 Nothing -> do
-                    dbResult <- loadFromDatabase app dictionary letterBag gameId gameCache
+                    dbResult <- loadFromDatabase app gameId gameCache
                     case dbResult of
                         Left err -> return $ Left err
                         Right (spawnDbListener, gm) ->
@@ -93,15 +97,13 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
         If the game has already been loaded into the cache, the returned action does nothing.
     -}
     loadFromDatabase :: App ->
-                        Dictionary ->
-                        LetterBag ->
                         Text ->
                         TVar (Mp.Map Text ServerGame) ->
                         IO (Either Text (IO (), ServerGame))
-    loadFromDatabase app dictionary letterBag gameId gameCache =
+    loadFromDatabase app gameId gameCache =
         do
             let pool = appConnPool app
-            eitherGame <- getGame pool letterBag dictionary gameId
+            eitherGame <- getGame app gameId
             case eitherGame of
                 Left err -> return $ Left err
                 Right serverGame ->
@@ -127,8 +129,8 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
                     $= chatMessageFromEntity
 
-    getGame :: App -> LetterBag -> Dictionary -> Text -> IO (Either Text ServerGame)
-    getGame app _ _ gameId = do
+    getGame :: App -> Text -> IO (Either Text ServerGame)
+    getGame app gameId = do
         let pool = appConnPool app
         dbEntries <- withPool pool $ do
             maybeGame <- selectFirst [M.GameGameId ==. gameId] []
@@ -140,12 +142,13 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                     return $ Right (gameModel, players, L.map entityVal moves)
 
         case dbEntries of
-            Right (Entity _ (M.Game _ bagText bagSeed locale), playerModels, moveModels) -> do
+            Right (Entity _ (M.Game _ bagText bagSeed maybeLocale), playerModels, moveModels) -> do
                 let serverPlayers = L.map playerFromEntity playerModels
 
                 runEitherT $ do
+                    let locale = maybe "en" id maybeLocale
                     let maybeLocalisedSetup = Mp.lookup locale (localisedGameSetups app)
-                    (dictionary, bag) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
+                    GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
                     internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
                     tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
                     let bag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
