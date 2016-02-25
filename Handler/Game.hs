@@ -39,17 +39,17 @@ getGameR gameId = do
     let cookies = reqCookies request
     let maybePlayerId = L.lookup "id" cookies
 
+    {-- If this is a websocket request, the handler is short cutted here
+        Once the client has loaded the page and javascript, the javascript for the page
+        initiates the websocket request which arrives here -}
+    webSockets $ gameApp app gameId maybePlayerId
+
     withGame app gameId (handleGameResult app gameId maybePlayerId)
 
 handleGameResult :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
 handleGameResult _ _ _ (Left err) = invalidArgs [err]
 handleGameResult app gameId maybePlayerId (Right serverGame) = do
   let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
-
-  {-- If this is a websocket request, the handler is short cutted here
-      Once the client has loaded the page and javascript, the javascript for the page
-      initiates the websocket request which arrives here -}
-  webSockets $ gameApp app gameId maybePlayerNumber
 
   gameSoFar <- liftIO (readTVarIO (game serverGame))
   let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
@@ -124,13 +124,14 @@ getGameDebugR = do
             <div> Lobbies: #{lobbiesSize}
         |]
 
-gameApp :: App -> Text -> Maybe Int -> WebSocketsT Handler ()
-gameApp app gameId maybePlayerNumber = do
+gameApp :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
+gameApp app gameId maybePlayerId = do
     connection <- ask
     withGame app gameId $ \result ->
       case result of
         Left err -> sendTextData (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
+          let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
           channel <- atomically (cloneTChan (broadcastChannel serverGame))
           liftIO (keepClientUpdated connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 
