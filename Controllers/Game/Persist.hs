@@ -139,7 +139,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                     return $ Right (gameModel, players, L.map entityVal moves)
 
         case dbEntries of
-            Right (Entity _ (M.Game _ bagText bagSeed), playerModels, moveModels) -> do
+            Right (Entity _ (M.Game _ bagText bagSeed locale), playerModels, moveModels) -> do
                 let serverPlayers = L.map playerFromEntity playerModels
 
                 runEitherT $ do
@@ -187,15 +187,15 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
         then listens for game events and updates the game in storage as
         it is played
     -}
-    persistNewGame :: Pool SqlBackend -> Text -> ServerGame -> IO ()
-    persistNewGame pool gameId serverGame = do
-      _ <- persistGameState pool gameId serverGame
+    persistNewGame :: Pool SqlBackend -> Text -> Text -> ServerGame -> IO ()
+    persistNewGame pool gameId locale serverGame = do
+      _ <- persistGameState pool gameId locale serverGame
       return ()
 
     withPool pool = flip runSqlPersistMPool pool
 
-    persistGameState :: Pool SqlBackend -> Text -> ServerGame -> IO (Key M.Game)
-    persistGameState pool gameId serverGame = do
+    persistGameState :: Pool SqlBackend -> Text -> Text -> ServerGame -> IO (Key M.Game)
+    persistGameState pool gameId locale serverGame = do
         gameState <- readTVarIO (game serverGame)
         let History letterBag _ = history gameState
         withPool pool $ do
@@ -204,6 +204,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                     gameId
                     (tilesToDbRepresentation (tiles letterBag))
                     (pack $ show (getGenerator letterBag)))
+                    (Just locale)
 
             persistPlayers gameId (playing serverGame)
             return gameDbId

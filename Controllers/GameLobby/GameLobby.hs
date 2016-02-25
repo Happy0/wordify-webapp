@@ -47,7 +47,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
     startGame app gameId channel serverGame = do
       do
           let pool = appConnPool app
-          persistNewGame pool gameId serverGame
+          persistNewGame pool gameId "en" serverGame
           -- Inform the clients that the game has been started
           atomically (writeTChan channel (LobbyFull gameId))
 

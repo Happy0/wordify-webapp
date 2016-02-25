@@ -13,6 +13,7 @@ Game
     gameId Text
     originalLetterBag Text
     letterBagSeed Text
+    bagLocale Text Maybe
     Primary gameId
 Move
     game Text
