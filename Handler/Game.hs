@@ -44,10 +44,10 @@ getGameR gameId = do
         initiates the websocket request which arrives here -}
     webSockets $ gameApp app gameId maybePlayerId
 
-    withGame app gameId (handleGameResult app gameId maybePlayerId)
+    withGame app gameId (renderGamePage app gameId maybePlayerId)
 
-handleGameResult :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
-handleGameResult _ _ _ (Left err) = invalidArgs [err]
+renderGamePage :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
+renderGamePage _ _ _ (Left err) = invalidArgs [err]
 handleGameResult app gameId maybePlayerId (Right serverGame) = do
   let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
 
