@@ -127,8 +127,9 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
                     $= chatMessageFromEntity
 
-    getGame :: Pool SqlBackend -> LetterBag -> Dictionary -> Text -> IO (Either Text ServerGame)
-    getGame pool bag dictionary gameId = do
+    getGame :: App -> LetterBag -> Dictionary -> Text -> IO (Either Text ServerGame)
+    getGame app _ _ gameId = do
+        let pool = appConnPool app
         dbEntries <- withPool pool $ do
             maybeGame <- selectFirst [M.GameGameId ==. gameId] []
             case maybeGame of
@@ -143,6 +144,8 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                 let serverPlayers = L.map playerFromEntity playerModels
 
                 runEitherT $ do
+                    let maybeLocalisedSetup = Mp.lookup locale (localisedGameSetups app)
+                    (dictionary, bag) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
                     internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
                     tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
                     let bag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
