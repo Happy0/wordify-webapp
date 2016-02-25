@@ -140,6 +140,10 @@ keepClientUpdated :: C.Connection -> ConnectionPool -> Text -> ServerGame -> TCh
 keepClientUpdated connection pool gameId serverGame channel playerNumber = do
     sendPreviousChatMessages pool gameId connection
 
+    -- Send the moves again incase the client missed any inbetween loading the page and
+    -- connecting with the websocket
+    readTVarIO (game serverGame) >>= sendPreviousMoves connection
+
     race_
             (forever $
                 (atomically . readTChan) channel >>= C.sendTextData connection . toJSONResponse)
@@ -152,6 +156,26 @@ keepClientUpdated connection pool gameId serverGame channel playerNumber = do
                             response <- liftIO $ performRequest serverGame playerNumber parsedCommand
                             C.sendTextData connection $ toJSONResponse $ response
             )
+
+sendPreviousMoves :: C.Connection -> G.Game -> IO ()
+sendPreviousMoves connection game = do
+  if (length moves == 0) then
+    return ()
+    else
+      do
+        let transitions = restoreGameLazy emptyGame $ NE.fromList (toList moves)
+        forM_ (NE.toList transitions) $ \transition ->
+          case transition of
+            Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack (show err)))
+            Right transition ->
+              C.sendTextData connection $ toJSONResponse (transitionToMessage transition)
+  where
+    -- TODO: Add function to make a new empty game from a game history to
+    -- haskellscrabble
+    Right playersState = makeGameStatePlayers (L.length $ G.players game)
+    Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
+    (G.History originalBag moves) = G.history game
+
 
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]
 gameToMoveSummaries game =
