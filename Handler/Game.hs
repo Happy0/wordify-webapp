@@ -47,15 +47,15 @@ getGameR gameId = do
 
     let (dictionary, letterBag) = getDictionaryAndLetterBag app
 
-    withGame app gameId dictionary letterBag (handleGameResult app gameId maybePlayerId)
+    withGame app gameId dictionary letterBag (handleGameResult app dictionary letterBag gameId maybePlayerId)
 
-handleGameResult :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
-handleGameResult _ _ _ (Left err) = invalidArgs [err]
-handleGameResult app gameId maybePlayerId (Right serverGame) = do
-  (channel, gameSoFar) <- atomically (getCurrentGameAndChannel serverGame)
+handleGameResult :: App -> Dictionary -> LetterBag -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
+handleGameResult _ _ _ _ _ (Left err) = invalidArgs [err]
+handleGameResult app dictionary letterBag gameId maybePlayerId (Right serverGame) = do
+  (_, gameSoFar) <- atomically (getCurrentGameAndChannel serverGame)
 
   let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
-  webSockets $ gameApp (appConnPool app) gameId serverGame channel maybePlayerNumber
+  webSockets $ gameApp app gameId dictionary letterBag maybePlayerNumber
 
   let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
   let players = G.players gameSoFar
@@ -129,10 +129,15 @@ getGameDebugR = do
             <div> Lobbies: #{lobbiesSize}
         |]
 
-gameApp :: ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> WebSocketsT Handler ()
-gameApp pool gameId serverGame channel maybePlayerNumber = do
+gameApp :: App -> Text -> Dictionary -> LetterBag -> Maybe Int -> WebSocketsT Handler ()
+gameApp app gameId dictionary letterBag maybePlayerNumber = do
     connection <- ask
-    liftIO (keepClientUpdated connection pool gameId serverGame channel maybePlayerNumber)
+    withGame app gameId dictionary letterBag $ \result ->
+      case result of
+        Left err -> sendTextData (toJSONResponse (InvalidCommand err))
+        Right serverGame -> do
+          channel <- atomically (cloneTChan (broadcastChannel serverGame))
+          liftIO (keepClientUpdated connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 
 keepClientUpdated :: C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
 keepClientUpdated connection pool gameId serverGame channel playerNumber = do
