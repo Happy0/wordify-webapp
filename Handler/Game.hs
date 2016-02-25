@@ -32,12 +32,6 @@ import Controllers.Game.Persist
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
-getCurrentGameAndChannel :: ServerGame -> STM (TChan GameMessage, G.Game)
-getCurrentGameAndChannel serverGame = do
-    channel <- duplicateGameChannel serverGame
-    gameSoFar <- readTVar (game serverGame)
-    return (channel, gameSoFar)
-
 getGameR :: Text -> Handler Html
 getGameR gameId = do
     request <- getRequest
@@ -52,11 +46,14 @@ getGameR gameId = do
 handleGameResult :: App -> Dictionary -> LetterBag -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
 handleGameResult _ _ _ _ _ (Left err) = invalidArgs [err]
 handleGameResult app dictionary letterBag gameId maybePlayerId (Right serverGame) = do
-  (_, gameSoFar) <- atomically (getCurrentGameAndChannel serverGame)
-
   let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+
+  {-- If this is a websocket request, the handler is short cutted here
+      Once the client has loaded the page and javascript, the javascript for the page
+      initiates the websocket request which arrives here -}
   webSockets $ gameApp app gameId dictionary letterBag maybePlayerNumber
 
+  gameSoFar <- liftIO (readTVarIO (game serverGame))
   let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
   let players = G.players gameSoFar
   let playing = G.playerNumber gameSoFar
