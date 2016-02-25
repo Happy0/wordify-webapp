@@ -48,7 +48,7 @@ getGameR gameId = do
 
 renderGamePage :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
-handleGameResult app gameId maybePlayerId (Right serverGame) = do
+renderGamePage app gameId maybePlayerId (Right serverGame) = do
   let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
 
   gameSoFar <- liftIO (readTVarIO (game serverGame))
@@ -91,6 +91,7 @@ handleGameResult app gameId maybePlayerId (Right serverGame) = do
               opts.playerToMove = #{toJSON playing}
               opts.tilesRemaining = #{toJSON numTilesRemaining}
               opts.moveHistory = #{toJSON summaries}
+              opts.lastMoveReceived = #{toJSON (G.moveNumber gameSoFar)}
 
               opts.send = send;
               var round = Round(opts);
