@@ -28,10 +28,15 @@ module Controllers.Game.Api (
 
     data ChatMessage = ChatMessage {user :: Text, message :: Text}
 
-    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} |
+    data WordSummary = WordSummary { word :: Text,
+                                    wordScore :: Int,
+                                    direction :: Direction,
+                                    placedPositions :: [Pos] }
+
+    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordSummaries :: [WordSummary]} |
                        PassMoveSummary |
                        ExchangeMoveSummary |
-                       GameEndSummary (Maybe [(Text, Int)]) [Player]
+                       GameEndSummary (Maybe [WordSummary]) [Player]
 
     data ClientMessage = AskPotentialScore [(Pos, Tile)] |
                          SendChatMessage Text |
@@ -70,20 +75,29 @@ module Controllers.Game.Api (
         toJSON (ChatMessage user message) = object ["player" .= user, "message" .= message]
 
     instance ToJSON MoveSummary where
-        toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
+        toJSON (BoardMoveSummary overallScore wordSummaries) =
+          object ["overallScore" .= overallScore,
+           "wordsMade" .= toJSON wordSummaries,
+          "type" .= boardSummaryType ]
         toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
         toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
         toJSON (GameEndSummary maybeWords players) =
             object ["type" .= gameEndSummaryType,
                     "players" .= players,
-                    "lastMoveScore" .= (fmap sum $ (fmap . fmap) snd maybeWords),
+                    "lastMoveScore" .= (fmap sum $ (fmap . fmap) wordScore maybeWords),
                     "wordsMade" .=
                         case
                             maybeWords of
                                 Nothing -> []
-                                Just wordsWithScores -> fmap wordSummaryJSON wordsWithScores]
+                                Just wordSummaries -> fmap toJSON wordSummaries]
 
-    wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
+    instance ToJSON WordSummary where
+      toJSON  (WordSummary word score direction placedPositions) =
+         object ["word" .= word,
+                 "score" .= score,
+                 "direction" .= if direction == Horizontal then "horizontal" else "vertical",
+                 "playerPlaced" .= toJSON placedPositions]
+
     boardSummaryType = ("board" :: Text)
     passSummaryType = ("pass" :: Text)
     exchangeSummaryType = ("exchange" :: Text)
