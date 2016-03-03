@@ -28,7 +28,10 @@ module Controllers.Game.Api (
 
     data ChatMessage = ChatMessage {user :: Text, message :: Text}
 
-    data MoveSummary = BoardMoveSummary {overallScore :: Int, wordsAndScores :: [(Text, Int)]} |
+    data MoveSummary = BoardMoveSummary {overallScore :: Int,
+                                         wordsAndScores :: [(Text, Int)],
+                                         moveDirection :: Direction,
+                                         placedTiles :: [Pos]} |
                        PassMoveSummary |
                        ExchangeMoveSummary |
                        GameEndSummary (Maybe [(Text, Int)]) [Player]
@@ -69,8 +72,17 @@ module Controllers.Game.Api (
     instance ToJSON ChatMessage where
         toJSON (ChatMessage user message) = object ["player" .= user, "message" .= message]
 
+    toWord :: Direction -> Text
+    toWord Horizontal = "horizontal"
+    toWord Vertical = "vertical"
+
     instance ToJSON MoveSummary where
-        toJSON (BoardMoveSummary overallScore wordsWithScores) = object ["overallScore" .= overallScore, "wordsMade" .= fmap wordSummaryJSON wordsWithScores, "type" .= boardSummaryType]
+        toJSON (BoardMoveSummary overallScore wordsWithScores direction placed) =
+           object ["overallScore" .= overallScore,
+                   "direction" .= toWord direction,
+                   "placed" .= fmap toJSON placed,
+                   "wordsMade" .= fmap wordSummaryJSON wordsWithScores,
+                   "type" .= boardSummaryType]
         toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
         toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
         toJSON (GameEndSummary maybeWords players) =
@@ -225,8 +237,14 @@ module Controllers.Game.Api (
 
     toMoveSummary :: FormedWords -> MoveSummary
     toMoveSummary formedWords =
-        let (overall, wordsAndScores) = wordsWithScores formedWords
-        in BoardMoveSummary overall (toTextScores wordsAndScores)
+        let (overallScore, wordsAndScores) = wordsWithScores formedWords
+        in let maybeDirection = direction (fst $ M.findMin (playerPlacedMap formedWords)) (fst $ M.findMax (playerPlacedMap formedWords))
+        in let direction = maybe Horizontal id maybeDirection -- Default to Horizontal
+        in (BoardMoveSummary
+              overallScore
+              (toTextScores wordsAndScores)
+              direction
+              (M.keys (playerPlacedMap formedWords)))
 
     toTextScores = fmap (\(word, score) -> (pack word, score))
 
