@@ -58,6 +58,7 @@ module.exports = function(opts) {
      * The user has made a move
      */
     var makeBoardMove = function(move) {
+
         var tilesPlaced = getServerPlacedModel();
         var data = {
             command : "boardMove",

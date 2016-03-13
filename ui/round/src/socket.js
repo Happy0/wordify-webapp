@@ -8,7 +8,7 @@ module.exports = function(opts) {
     var handlers = {
         "initialise" : function(data) {
             m.startComputation();
-            
+
             controller.updateRack(data.rack);
             controller.setPlayers(data.players);
             controller.setPlayerNumber(data.playerNumber);
@@ -21,6 +21,8 @@ module.exports = function(opts) {
             m.endComputation();
         },
         "playerBoardMove" : function(data) {
+            controller.scrabbleGroundCtrl.highlight.removeAllHighlightedTiles();
+
             var moveNumber = data.moveNumber;
 
             // If we've already been sent this move (e.g. while
@@ -38,6 +40,8 @@ module.exports = function(opts) {
             controller.addBoardMoveToHistory(data.summary);
 
             controller.data.lastMoveReceived = moveNumber;
+
+            controller.scrabbleGroundCtrl.highlight.highlightMove(data.summary);
         },
         "playerExchangeMove" : function(data) {
             var moveNumber = data.moveNumber;
