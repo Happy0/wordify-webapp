@@ -131,6 +131,11 @@ module.exports = function(opts) {
               body: "It's your move",
             });
 
+            notification.onclick = function(){
+                window.focus();
+                notification.close();
+            };
+
             if (Notification.permission === "granted") {
                 setTimeout(notification.close.bind(notification), 5000);
             }
