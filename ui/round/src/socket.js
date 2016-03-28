@@ -47,7 +47,9 @@ module.exports = function(opts) {
             }
 
             if (!document.hasFocus()) {
-              window.addEventListener("focus", highlightLastMove, false);
+              $(window).one('focus', function() {
+                highlightLastMove();
+              });
             }
             else {
               highlightLastMove();
