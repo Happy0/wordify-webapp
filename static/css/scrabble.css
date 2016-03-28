@@ -63,6 +63,10 @@
     color: white;
 }
 
+.highlight-main {
+  background-color: white;
+}
+
 .lettertext {
     top: 45%;
     right: 50%;

@@ -92,6 +92,7 @@ renderGamePage app gameId maybePlayerId (Right serverGame) = do
               opts.tilesRemaining = #{toJSON numTilesRemaining}
               opts.moveHistory = #{toJSON summaries}
               opts.lastMoveReceived = #{toJSON (G.moveNumber gameSoFar)}
+              opts.ground.highlightMoveMainWordClass = "highlight-main";
 
               opts.send = send;
               var round = Round(opts);
