@@ -21,8 +21,6 @@ module.exports = function(opts) {
             m.endComputation();
         },
         "playerBoardMove" : function(data) {
-            controller.scrabbleGroundCtrl.highlight.removeAllHighlightedTiles();
-
             var moveNumber = data.moveNumber;
 
             // If we've already been sent this move (e.g. while
@@ -44,6 +42,14 @@ module.exports = function(opts) {
             var highlightLastMove = function () {
               controller.scrabbleGroundCtrl.highlight.highlightMove(data.summary);
               m.redraw();
+
+              setTimeout(function() {
+                // Once the CSS animation is complete, we remove the animation class so that
+                // if next move connects to any of the last tiles played, those tiles can
+                // animate again.
+                controller.scrabbleGroundCtrl.highlight.removeAllHighlightedTiles();
+                m.redraw();
+              }, 2000);
             }
 
             if (!document.hasFocus()) {
