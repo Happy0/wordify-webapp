@@ -23,8 +23,6 @@ module.exports = function(opts) {
     // Our scrabbleground controller for manipulating the state of the game
     var scrabbleGroundCtrl = new Scrabbleground.controller(scrabbleGroundOpts);
 
-    $(document).click(scrabbleGroundCtrl.highlight.removeAllHighlightedTiles);
-
     /**
      * A player has made a board move
      */

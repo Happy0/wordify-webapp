@@ -63,8 +63,16 @@
     color: white;
 }
 
+@keyframes highlight-animation {
+  0% {background-color: #b09978;}
+  50% {background-color: white;}
+  100% {background-color: #b09978;}
+
+}
+
 .highlight-main {
-  background-color: white;
+  animation-name: highlight-animation;
+  animation-duration: 4s;
 }
 
 .lettertext {

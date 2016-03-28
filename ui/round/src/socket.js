@@ -41,7 +41,17 @@ module.exports = function(opts) {
 
             controller.data.lastMoveReceived = moveNumber;
 
-            controller.scrabbleGroundCtrl.highlight.highlightMove(data.summary);
+            var highlightLastMove = function () {
+              controller.scrabbleGroundCtrl.highlight.highlightMove(data.summary);
+              m.redraw();
+            }
+
+            if (!document.hasFocus()) {
+              window.addEventListener("focus", highlightLastMove, false);
+            }
+            else {
+              highlightLastMove();
+            }
         },
         "playerExchangeMove" : function(data) {
             var moveNumber = data.moveNumber;
