@@ -129,7 +129,7 @@ module.exports = function(ctrl) {
             scrollToBottomOnRender(element, initialised, context);
         }
 
-        return m('span', {class: 'chat-box'},
+        return m('div', {class: 'chat-box'},
                  [
                      m('ul', {class: 'chat-messages', config: messagesConfig}, ctrl.data.chatMessages.map(function(message) {
                     return renderMessage(message.sender, message.message)
@@ -213,7 +213,9 @@ module.exports = function(ctrl) {
     }
 
     var renderMiddleColumn = function() {
-        return m('div', {class: ["liscrabble-board-wrap"]}, [renderBoard(), renderTileRack(), renderActionButtons()]);
+        return m('div', {}, [
+                  m('div', {class: "liscrabble-board-wrap"}, renderBoard()),
+                  m('div', {}, [renderTileRack(), renderActionButtons()])]);
 
     }
 
