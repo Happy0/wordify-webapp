@@ -51,7 +51,7 @@ type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
 appHeader =
   do
     toWidget [hamlet|
-      <div style="position: fixed;padding: 5px 0px 15px 10px;border-bottom: 1px solid #e0e0e0;height: 30px;width: 100%;background: white;z-index: 1000;">
+      <div style="padding: 5px 0px 15px 10px;border-bottom: 1px solid #e0e0e0;height: 30px;width: 100%;background: white;z-index: 1000;">
         <span>
           <a href=@{HomeR}> Home |
         <span>
