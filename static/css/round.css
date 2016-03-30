@@ -126,7 +126,6 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b7deed', end
 
 .chat-box {
     position: relative;
-    margin: auto;
 }
 
 .chat-messages {
@@ -139,6 +138,7 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b7deed', end
     padding-top: 10px;
     border: 1px solid lightgrey;
     background-color: white;
+    margin: auto;
 }
 
 .chat-message {
@@ -148,6 +148,8 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b7deed', end
 .chat-input {
     width: 90%;
     border: 1px solid lightgrey;
+    display: block;
+    margin: auto;
 }
 
 .chat-user {
