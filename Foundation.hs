@@ -97,6 +97,7 @@ instance Yesod App where
             addScriptRemote "http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"
             addStylesheetRemote "http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css"
             addStylesheet $ StaticR css_bootstrap_css
+            addStylesheet $ StaticR css_common_css
             appHeader
             $(widgetFile "default-layout")
         withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet")
