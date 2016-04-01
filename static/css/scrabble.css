@@ -16,7 +16,6 @@
     height: 6.6667%;
     border: 1px solid #d5c3a2;
     display: block;
-    font-size: 75%;
 }
 
 .board-square.normal {
@@ -46,6 +45,9 @@
 
 .tile {
     font-size: 14px;
+    vertical-align: middle;
+    text-align: center;
+    line-height: 50%;
     position: absolute;
     top: 0px;
     left : 0px;
