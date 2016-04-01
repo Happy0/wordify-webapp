@@ -22,5 +22,5 @@ getHomeR = do
     defaultLayout $ do
         toWidget
             [hamlet|
-              <p> Stuff, things
+              <div>
             |]
