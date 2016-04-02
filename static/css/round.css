@@ -14,8 +14,8 @@
 .liscrabble-board-wrap {
     width: 30vw;
     height: 30vw;
-    min-width: 500px;
-    min-height: 500px;
+    min-width: 600px;
+    min-height: 600px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -64,7 +64,7 @@
     position:relative;
     margin:auto;
     overflow: auto;
-    max-height: 490px;
+    max-height: 520px;
     width: 75%;
     border:1px solid lightgray;
 }
@@ -125,7 +125,7 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b7deed', end
 
 .chat-messages {
     overflow: auto;
-    height: 550px;
+    height: 600px;
     width: 90%;
     list-style-type: none;
     padding: 0px;
