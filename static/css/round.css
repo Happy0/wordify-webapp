@@ -64,9 +64,18 @@
     position:relative;
     margin:auto;
     overflow: auto;
-    max-height: 520px;
     width: 75%;
     border:1px solid lightgray;
+    display: block;
+}
+
+.move-history {
+  max-height: calc(600px - 10%);
+}
+
+.score-board {
+  margin-bottom: 5%;
+  max-height: calc(600px - 85%)
 }
 
 .round-table table {
@@ -109,10 +118,6 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b7deed', end
 
 .submit-move-button {
     margin-right: 10px;
-}
-
-.score-board {
-  margin-bottom: 20px;
 }
 
 .highlighted-slot {

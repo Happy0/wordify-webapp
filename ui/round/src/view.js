@@ -163,7 +163,7 @@ module.exports = function(ctrl) {
                 ]);
         }
 
-        var historyTable = m('table', {}, m('tbody',
+        var historyTable = m('table', {}, m('tbody', {style: ''},
 
             history.map(function(move) {
                 if (move.type == "board") {
@@ -186,7 +186,7 @@ module.exports = function(ctrl) {
                 }
         })));
 
-        return m('div', {config: historyConfig, class : "round-table"}, historyTable);
+        return m('div', {config: historyConfig, class : "round-table move-history"}, historyTable);
     };
 
     var renderScoreBoard = function() {
@@ -199,7 +199,7 @@ module.exports = function(ctrl) {
                           player.score + ' (' + ctrl.data.players[idx].endBonus + ')')]);
         }
 
-        return m('table', {},
+        return m('table', {class: 'score-board round-table'},
                 m('tbody',{}, [players.map(renderPlayerRow),
                   m('tr',
                     m('td', {}, 'Tiles Remaining'),
@@ -225,7 +225,7 @@ module.exports = function(ctrl) {
             m('div', {class: 'main row-fluid'},
               m('div', {},
                  [
-                        m('span', {class: 'col-md-3'}, [m('div', {class: 'score-board round-table'}, renderScoreBoard()), renderMoveHistory()]),
+                        m('span', {class: 'col-md-3'}, m('div', {style: 'max-height: 600px;'}, [renderScoreBoard(), renderMoveHistory()])),
                         m('span', {class: 'col-md-6'},  [renderMiddleColumn()]),
                         m('span', {class: 'col-md-3'}, [renderChatBox()])
                  ]))
