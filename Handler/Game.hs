@@ -88,7 +88,6 @@ renderGamePage app gameId maybePlayerId (Right serverGame) = do
               opts.ground.board = #{toJSON (G.board gameSoFar)};
               opts.players = #{toJSON players}
               opts.playerNumber = #{toJSON maybePlayerNumber}
-              opts.playerToMove = #{toJSON playing}
               opts.tilesRemaining = #{toJSON numTilesRemaining}
               opts.moveHistory = #{toJSON summaries}
               opts.lastMoveReceived = #{toJSON (G.moveNumber gameSoFar)}
@@ -99,6 +98,8 @@ renderGamePage app gameId maybePlayerId (Right serverGame) = do
 
               //TODO: Make a rack be definable in the 'data' object
               round.controller.updateRack(#{toJSON rack});
+
+              round.controller.setPlayerToMove(#{toJSON playing});
 
               conn.onmessage = function (e) {
                   var data = JSON.parse(e.data);
