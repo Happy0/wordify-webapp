@@ -101,6 +101,10 @@ renderGamePage app gameId maybePlayerId (Right serverGame) = do
 
               round.controller.setPlayerToMove(#{toJSON playing});
 
+              conn.onclose = function (e) {
+                
+              };
+
               conn.onmessage = function (e) {
                   var data = JSON.parse(e.data);
                   round.socketReceive(data);
