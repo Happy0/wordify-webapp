@@ -1,5 +1,5 @@
 {
-    "name" : "socket",
+    "name" : "RobustSocket",
     "version" : "0.1.0",
     "description" : "A websocket in the web application. Handles reconnections and connection trouble notifications.",
     "main" : "src/main.js",

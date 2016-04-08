@@ -1,7 +1,7 @@
 var gulp = require('gulp');
 var gutil = require('gulp-util');
 var source = require('vinyl-source-stream')
-var standalone = "WordifySocket"
+var standalone = "RobustSocket"
 var browserify = require('browserify');
 var watchify = require('watchify');
 
@@ -25,7 +25,7 @@ gulp.task('dev', function() {
   function rebundle() {
       return bundleStream.bundle()
         .on('error', onError)
-        .pipe(source('round.js'))
+        .pipe(source('robust_socket.js'))
         .pipe(gulp.dest(destination));
     }
 
