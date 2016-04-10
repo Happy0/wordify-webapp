@@ -126,9 +126,10 @@ module.exports = function(opts) {
         if (data.playerToMove == data.playerNumber)
         {
             scrabbleGroundCtrl.setBoardViewOnly(false);
+            document.title="It's your move."
 
             var notification = new Notification('Wordify', {
-              body: "It's your move",
+              body: "It's your move.",
             });
 
             notification.onclick = function(){
@@ -142,6 +143,7 @@ module.exports = function(opts) {
         }
         else
         {
+            document.title="Waiting for opponent(s) to move."
             scrabbleGroundCtrl.setBoardViewOnly(true);
             setPotentialScore(0);
         }
