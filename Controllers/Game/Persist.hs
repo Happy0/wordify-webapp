@@ -1,6 +1,7 @@
-module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watchForUpdates) where
+module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, persistGameUpdate) where
 
     import Prelude
+    import Control.Applicative
     import Control.Concurrent
     import Control.Monad
     import Control.Monad.IO.Class
@@ -51,55 +52,33 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
         maybeReleaseGame (Left _) = putStrLn "release err" >> return ()
         maybeReleaseGame (Right game) = do
             connections <- readTVarIO (numConnections game)
-            putStrLn $ "Releasing! : " ++ (show connections)
             atomically $ do
                 decreaseConnectionsByOne game
                 connections <- readTVar $ numConnections game
 
                 if connections == 0
-                    -- Tell the thread which writes updates to the database to finish writing
-                    -- the messages and then remove the game from the cache if there are still
-                    -- no connected players
-                    then writeTChan (broadcastChannel game) GameIdle
+                    then do
+                      let gameCache = games app
+                      modifyTVar gameCache (Mp.delete gameId)
+
                     else return ()
 
-    {-
-        Loads a game either from the game cache or the database. If the game is loaded
-        from the database, it is put into the game cache and a thread is spawned to
-        read game messages to store moves in the database.
-
-        The messages are read from the ServerGame's message channel and only removed from
-        the channel once they have been written to the database. This means that new clients
-        can clone the channel with any messages that have not yet been written to the database.
-    -}
     loadGame :: App -> Text -> IO (Either Text ServerGame)
-    loadGame app gameId = do
+    loadGame app gameId =
         let gameCache = games app
-        maybeGame <- atomically $ do
-          mbGame <- (Mp.lookup gameId <$> readTVar gameCache)
-          mapM_ increaseConnectionsByOne mbGame
-          return mbGame
-        case maybeGame of
-                Nothing -> do
-                    dbResult <- loadFromDatabase app gameId gameCache
-                    case dbResult of
-                        Left err -> return $ Left err
-                        Right (spawnDbListener, gm) ->
-                            do
-                                spawnDbListener
-                                return $ Right gm
-                Just game -> do
-                  return (Right game)
+        in atomically (loadGameFromCache app gameId) <|> loadFromDatabase app gameId gameCache
 
-    {-
-        Loads a game from the database into the game cache. Returns the loaded game and
-        an action which spawns a thread to listen to game events and write them to the database.
-        If the game has already been loaded into the cache, the returned action does nothing.
-    -}
+    loadGameFromCache :: App -> Text -> STM (Either Text ServerGame)
+    loadGameFromCache app gameId = do
+      let gameCache = games app
+      maybeGame <- Mp.lookup gameId <$> readTVar gameCache
+      mapM_ increaseConnectionsByOne maybeGame
+      return (note "Game does not exist" maybeGame)
+
     loadFromDatabase :: App ->
                         Text ->
                         TVar (Mp.Map Text ServerGame) ->
-                        IO (Either Text (IO (), ServerGame))
+                        IO (Either Text ServerGame)
     loadFromDatabase app gameId gameCache =
         do
             let pool = appConnPool app
@@ -110,20 +89,16 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                     -- Add the game to the cache of active games
                     atomically $ do
                         -- Check another client didn't race us to the database
-                        cachedGame <- Mp.lookup gameId <$> readTVar gameCache
-                        case cachedGame of
-                            Nothing -> do
+                        cachedGame <- loadGameFromCache app gameId
+                        game <- case cachedGame of
+                            Left _ -> do
                                 newCache <- Mp.insert gameId serverGame <$> readTVar gameCache
                                 writeTVar gameCache newCache
-                                let channel = broadcastChannel serverGame
-                                let spawnDbListener = (forkIO $ watchForUpdates app gameId channel) >> return ()
-                                (increaseConnectionsByOne serverGame)
+                                increaseConnectionsByOne serverGame
 
-                                return $ Right (spawnDbListener, serverGame)
-                            Just entry -> do
-                                (increaseConnectionsByOne serverGame)
-                                let spawnDbListener = return ()
-                                return $ Right (spawnDbListener, entry)
+                                return $ Right serverGame
+                            Right entry -> return (Right entry)
+                        return game
 
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
@@ -157,9 +132,9 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                     currentGame <- hoistEither $ playThroughGame game bag moveModels
                     currentGameVar <- liftIO $ newTVarIO currentGame
 
-                    channel <- liftIO $ newTChanIO
-                    connections <- liftIO $ newTVarIO 0
-                    return $ ServerGame currentGameVar serverPlayers channel connections
+                    channel <- liftIO $ newBroadcastTChanIO
+                    serverGame <- liftIO $ atomically (makeServerGame gameId currentGameVar serverPlayers channel)
+                    return serverGame
 
             Left err -> return $ Left err
 
@@ -168,7 +143,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
         where
             playNextMove :: Game -> M.Move -> Either Text Game
             playNextMove game moveModel =
-                case moveFromEntity (board game) initialBag moveModel of
+              case moveFromEntity (board game) initialBag moveModel of
                     Left err ->  Left err
                     Right move ->
                         let moveResult = makeMove game move
@@ -223,65 +198,19 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, watc
                         insert $
                             M.Player gameId playerName identifier playerNumber
 
-    watchForUpdates :: App -> Text -> TChan GameMessage -> IO ()
-    watchForUpdates app gameId messageChannel =
-        do
-            let pool = appConnPool app
-            -- We only remove the message from the message channel once it has been persisted to the database
-            -- so that clients don't miss any messages
-            message <- atomically . peekTChan $ messageChannel
-            case message of
-                GameIdle -> do
-                    noNewClients <- atomically $ do
-                        serverGames <- readTVar $ games app
-                        let maybeGame = Mp.lookup gameId serverGames
-                        case maybeGame of
-                            Nothing -> return False -- TODO: Log this
-                            Just serverGame -> do
-                                connections <- readTVar (numConnections serverGame)
-                                if connections == 0 then
-                                    do
-                                        _ <- readTChan messageChannel
-
-                                        -- If the TChan is not empty at this stage, it means that players connected
-                                        -- and resumed playing before we closed the game (perhaps because the DB write queue got busy).
-                                        --  Since there are 0 connections, the players subsequently disconnected again, and another GameIdle message will be
-                                        -- encountered later, allowing us to kill the thread. Very unlikely to happen, but I'm paranoid...
-                                        tChanNotEmpty <- not <$> isEmptyTChan messageChannel
-                                        if tChanNotEmpty
-                                          then return False
-                                          else do
-                                            modifyTVar (games app) $ Mp.delete gameId
-                                            return True
-                                    else
-                                        -- If a new client connected before we'd written all the messages to
-                                        -- the database, keep the game in the cache
-                                        return False
-
-                    atomically . readTChan $ messageChannel
-
-                    if noNewClients
-                        then return ()
-                        else watchForUpdates app gameId messageChannel
-
-                updateMessage -> do
-                    persistUpdate pool gameId updateMessage
-                    atomically . readTChan $ messageChannel
-                    watchForUpdates app gameId messageChannel
-
-    persistUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
-    persistUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
-    persistUpdate pool gameId (PlayerBoardMove moveNumber placed _ _ _ _) =
+    persistGameUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
+    persistGameUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
+    persistGameUpdate pool gameId (PlayerBoardMove moveNumber placed _ _ _ _) =
         persistBoardMove pool gameId moveNumber placed
-    persistUpdate pool gameId (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId moveNumber
-    persistUpdate pool gameId (PlayerExchangeMove moveNumber _ exchanged _) =
+    persistGameUpdate pool gameId (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId moveNumber
+    persistGameUpdate pool gameId (PlayerExchangeMove moveNumber _ exchanged _) =
        persistExchangeMove pool gameId moveNumber exchanged
-    persistUpdate pool gameId (GameEnd moveNumber placed moveSummary) =
+    persistGameUpdate pool gameId (GameEnd moveNumber placed moveSummary) =
         case placed of
              Nothing -> persistPassMove pool gameId moveNumber
              Just placed -> persistBoardMove pool gameId moveNumber placed
 
-    persistUpdate _ _ _ = return ()
+    persistGameUpdate _ _ _ = return ()
 
     persistBoardMove :: Pool SqlBackend -> Text -> Int -> [(Pos, Tile)] -> IO ()
     persistBoardMove pool gameId moveNumber placed = do

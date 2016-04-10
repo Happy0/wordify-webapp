@@ -13,6 +13,8 @@ module Controllers.Game.Game(
     import Control.Concurrent.STM.TChan
     import Data.Conduit
     import qualified Data.Map as M
+    import Data.Pool
+    import Database.Persist.Sql
     import Data.Text
     import Wordify.Rules.FormedWord
     import Wordify.Rules.Game
@@ -23,12 +25,12 @@ module Controllers.Game.Game(
     import Wordify.Rules.ScrabbleError
     import Wordify.Rules.Tile
 
-    performRequest :: ServerGame -> Maybe Int -> ClientMessage -> IO ServerResponse
-    performRequest serverGame player (BoardMove placed) = handleBoardMove serverGame player placed
-    performRequest serverGame player (ExchangeMove exchanged) = handleExchangeMove serverGame player exchanged
-    performRequest serverGame player PassMove = handlePassMove serverGame player
-    performRequest serverGame player (SendChatMessage msg) = handleChatMessage serverGame player msg
-    performRequest serverGame player (AskPotentialScore placed) = handlePotentialScore serverGame placed
+    performRequest :: ServerGame -> Pool SqlBackend -> Maybe Int -> ClientMessage -> IO ServerResponse
+    performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool player placed
+    performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool player exchanged
+    performRequest serverGame pool player PassMove = handlePassMove serverGame pool player
+    performRequest serverGame pool player (SendChatMessage msg) = handleChatMessage serverGame pool player msg
+    performRequest serverGame pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
 
     handlePotentialScore :: ServerGame -> [(Pos,Tile)] -> IO ServerResponse
     handlePotentialScore serverGame placedTiles =
@@ -50,11 +52,12 @@ module Controllers.Game.Game(
         an error to the client and writes nothing to the channel.
     -}
     handleMove :: ServerGame ->
+                Pool SqlBackend ->
                 Int ->
                 Move ->
                 (Either ScrabbleError GameTransition -> ServerResponse) ->
                 IO ServerResponse
-    handleMove serverGame playerMoving move moveOutcomeHandler=
+    handleMove serverGame pool playerMoving move moveOutcomeHandler=
         do
             gameState <- readTVarIO (game serverGame)
             if (playerNumber gameState) /= playerMoving
@@ -65,16 +68,19 @@ module Controllers.Game.Game(
                     case moveOutcome of
                         Left err -> return $ moveOutcomeHandler $ Left err
                         Right transition -> do
+                            let eventMessage = transitionToMessage transition
+                            P.persistGameUpdate pool (gameId serverGame) eventMessage
                             atomically $ do
-                                writeTChan channel (transitionToMessage transition)
+                                writeTChan channel eventMessage
                                 writeTVar (game serverGame) $ newGame transition
                             return $ moveOutcomeHandler moveOutcome
 
-    handleBoardMove :: ServerGame -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
-    handleBoardMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
-    handleBoardMove sharedServerGame (Just playerNo) placed =
+    handleBoardMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
+    handleBoardMove _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"
+    handleBoardMove sharedServerGame  pool(Just playerNo) placed =
         handleMove
             sharedServerGame
+            pool
             playerNo
             (PlaceTiles $ M.fromList (placed))
             moveOutcomeHandler
@@ -83,11 +89,12 @@ module Controllers.Game.Game(
             moveOutcomeHandler (Right (MoveTransition newPlayer _ _ )) = BoardMoveSuccess (tilesOnRack newPlayer)
             moveOutcomeHandler (Right _) = BoardMoveSuccess []
 
-    handleExchangeMove :: ServerGame -> Maybe Int -> [Tile] -> IO ServerResponse
-    handleExchangeMove _ Nothing _ = return $ InvalidCommand "Observers cannot move"
-    handleExchangeMove sharedServerGame (Just playerNo) exchanged =
+    handleExchangeMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> [Tile] -> IO ServerResponse
+    handleExchangeMove _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"
+    handleExchangeMove sharedServerGame pool (Just playerNo) exchanged =
         handleMove
              sharedServerGame
+             pool
              playerNo
              (Exchange exchanged)
              moveOutcomeHandler
@@ -96,16 +103,17 @@ module Controllers.Game.Game(
             moveOutcomeHandler (Right (ExchangeTransition _ beforePlayer afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
             moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
-    handlePassMove :: ServerGame ->  Maybe Int -> IO ServerResponse
-    handlePassMove _ Nothing = return $ InvalidCommand "Observers cannot move"
-    handlePassMove sharedServerGame (Just playerNo) = handleMove sharedServerGame playerNo Pass moveOutcomeHandler
+    handlePassMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> IO ServerResponse
+    handlePassMove _ _ Nothing = return $ InvalidCommand "Observers cannot move"
+    handlePassMove sharedServerGame pool (Just playerNo) =
+       handleMove sharedServerGame pool playerNo Pass moveOutcomeHandler
         where
             moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
             moveOutcomeHandler (Right _) = PassMoveSuccess
 
-    handleChatMessage :: ServerGame -> Maybe Int -> Text -> IO ServerResponse
-    handleChatMessage _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-    handleChatMessage serverGame (Just playerNumber) message =
+    handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe Int -> Text -> IO ServerResponse
+    handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
+    handleChatMessage serverGame pool (Just playerNumber) message =
         do
             let playerName = SP.name <$> (getServerPlayer serverGame playerNumber)
 

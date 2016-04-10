@@ -104,7 +104,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
             newChannel <- newBroadcastTChan
             newGame <- newTVar (pendingGame lobby)
             numConnections <- newTVar 0
-            let serverGame = ServerGame newGame players newChannel numConnections
+            serverGame <- makeServerGame gameId newGame players newChannel
             return serverGame
         where
             players = lobbyPlayers lobby
