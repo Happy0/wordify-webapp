@@ -135,7 +135,7 @@ gameApp app gameId maybePlayerId = do
         Left err -> sendTextData (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
           let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
-          channel <- atomically (cloneTChan (broadcastChannel serverGame))
+          channel <- atomically (dupTChan (broadcastChannel serverGame))
           liftIO (keepClientUpdated connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 
 keepClientUpdated :: C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()

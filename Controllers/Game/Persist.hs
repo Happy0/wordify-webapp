@@ -1,5 +1,6 @@
 module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, persistGameUpdate) where
 
+
     import Prelude
     import Control.Applicative
     import Control.Concurrent
@@ -8,6 +9,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
     import Control.Concurrent.STM
     import Control.Exception
     import Control.Monad.Trans.Either
+    import Control.Monad.Except
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
     import Controllers.Game.Model.ServerPlayer
@@ -64,9 +66,11 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
                     else return ()
 
     loadGame :: App -> Text -> IO (Either Text ServerGame)
-    loadGame app gameId =
-        let gameCache = games app
-        in atomically (loadGameFromCache app gameId) <|> loadFromDatabase app gameId gameCache
+    loadGame app gameId = runExceptT $ getGameFromCache <|> getGameFromDatabase
+        where
+            getGameFromCache = ExceptT (atomically (loadGameFromCache app gameId))
+            getGameFromDatabase = ExceptT (loadFromDatabase app gameId (games app))
+
 
     loadGameFromCache :: App -> Text -> STM (Either Text ServerGame)
     loadGameFromCache app gameId = do
