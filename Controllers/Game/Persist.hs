@@ -76,8 +76,9 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
     loadGameFromCache app gameId = do
       let gameCache = games app
       maybeGame <- Mp.lookup gameId <$> readTVar gameCache
-      mapM_ increaseConnectionsByOne maybeGame
+      forM_ maybeGame increaseConnectionsByOne
       return (note "Game does not exist" maybeGame)
+
 
     loadFromDatabase :: App ->
                         Text ->
@@ -85,24 +86,20 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
                         IO (Either Text ServerGame)
     loadFromDatabase app gameId gameCache =
         do
-            let pool = appConnPool app
             eitherGame <- getGame app gameId
             case eitherGame of
                 Left err -> return $ Left err
                 Right serverGame ->
-                    -- Add the game to the cache of active games
-                    atomically $ do
-                        -- Check another client didn't race us to the database
-                        cachedGame <- loadGameFromCache app gameId
-                        game <- case cachedGame of
-                            Left _ -> do
-                                newCache <- Mp.insert gameId serverGame <$> readTVar gameCache
-                                writeTVar gameCache newCache
-                                increaseConnectionsByOne serverGame
+                    atomically $ runExceptT $ do
+                        let cachedGame = ExceptT (loadGameFromCache app gameId)
+                        let newlyCachedGame = ExceptT $ do
+                            modifyTVar gameCache $ Mp.insert gameId serverGame
+                            return (Right serverGame)
 
-                                return $ Right serverGame
-                            Right entry -> return (Right entry)
+                        game <- (cachedGame <|> newlyCachedGame)
+                        lift $ increaseConnectionsByOne game
                         return game
+
 
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
