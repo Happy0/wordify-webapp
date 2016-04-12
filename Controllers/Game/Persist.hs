@@ -96,7 +96,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
                             modifyTVar gameCache $ Mp.insert gameId serverGame
                             return (Right serverGame)
 
-                        game <- (cachedGame <|> newlyCachedGame)
+                        game <- cachedGame <|> newlyCachedGame
                         lift $ increaseConnectionsByOne game
                         return game
 
