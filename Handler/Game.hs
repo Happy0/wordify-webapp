@@ -139,7 +139,7 @@ gameApp app gameId maybePlayerId = do
         Left err -> sendTextData (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
           let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
-          channel <- atomically (cloneTChan (broadcastChannel serverGame))
+          channel <- atomically (dupTChan (broadcastChannel serverGame))
           liftIO (keepClientUpdated connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 
 keepClientUpdated :: C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
@@ -159,7 +159,7 @@ keepClientUpdated connection pool gameId serverGame channel playerNumber = do
                     case eitherDecode msg of
                         Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
                         Right parsedCommand -> do
-                            response <- liftIO $ performRequest serverGame playerNumber parsedCommand
+                            response <- liftIO $ performRequest serverGame pool playerNumber parsedCommand
                             C.sendTextData connection $ toJSONResponse $ response
             )
 
@@ -212,6 +212,3 @@ getPlayerNumber :: ServerGame -> Text -> Maybe Int
 getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerId == identifier player) $ zip [1 .. 4] players)
     where
         players = playing serverGame
-
-duplicateGameChannel :: ServerGame -> STM (TChan GameMessage)
-duplicateGameChannel serverGame = cloneTChan $ broadcastChannel serverGame

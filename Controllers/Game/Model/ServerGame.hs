@@ -1,4 +1,6 @@
-module Controllers.Game.Model.ServerGame (ServerGame(ServerGame),
+module Controllers.Game.Model.ServerGame (ServerGame,
+                                          makeServerGame,
+                                          gameId,
                                           game,
                                           playing,
                                           broadcastChannel,
@@ -14,8 +16,20 @@ module Controllers.Game.Model.ServerGame (ServerGame(ServerGame),
     import qualified Data.List.Safe as SL
     import Control.Concurrent.STM.TVar
     import Control.Monad.STM
+    import Data.Text
 
-    data ServerGame = ServerGame {game :: TVar Game, playing :: [ServerPlayer], broadcastChannel :: (TChan GameMessage), numConnections :: TVar Int}
+    data ServerGame = ServerGame {
+                          gameId :: Text,
+                          game :: TVar Game,
+                          playing :: [ServerPlayer],
+                          broadcastChannel :: (TChan GameMessage),
+                          numConnections :: TVar Int
+                        }
+
+    makeServerGame :: Text -> TVar Game -> [ServerPlayer] -> (TChan GameMessage) -> STM ServerGame
+    makeServerGame gameId game players messageChannel = do
+      connections <- newTVar 0
+      return (ServerGame gameId game players messageChannel connections)
 
     getServerPlayer :: ServerGame -> Int -> Maybe ServerPlayer
     getServerPlayer serverGame playerNumber = playing serverGame SL.!! (playerNumber - 1)
