@@ -94,10 +94,10 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
                         let cachedGame = ExceptT (loadGameFromCache app gameId)
                         let newlyCachedGame = ExceptT $ do
                             modifyTVar gameCache $ Mp.insert gameId serverGame
+                            increaseConnectionsByOne serverGame
                             return (Right serverGame)
 
                         game <- cachedGame <|> newlyCachedGame
-                        lift $ increaseConnectionsByOne game
                         return game
 
 
