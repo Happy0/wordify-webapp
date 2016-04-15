@@ -97,9 +97,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
                             increaseConnectionsByOne serverGame
                             return (Right serverGame)
 
-                        game <- cachedGame <|> newlyCachedGame
-                        return game
-
+                        return $ cachedGame <|> newlyCachedGame
 
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
