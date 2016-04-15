@@ -79,7 +79,6 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
       forM_ maybeGame increaseConnectionsByOne
       return (note "Game does not exist" maybeGame)
 
-
     loadFromDatabase :: App ->
                         Text ->
                         TVar (Mp.Map Text ServerGame) ->
@@ -89,15 +88,13 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
             eitherGame <- getGame app gameId
             case eitherGame of
                 Left err -> return $ Left err
-                Right serverGame ->
-                    atomically $ runExceptT $ do
-                        let cachedGame = ExceptT (loadGameFromCache app gameId)
-                        let newlyCachedGame = ExceptT $ do
-                            modifyTVar gameCache $ Mp.insert gameId serverGame
-                            increaseConnectionsByOne serverGame
-                            return (Right serverGame)
-
-                        return $ cachedGame <|> newlyCachedGame
+                Right serverGame -> atomically $ runExceptT (cachedGame <|> gameInsertedToCache)
+                    where
+                      cachedGame = ExceptT (loadGameFromCache app gameId)
+                      gameInsertedToCache = ExceptT $ do
+                          modifyTVar gameCache $ Mp.insert gameId serverGame
+                          increaseConnectionsByOne serverGame
+                          return (Right serverGame)
 
     getChatMessages gameId =
                  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
