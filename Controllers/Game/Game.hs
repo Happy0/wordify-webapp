@@ -82,7 +82,7 @@ module Controllers.Game.Game(
             sharedServerGame
             pool
             playerNo
-            (PlaceTiles $ M.fromList (placed))
+            (PlaceTiles $ M.fromList placed)
             moveOutcomeHandler
         where
             moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
@@ -113,7 +113,7 @@ module Controllers.Game.Game(
 
     handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe Int -> Text -> IO ServerResponse
     handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-    handleChatMessage serverGame pool (Just playerNumber) message =
+    handleChatMessage serverGame pool (Just playerNumber) messageText =
         do
             let playerName = SP.name <$> (getServerPlayer serverGame playerNumber)
 
@@ -121,5 +121,7 @@ module Controllers.Game.Game(
                 Nothing -> return $ InvalidCommand "Internal server error"
                 Just name -> do
                     let channel = broadcastChannel serverGame
-                    atomically $ writeTChan channel $ PlayerChat (ChatMessage name message)
+                    let message = PlayerChat $ ChatMessage name messageText
+                    P.persistGameUpdate pool (gameId serverGame) message
+                    atomically $ writeTChan channel message
                     return ChatSuccess
