@@ -66,7 +66,6 @@
     overflow: auto;
     width: 75%;
     border:1px solid lightgray;
-    display: block;
 }
 
 .move-history {
