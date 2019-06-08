@@ -1,3 +1,6 @@
+-- By default this file is used by `persistFileWith` in Model.hs (which is imported by Foundation.hs)
+-- Syntax for this file here: https://github.com/yesodweb/persistent/blob/master/docs/Persistent-entity-syntax.md
+
 User
     ident Text
     password Text Maybe
@@ -5,9 +8,15 @@ User
     deriving Typeable
 Email
     email Text
-    user UserId Maybe
+    userId UserId Maybe
     verkey Text Maybe
     UniqueEmail email
+Comment json -- Adding "json" causes ToJSON and FromJSON instances to be derived.
+    message Text
+    userId UserId Maybe
+    deriving Eq
+    deriving Show
+
 Game
     -- TODO: Store the game local here
     gameId Text
@@ -32,5 +41,3 @@ Player
     name Text
     playerId Text
     playerNumber Int
-
- -- By default this file is used in Model.hs (which is imported by Foundation.hs)

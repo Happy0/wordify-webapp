@@ -1,3 +1,0 @@
-A scrabble webapp written in Haskell using Yesod. Very much a work in progress.
-
-Built on top of the game logic library: https://github.com/happy0/haskellscrabble

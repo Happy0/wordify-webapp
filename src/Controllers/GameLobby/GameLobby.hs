@@ -16,7 +16,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
     import qualified Data.Map as M
     import Controllers.Game.Model.ServerGame
     import Controllers.Game.Api
-    import Control.Monad.Trans.Either
+    import Control.Monad.Trans.Except
     import Control.Error.Util
     import qualified Data.List as L
     import Control.Monad.Trans.Class
@@ -31,7 +31,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
     -}
     setupPrequisets :: App -> T.Text -> Maybe T.Text -> STM (Either LobbyResponse (T.Text, TChan LobbyMessage, Maybe ServerGame))
     setupPrequisets app gameId maybePlayerId =
-        runEitherT $ do
+        runExceptT $ do
                 lobbyVar <- getGameLobby gameId (gameLobbies app)
                 currentLobby <- lift $ readTVar lobbyVar
                 broadcastChan <- lift . dupTChan . channel $ currentLobby
@@ -109,8 +109,8 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
         where
             players = lobbyPlayers lobby
 
-    getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> EitherT LobbyResponse STM (TVar GameLobby)
-    getGameLobby gameId lobbies = EitherT (note GameLobbyDoesNotExist . M.lookup gameId <$> readTVar lobbies)
+    getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> ExceptT LobbyResponse STM (TVar GameLobby)
+    getGameLobby gameId lobbies = ExceptT (note GameLobbyDoesNotExist . M.lookup gameId <$> readTVar lobbies)
 
     getExistingPlayer :: GameLobby -> T.Text -> Either LobbyResponse ServerPlayer
     getExistingPlayer lobby playerId = note InvalidPlayerID $ L.find (\player -> identifier player == playerId) players

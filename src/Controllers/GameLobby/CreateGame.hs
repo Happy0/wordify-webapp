@@ -18,7 +18,7 @@ module Controllers.GameLobby.CreateGame(createGame) where
     import Control.Error.Util
     import Wordify.Rules.Game
     import Data.Bifunctor
-    import Control.Monad.Trans.Either
+    import Control.Monad.Trans.Except
     import Control.Monad.Trans.Class
     import Control.Concurrent.STM
     import Controllers.Game.Model.GameLobby
@@ -26,7 +26,7 @@ module Controllers.GameLobby.CreateGame(createGame) where
 
     createGame :: App -> Int -> Locale -> IO (Either Text Text)
     createGame app numPlayers locale =
-        runEitherT $
+        runExceptT $
             do
                     newGameId <- lift $ T.pack . fst . randomString 8 <$> getStdGen
                     newGame <- setupGame app locale numPlayers
@@ -45,7 +45,7 @@ module Controllers.GameLobby.CreateGame(createGame) where
                 gameLobby <- newTVar (GameLobby game [] numPlayers broadcastChan newGenerator timeCreated)
                 modifyTVar lobbies $ M.insert gameId gameLobby
 
-    setupGame :: App -> Locale -> Int -> (EitherT Text IO Game)
+    setupGame :: App -> Locale -> Int -> (ExceptT Text IO Game)
     setupGame app locale numPlayers =
             do
                 let gameSetups = localisedGameSetups app

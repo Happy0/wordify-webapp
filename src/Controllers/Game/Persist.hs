@@ -8,7 +8,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
     import Control.Monad.IO.Class
     import Control.Concurrent.STM
     import Control.Exception
-    import Control.Monad.Trans.Either
+    import Control.Monad.Trans.Except
     import Control.Monad.Except
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
@@ -37,7 +37,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
     import Control.Monad.Trans.Resource
     import Control.Monad.Trans.Class
 
-    withGame :: (MonadIO m, MonadThrow m, MonadBaseControl IO m) =>
+    withGame :: (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
                 App ->
                 Text ->
                 (Either Text ServerGame -> m c) ->
@@ -116,7 +116,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
             Right (Entity _ (M.Game _ bagText bagSeed maybeLocale), playerModels, moveModels) -> do
                 let serverPlayers = L.map playerFromEntity playerModels
 
-                runEitherT $ do
+                runExceptT $ do
                     let locale = maybe "en" id maybeLocale
                     let maybeLocalisedSetup = Mp.lookup locale (localisedGameSetups app)
                     GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)

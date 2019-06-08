@@ -1,9 +1,17 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Application
     ( getApplicationDev
     , appMain
     , develMain
     , makeFoundation
+    , makeLogWare
     -- * for DevelMain
     , getApplicationRepl
     , shutdownApp
@@ -15,8 +23,13 @@ module Application
 import Control.Monad.Logger                 (liftLoc, runLoggingT)
 import Database.Persist.Sqlite              (createSqlitePool, runSqlPool,
                                              sqlDatabase, sqlPoolSize)
+
+import qualified Prelude as P
+
 import Import
 import Language.Haskell.TH.Syntax           (qLocation)
+import Network.HTTP.Client.TLS              (getGlobalManager)
+import Network.Wai (Middleware)
 import Network.Wai.Handler.Warp             (Settings, defaultSettings,
                                              defaultShouldDisplayException,
                                              runSettings, setHost,
@@ -50,14 +63,14 @@ import Data.Time.Clock
 mkYesodDispatch "App" resourcesApp
 
 -- | This function allocates resources (such as a database connection pool),
--- performs initialization and return a foundation datatype value. This is also
+-- performs initialization and returns a foundation datatype value. This is also
 -- the place to put your migrate statements to have automatic database
 -- migrations handled by Yesod.
 makeFoundation :: AppSettings -> IO App
 makeFoundation appSettings = do
     -- Some basic initializations: HTTP connection manager, logger, and static
     -- subsite.
-    appHttpManager <- newManager
+    appHttpManager <- getGlobalManager
     appLogger <- newStdoutLoggerSet defaultBufSize >>= makeYesodLogger
     appStatic <-
         (if appMutableStatic appSettings then staticDevel else static)
@@ -75,6 +88,9 @@ makeFoundation appSettings = do
     -- temporary foundation without a real connection pool, get a log function
     -- from there, and then create the real foundation.
     let mkFoundation appConnPool = App {..}
+        -- The App {..} syntax is an example of record wild cards. For more
+        -- information, see:
+        -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
         tempFoundation = mkFoundation $ error "connPool forced in tempFoundation"
         logFunc = messageLoggerSource tempFoundation appLogger
 
@@ -96,24 +112,24 @@ cleanIdleLobbies lobbies = do
     timeNow <- getCurrentTime    
 
     flip mapM_ keyVals $
-         \(key, val) ->
+            \(key, val) ->
             do
                 lobby <- readTVarIO val
                 let opened = openedAt lobby
                 let diff = diffUTCTime timeNow opened
-               
+                
                 -- If the lobby hasn't resulted in a created game after an hour,
                 -- remove it 
                 when (diff >= (60 * 60)) $
                     atomically $
                         modifyTVar lobbies (M.delete key)
-               
+                
 
 loadGameBundles :: IO LocalisedGameSetups
 loadGameBundles =
     do
-        localisations <- readFile "config/localisations.txt"
-        gameBundles <- mapM loadGameBundle $ splitOn "\n" localisations
+        localisations <- P.readFile "config/localisations.txt"
+        gameBundles <- mapM loadGameBundle $ splitOn ("\n" :: String) localisations
         return $ M.fromList gameBundles
 
 loadGameBundle :: String -> IO (Text, LocalisedGameSetup)
@@ -141,11 +157,19 @@ loadDictionary locale =
             Left err -> error $ show err
             Right dict -> return dict
 
+
 -- | Convert our foundation to a WAI Application by calling @toWaiAppPlain@ and
--- applyng some additional middlewares.
+-- applying some additional middlewares.
 makeApplication :: App -> IO Application
 makeApplication foundation = do
-    logWare <- mkRequestLogger def
+    logWare <- makeLogWare foundation
+    -- Create the WAI application and apply middlewares
+    appPlain <- toWaiAppPlain foundation
+    return $ logWare $ defaultMiddlewaresNoLogging appPlain
+
+makeLogWare :: App -> IO Middleware
+makeLogWare foundation =
+    mkRequestLogger def
         { outputFormat =
             if appDetailedRequestLogging $ appSettings foundation
                 then Detailed True
@@ -156,9 +180,6 @@ makeApplication foundation = do
         , destination = Logger $ loggerSet $ appLogger foundation
         }
 
-    -- Create the WAI application and apply middlewares
-    appPlain <- toWaiAppPlain foundation
-    return $ logWare $ defaultMiddlewaresNoLogging appPlain
 
 -- | Warp settings for the given foundation value.
 warpSettings :: App -> Settings
@@ -185,7 +206,7 @@ getApplicationDev = do
     return (wsettings, app)
 
 getAppSettings :: IO AppSettings
-getAppSettings = loadAppSettings [configSettingsYml] [] useEnv
+getAppSettings = loadYamlSettings [configSettingsYml] [] useEnv
 
 -- | main function for use by yesod devel
 develMain :: IO ()
@@ -195,7 +216,7 @@ develMain = develMainHelper getApplicationDev
 appMain :: IO ()
 appMain = do
     -- Get the settings from all relevant sources
-    settings <- loadAppSettingsArgs
+    settings <- loadYamlSettingsArgs
         -- fall back to compile-time values, set to [] to require values at runtime
         [configSettingsYmlValue]
 
@@ -236,5 +257,5 @@ handler :: Handler a -> IO a
 handler h = getAppSettings >>= makeFoundation >>= flip unsafeHandler h
 
 -- | Run DB queries
-db :: ReaderT SqlBackend (HandlerT App IO) a -> IO a
+db :: ReaderT SqlBackend Handler a -> IO a
 db = handler . runDB

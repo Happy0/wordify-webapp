@@ -1,2 +1,3 @@
 body
     background: linear-gradient(to bottom, #fcfff4 0%,#e9e9ce 99%)
+    height: 100%

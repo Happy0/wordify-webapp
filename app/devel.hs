@@ -1,5 +1,5 @@
 {-# LANGUAGE PackageImports #-}
-import "liscrabble" Application (develMain)
+import "wordify-webapp" Application (develMain)
 import Prelude (IO)
 
 main :: IO ()

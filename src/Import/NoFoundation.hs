@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Import.NoFoundation
     ( module Import
     ) where
