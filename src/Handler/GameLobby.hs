@@ -5,10 +5,10 @@ module Handler.GameLobby where
     import Yesod.Core
     import Yesod.WebSockets
     import qualified Data.Map as M
-    import Controllers.Game.Model.GameLobby
     import Controllers.Game.Model.ServerPlayer
     import Controllers.Game.Model.ServerGame
     import Model.Api
+    import Controllers.GameLobby.Model.GameLobby
     import Controllers.GameLobby.GameLobby
     import qualified Data.Text as T
     import Controllers.GameLobby.Api

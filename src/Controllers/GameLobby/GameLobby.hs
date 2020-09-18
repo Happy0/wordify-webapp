@@ -7,7 +7,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
     import Controllers.Game.Model.ServerPlayer
     import Controllers.GameLobby.Api
     import Model.Api
-    import Controllers.Game.Model.GameLobby
+    import Controllers.GameLobby.Model.GameLobby
     import qualified Data.Text as T
     import Control.Concurrent.STM.TChan
     import Control.Monad

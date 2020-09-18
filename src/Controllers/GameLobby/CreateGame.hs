@@ -21,7 +21,7 @@ module Controllers.GameLobby.CreateGame(createGame) where
     import Control.Monad.Trans.Except
     import Control.Monad.Trans.Class
     import Control.Concurrent.STM
-    import Controllers.Game.Model.GameLobby
+    import Controllers.GameLobby.Model.GameLobby
     import Data.Time.Clock
 
     createGame :: App -> Int -> Locale -> IO (Either Text Text)

@@ -26,7 +26,7 @@ import qualified Yesod.Core.Unsafe as Unsafe
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text.Encoding as TE
 
-import Controllers.Game.Model.GameLobby
+import Controllers.GameLobby.Model.GameLobby
 import Controllers.Game.Model.ServerGame
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag

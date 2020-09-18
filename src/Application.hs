@@ -53,7 +53,7 @@ import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 import Data.FileEmbed
 import Control.Concurrent.Timer
-import Controllers.Game.Model.GameLobby
+import Controllers.GameLobby.Model.GameLobby
 import Control.Concurrent.Suspend
 import Data.Time.Clock
 

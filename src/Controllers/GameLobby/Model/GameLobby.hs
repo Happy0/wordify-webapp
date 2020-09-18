@@ -1,4 +1,4 @@
-module Controllers.Game.Model.GameLobby (GameLobby(GameLobby), updatePlayers, pendingGame, lobbyPlayers, awaiting, channel, openedAt, playerIdGenerator) where
+module Controllers.GameLobby.Model.GameLobby (GameLobby(GameLobby), updatePlayers, pendingGame, lobbyPlayers, awaiting, channel, openedAt, playerIdGenerator) where
 
     import Prelude
     import Wordify.Rules.Game
