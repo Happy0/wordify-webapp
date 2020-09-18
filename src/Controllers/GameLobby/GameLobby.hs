@@ -22,6 +22,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
     import Control.Monad.Trans.Class
     import Data.Either
     import Controllers.Game.Persist
+    import System.Random.Shuffle
 
     {-
         Sets up the broadcast channel for servicing the websocket, returning:
@@ -29,7 +30,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
         * A message channel for listening for people joining the lobby.
         * If the lobby becomes full due to the player joining, the new server game
     -}
-    setupPrequisets :: App -> T.Text -> Maybe T.Text -> STM (Either LobbyResponse (T.Text, TChan LobbyMessage, Maybe ServerGame))
+    setupPrequisets :: App -> T.Text -> Maybe T.Text -> STM (Either LobbyInputError (T.Text, TChan LobbyMessage, Maybe ServerGame))
     setupPrequisets app gameId maybePlayerId =
         runExceptT $ do
                 lobbyVar <- getGameLobby gameId (gameLobbies app)
@@ -103,16 +104,19 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
             let gamesInProgress = games app
             newChannel <- newBroadcastTChan
             newGame <- newTVar (pendingGame lobby)
+            randomNumberGenerator <- readTVar (playerIdGenerator lobby)
+            -- We shuffle so that who gets to go first is randomised.
+            let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
             numConnections <- newTVar 0
-            serverGame <- makeServerGame gameId newGame players newChannel
+            serverGame <- makeServerGame gameId newGame shuffledPlayers newChannel
             return serverGame
         where
             players = lobbyPlayers lobby
-
-    getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> ExceptT LobbyResponse STM (TVar GameLobby)
+       
+    getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> ExceptT LobbyInputError STM (TVar GameLobby)
     getGameLobby gameId lobbies = ExceptT (note GameLobbyDoesNotExist . M.lookup gameId <$> readTVar lobbies)
 
-    getExistingPlayer :: GameLobby -> T.Text -> Either LobbyResponse ServerPlayer
+    getExistingPlayer :: GameLobby -> T.Text -> Either LobbyInputError ServerPlayer
     getExistingPlayer lobby playerId = note InvalidPlayerID $ L.find (\player -> identifier player == playerId) players
         where
             players = lobbyPlayers lobby

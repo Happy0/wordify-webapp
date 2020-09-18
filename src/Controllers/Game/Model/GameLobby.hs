@@ -10,13 +10,13 @@ module Controllers.Game.Model.GameLobby (GameLobby(GameLobby), updatePlayers, pe
     import System.Random
     import Control.Concurrent.STM.TVar
 
-
     -- TODO: Move this module to the GameLobby folder
     data GameLobby = GameLobby {
                         pendingGame :: Game,
                         lobbyPlayers :: [ServerPlayer],
                         awaiting :: Int,
                         channel :: TChan LobbyMessage,
+                        -- TODO: rename this to 'lobbyGenerator'
                         playerIdGenerator :: TVar StdGen,
                         openedAt :: UTCTime
                     }
