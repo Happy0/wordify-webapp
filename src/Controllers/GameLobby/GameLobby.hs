@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChannelMessage, handleJoinNewPlayer, handleLobbyFull) where
+module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChannelMessage) where
 
     import Prelude
     import Foundation
