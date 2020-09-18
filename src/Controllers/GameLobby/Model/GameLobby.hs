@@ -1,4 +1,13 @@
-module Controllers.GameLobby.Model.GameLobby (GameLobby(GameLobby), updatePlayers, pendingGame, lobbyPlayers, awaiting, channel, openedAt, playerIdGenerator) where
+module Controllers.GameLobby.Model.GameLobby (
+    GameLobby(GameLobby),
+     addPlayer,
+     pendingGame,
+     lobbyPlayers,
+     awaiting,
+     channel,
+     openedAt,
+     playerIdGenerator,
+     inLobby) where
 
     import Prelude
     import Wordify.Rules.Game
@@ -9,6 +18,9 @@ module Controllers.GameLobby.Model.GameLobby (GameLobby(GameLobby), updatePlayer
     import Data.Time.Clock
     import System.Random
     import Control.Concurrent.STM.TVar
+    import qualified Data.Text as T
+    import Data.List
+    import Data.Maybe
 
     -- TODO: Move this module to the GameLobby folder
     data GameLobby = GameLobby {
@@ -21,5 +33,15 @@ module Controllers.GameLobby.Model.GameLobby (GameLobby(GameLobby), updatePlayer
                         openedAt :: UTCTime
                     }
 
-    updatePlayers :: [ServerPlayer] -> GameLobby -> GameLobby
-    updatePlayers players lobby = lobby {lobbyPlayers = players}
+    addPlayer :: GameLobby -> ServerPlayer -> GameLobby
+    addPlayer gameLobby newPlayer = 
+        let newPlayers = (lobbyPlayers gameLobby) ++ [newPlayer]
+        in updatePlayers gameLobby newPlayers
+
+    updatePlayers :: GameLobby -> [ServerPlayer] -> GameLobby
+    updatePlayers lobby players = lobby {lobbyPlayers = players}
+
+    inLobby :: GameLobby -> T.Text -> Bool
+    inLobby lobby playerIdentifier = isJust (find isPlayer (lobbyPlayers lobby))
+        where
+            isPlayer player = (identifier player) == playerIdentifier

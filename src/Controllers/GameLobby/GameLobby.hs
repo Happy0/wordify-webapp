@@ -71,8 +71,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
             let players = lobbyPlayers lobby
             let newPlayerName =  T.concat ["player", T.pack . show $ (length players + 1)]
             let newPlayer = makeNewPlayer newPlayerName playerId
-            let newPlayers = players ++ [newPlayer]
-            let newLobby = updatePlayers newPlayers lobby
+            let newLobby = addPlayer lobby newPlayer
 
             writeTVar gameLobby newLobby
 
