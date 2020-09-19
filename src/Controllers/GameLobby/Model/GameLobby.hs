@@ -1,5 +1,7 @@
 module Controllers.GameLobby.Model.GameLobby (
     GameLobby(GameLobby),
+    ClientLobbyJoinResult(ClientLobbyJoinResult, broadcastChannel),
+     gameStarted,
      addPlayer,
      pendingGame,
      lobbyPlayers,
@@ -14,6 +16,7 @@ module Controllers.GameLobby.Model.GameLobby (
     import Prelude
     import Wordify.Rules.Game
     import Controllers.Game.Model.ServerPlayer
+    import Controllers.Game.Model.ServerGame
     import Controllers.GameLobby.Api
     import Control.Concurrent.STM.TChan
     import Controllers.GameLobby.Api
@@ -25,8 +28,14 @@ module Controllers.GameLobby.Model.GameLobby (
     import Data.List
     import Data.Maybe
     
+    data ClientLobbyJoinResult = ClientLobbyJoinResult {
+        -- For listening and sending events to the game lobby from the client
+        broadcastChannel :: TChan LobbyMessage,
 
-    -- TODO: Move this module to the GameLobby folder
+        -- If the lobby was made full as a result of the client join, the newly created server game
+        createdGame :: Maybe ServerGame
+    }
+
     data GameLobby = GameLobby {
                         pendingGame :: Game,
                         lobbyPlayers :: [ServerPlayer],
@@ -36,6 +45,9 @@ module Controllers.GameLobby.Model.GameLobby (
                         playerIdGenerator :: TVar StdGen,
                         openedAt :: UTCTime
                     }
+
+    gameStarted :: ClientLobbyJoinResult -> Bool
+    gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)
 
     duplicateBroadcastChannel :: GameLobby -> STM (TChan LobbyMessage)
     duplicateBroadcastChannel gameLobby = dupTChan . channel $ gameLobby

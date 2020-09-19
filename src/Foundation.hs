@@ -10,6 +10,7 @@
 
 module Foundation where
 
+import System.Random
 import Import.NoFoundation
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
 import Text.Hamlet          (hamletFile)
@@ -49,6 +50,7 @@ data App = App
     , localisedGameSetups :: LocalisedGameSetups
     , gameLobbies :: TVar (Map Text (TVar GameLobby))
     , games :: TVar (Map Text ServerGame)
+    , randomGenerator :: TVar StdGen
     }
 
 data MenuItem = MenuItem

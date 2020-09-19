@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChannelMessage) where
+module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage) where
 
     import Prelude
     import Foundation
@@ -24,25 +24,26 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
     import Controllers.Game.Persist
     import System.Random.Shuffle
 
-    {-
-        Sets up the broadcast channel for servicing the websocket, returning:
-        * An ID for the new player if they have not joined the lobby before and received a cookie.
-        * A message channel for listening for people joining the lobby.
-        * If the lobby becomes full due to the player joining, the new server game
-    -}
-    setupPrequisets :: App -> T.Text -> Maybe T.Text -> STM (Either LobbyInputError (T.Text, TChan LobbyMessage, Maybe ServerGame))
-    setupPrequisets app gameId maybePlayerId =
+    joinClient :: App -> T.Text -> ServerPlayer -> IO (Either LobbyInputError ClientLobbyJoinResult)
+    joinClient app gameId serverPlayer =
+        do
+            result <- atomically $ updateLobbyState app gameId serverPlayer
+
+            case result of
+                Left errorMessage -> return $ Left errorMessage
+                Right (ClientLobbyJoinResult broadcastChannel (Just startedGame)) ->
+                    do
+                        _ <- startGame app gameId broadcastChannel startedGame
+                        return result
+                Right _ ->
+                    return result
+
+    updateLobbyState :: App -> T.Text -> ServerPlayer -> STM (Either LobbyInputError ClientLobbyJoinResult)
+    updateLobbyState app gameId serverPlayer =
         runExceptT $ do
                 lobbyVar <- getGameLobby gameId (gameLobbies app)
-                currentLobby <- lift $ readTVar lobbyVar
-                broadcastChan <- lift $ duplicateBroadcastChannel currentLobby
-                case maybePlayerId of
-                    Nothing -> do
-                            (newPlayer, maybeNewGame) <- lift $ handleJoinNewPlayer app gameId lobbyVar
-                            return (identifier newPlayer, broadcastChan, maybeNewGame)
-                    Just playerId -> do
-                        _ <- hoistEither (getExistingPlayer currentLobby playerId)
-                        return (playerId, broadcastChan, Nothing)
+                result <- lift $ handleJoinClient app gameId lobbyVar serverPlayer
+                return result
 
     startGame :: App -> T.Text -> TChan LobbyMessage -> ServerGame -> IO ()
     startGame app gameId channel serverGame = do
@@ -56,29 +57,31 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
     handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
     handleChannelMessage (LobbyFull gameId) = StartGame gameId
 
+    handleJoinClient:: App -> T.Text -> TVar GameLobby -> ServerPlayer -> STM ClientLobbyJoinResult
+    handleJoinClient app gameId gameLobby serverPlayer =
+        do
+            lobby <- readTVar gameLobby
+            channel <- duplicateBroadcastChannel lobby
+
+            if (inLobby lobby (identifier serverPlayer)) then
+                return $ ClientLobbyJoinResult channel Nothing
+            else
+                handleJoinNewPlayer app gameId serverPlayer gameLobby
     {-
         Creates a new player, adds them to the lobby, notifying the players
         of the new arrival via the broadcast channel and returns the new player.
     -}
-    handleJoinNewPlayer :: App -> T.Text -> TVar GameLobby -> STM (ServerPlayer, Maybe ServerGame)
-    handleJoinNewPlayer app gameId gameLobby =
+    handleJoinNewPlayer :: App -> T.Text -> ServerPlayer -> TVar GameLobby -> STM ClientLobbyJoinResult
+    handleJoinNewPlayer app gameId newPlayer gameLobby =
         do
             lobby <- readTVar gameLobby
-            newPlayerIdGenerator <- readTVar $ playerIdGenerator lobby
-            let (playerId, newGen) = makeNewPlayerId newPlayerIdGenerator
-            writeTVar (playerIdGenerator lobby) newGen
-
-            let players = lobbyPlayers lobby
-            let newPlayerName =  T.concat ["player", T.pack . show $ (length players + 1)]
-            let newPlayer = makeNewPlayer newPlayerName playerId
             let newLobby = addPlayer lobby newPlayer
-
             writeTVar gameLobby newLobby
-
             writeTChan (channel lobby) $ PlayerJoined newPlayer
             maybeServerGame <- handleLobbyFull app newLobby gameId
+            channel <- duplicateBroadcastChannel newLobby
 
-            return (newPlayer, maybeServerGame)
+            return (ClientLobbyJoinResult channel maybeServerGame)
 
     handleLobbyFull :: App -> GameLobby -> T.Text -> STM (Maybe ServerGame)
     handleLobbyFull app lobby gameId 

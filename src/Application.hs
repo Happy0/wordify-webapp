@@ -56,6 +56,7 @@ import Control.Concurrent.Timer
 import Controllers.GameLobby.Model.GameLobby
 import Control.Concurrent.Suspend
 import Data.Time.Clock
+import System.Random
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -79,6 +80,8 @@ makeFoundation appSettings = do
     localisedGameSetups <- loadGameBundles
     gameLobbies <- newTVarIO M.empty
     games <- newTVarIO M.empty
+    stdGen <- getStdGen
+    randomGenerator <- newTVarIO stdGen 
 
     repeatedTimer (cleanIdleLobbies gameLobbies) (hDelay 48)
 

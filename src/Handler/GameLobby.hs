@@ -23,6 +23,8 @@ module Handler.GameLobby where
     import Data.Either
     import Web.Cookie
     import qualified Data.Text.Encoding as E
+    import System.Random
+    import Network.Mail.Mime
 
     {-
       Creates a new game lobby for inviting players to a game via a link.
@@ -40,6 +42,29 @@ module Handler.GameLobby where
           Left err -> invalidArgs [err]
           Right gameId -> return gameId
 
+    -- TODO: User accounts
+    playerFromCookie :: App -> Handler ServerPlayer
+    playerFromCookie app = do
+        currentPlayerId <- lookupCookie "id"
+        player <- atomically $ generatePlayer app
+        case currentPlayerId of
+            Just playerId -> return $ makeNewPlayer (name player) playerId
+            Nothing ->
+                do
+                    setCookie def {setCookieName = "id", setCookieValue = E.encodeUtf8 (identifier player)}
+                    return $ player
+
+
+    generatePlayer :: App -> STM ServerPlayer
+    generatePlayer app =
+        do
+            newPlayerIdGenerator <- readTVar $ (randomGenerator app)
+            let (playerId, newGen) = makeNewPlayerId newPlayerIdGenerator
+            let (suffix, nextGen) = randomString 4 newGen
+
+            writeTVar (randomGenerator app) nextGen
+            return $ makeNewPlayer ("Player" ++ pack suffix) playerId 
+
     {-
       Joins an existing lobby.
 
@@ -50,26 +75,20 @@ module Handler.GameLobby where
     getGameLobbyR gameId =
         do
             app <- getYesod
-            maybePlayerId <- lookupCookie "id"
+            player <- playerFromCookie app
+            let playerId = identifier player
 
-            initialisationResult <- atomically (setupPrequisets app gameId maybePlayerId)
+            initialisationResult <- liftIO $ joinClient app gameId player
             case initialisationResult of
               Left GameLobbyDoesNotExist -> redirect (GameR gameId)
               Left InvalidPlayerID -> invalidArgs ["Invalid player ID given by browser"]
-              Right (playerId, channel, maybeGameSetup) -> do
-                setCookie def {setCookieName = "id", setCookieValue = E.encodeUtf8 playerId}
-
-                -- If the lobby is full, start the game
-                case maybeGameSetup of
-                  Nothing -> do
-                    -- Connect to the game lobby and wait for remaining players to connect
-                    webSockets $ lobbyWebSocketHandler channel gameId playerId
-                    defaultLayout renderLobbyPage
-                  Just serverGame -> do
-                    -- If we're last to join (the lobby is full), start the game and then
-                    -- go to the game page
-                    liftIO (startGame app gameId channel serverGame)
+              Right joinResult@(ClientLobbyJoinResult broadcastChannel _) -> do
+                if (gameStarted joinResult) then
                     redirect (GameR gameId)
+                else
+                    do
+                        webSockets $ lobbyWebSocketHandler broadcastChannel gameId playerId
+                        defaultLayout renderLobbyPage
 
     renderLobbyPage = do
       addStylesheet $ (StaticR css_lobby_css)
