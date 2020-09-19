@@ -7,7 +7,9 @@ module Controllers.GameLobby.Model.GameLobby (
      channel,
      openedAt,
      playerIdGenerator,
-     inLobby) where
+     duplicateBroadcastChannel,
+     inLobby,
+     lobbyIsFull) where
 
     import Prelude
     import Wordify.Rules.Game
@@ -17,10 +19,12 @@ module Controllers.GameLobby.Model.GameLobby (
     import Controllers.GameLobby.Api
     import Data.Time.Clock
     import System.Random
+    import Control.Monad.STM
     import Control.Concurrent.STM.TVar
     import qualified Data.Text as T
     import Data.List
     import Data.Maybe
+    
 
     -- TODO: Move this module to the GameLobby folder
     data GameLobby = GameLobby {
@@ -33,10 +37,16 @@ module Controllers.GameLobby.Model.GameLobby (
                         openedAt :: UTCTime
                     }
 
+    duplicateBroadcastChannel :: GameLobby -> STM (TChan LobbyMessage)
+    duplicateBroadcastChannel gameLobby = dupTChan . channel $ gameLobby
+
     addPlayer :: GameLobby -> ServerPlayer -> GameLobby
     addPlayer gameLobby newPlayer = 
         let newPlayers = (lobbyPlayers gameLobby) ++ [newPlayer]
         in updatePlayers gameLobby newPlayers
+
+    lobbyIsFull :: GameLobby -> Bool
+    lobbyIsFull lobby = length (lobbyPlayers lobby) == (awaiting lobby)
 
     updatePlayers :: GameLobby -> [ServerPlayer] -> GameLobby
     updatePlayers lobby players = lobby {lobbyPlayers = players}

@@ -35,7 +35,7 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
         runExceptT $ do
                 lobbyVar <- getGameLobby gameId (gameLobbies app)
                 currentLobby <- lift $ readTVar lobbyVar
-                broadcastChan <- lift . dupTChan . channel $ currentLobby
+                broadcastChan <- lift $ duplicateBroadcastChannel currentLobby
                 case maybePlayerId of
                     Nothing -> do
                             (newPlayer, maybeNewGame) <- lift $ handleJoinNewPlayer app gameId lobbyVar
@@ -81,15 +81,13 @@ module Controllers.GameLobby.GameLobby (setupPrequisets, startGame, handleChanne
             return (newPlayer, maybeServerGame)
 
     handleLobbyFull :: App -> GameLobby -> T.Text -> STM (Maybe ServerGame)
-    handleLobbyFull app lobby gameId =
-        if (length (lobbyPlayers lobby) == (awaiting lobby)) then
+    handleLobbyFull app lobby gameId 
+        | lobbyIsFull lobby =
             do
-                -- Broadcast that the game is ready to begin
-                let broadcastChannel = channel lobby
                 removeGameLobby app gameId
                 serverGame <- (createGame app gameId lobby)
                 return $ Just serverGame
-        else
+        | otherwise =
             return Nothing
 
     removeGameLobby :: App -> T.Text -> STM ()
