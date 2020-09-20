@@ -115,8 +115,3 @@ module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage) where
        
     getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> ExceptT LobbyInputError STM (TVar GameLobby)
     getGameLobby gameId lobbies = ExceptT (note GameLobbyDoesNotExist . M.lookup gameId <$> readTVar lobbies)
-
-    getExistingPlayer :: GameLobby -> T.Text -> Either LobbyInputError ServerPlayer
-    getExistingPlayer lobby playerId = note InvalidPlayerID $ L.find (\player -> identifier player == playerId) players
-        where
-            players = lobbyPlayers lobby

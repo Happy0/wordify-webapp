@@ -84,6 +84,10 @@ module Handler.GameLobby where
               Left InvalidPlayerID -> invalidArgs ["Invalid player ID given by browser"]
               Right joinResult@(ClientLobbyJoinResult broadcastChannel _) -> do
                 if (gameStarted joinResult) then
+                    -- If the game was created, the last connected client wouldn't get the 'Game Started'
+                    -- event over the websocket because this second request for the websocket connection would no
+                    -- longer see the game in the lobby list resulting in a HTTP redirect given to the websocket
+                    -- which it cannot handle
                     redirect (GameR gameId)
                 else
                     do
