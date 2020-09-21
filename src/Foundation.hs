@@ -48,6 +48,8 @@ data App = App
     , appHttpManager :: Manager
     , appLogger      :: Logger
     , localisedGameSetups :: LocalisedGameSetups
+
+    -- TODO: https://hackage.haskell.org/package/stm-containers
     , gameLobbies :: TVar (Map Text (TVar GameLobby))
     , games :: TVar (Map Text ServerGame)
     , randomGenerator :: TVar StdGen
