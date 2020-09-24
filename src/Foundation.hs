@@ -247,6 +247,8 @@ instance YesodAuth App where
 
         return . Authenticated . credsIdent $ creds
 
+    redirectToReferer _ = True
+
     loginDest _ = HomeR
     logoutDest _ = HomeR
 
