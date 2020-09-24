@@ -47,15 +47,19 @@ import Handler.Common
 import Handler.Home
 import Handler.Game
 import Handler.GameLobby
+import Handler.AuthTest
 import Data.List.Split
 import qualified Data.Map as M
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 import Data.FileEmbed
 import Control.Concurrent.Timer
+import Control.Error.Util
+import Control.Monad.Trans.Except
 import Controllers.GameLobby.Model.GameLobby
 import Control.Concurrent.Suspend
 import Data.Time.Clock
+import System.Environment
 import System.Random
 
 -- This line actually creates our YesodDispatch instance. It is the second half
@@ -81,8 +85,9 @@ makeFoundation appSettings = do
     gameLobbies <- newTVarIO M.empty
     games <- newTVarIO M.empty
     stdGen <- getStdGen
-    randomGenerator <- newTVarIO stdGen 
+    randomGenerator <- newTVarIO stdGen
 
+    authDetails <- getAuthDetails
     repeatedTimer (cleanIdleLobbies gameLobbies) (hDelay 48)
 
     -- We need a log function to create a connection pool. We need a connection
@@ -107,6 +112,14 @@ makeFoundation appSettings = do
 
     -- Return the foundation
     return $ mkFoundation pool
+
+getAuthDetails :: IO (Either Text AuthDetails)
+getAuthDetails = runExceptT $
+    do
+        clientId <- ExceptT $ note "Missing AUTH_CLIENT_ID environment variable" <$> (lookupEnv "AUTH_CLIENT_ID")
+        clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> (lookupEnv "AUTH_CLIENT_SECRET")
+        return $ AuthDetails (pack clientId) (pack clientSecret)
+
 
 cleanIdleLobbies :: TVar (Map Text (TVar GameLobby)) -> IO ()
 cleanIdleLobbies lobbies = do

@@ -3,9 +3,11 @@
 
 User
     ident Text
-    password Text Maybe
-    UniqueUser ident
-    deriving Typeable
+    name Text Maybe
+    nickname Text Maybe
+    Primary ident
+    UniqueText ident
+
 Email
     email Text
     userId UserId Maybe

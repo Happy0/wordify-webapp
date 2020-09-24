@@ -2,13 +2,11 @@ module Auth0 (auth0Provider) where
 
     import Prelude
     import Yesod.Auth.OAuth2.Prelude
+    import Controllers.User.Model.AuthUser(AuthUser(AuthUser))
     import qualified Data.Text as T
-    
-    instance FromJSON User where
-        parseJSON = withObject "User" $ \o -> User <$> o .: "id"
-
-
-    newtype User = User Int
+    import Data.Aeson
+    import Debug.Trace
+    import System.IO.Unsafe
 
     pluginName :: Text
     pluginName = "oauth0"
@@ -16,22 +14,22 @@ module Auth0 (auth0Provider) where
     auth0Provider :: YesodAuth m => Text -> Text -> AuthPlugin m
     auth0Provider clientId clientSecret =
         authOAuth2 pluginName oauth2 $ \manager token -> do
-            (User userId, userResponse) <- authGetProfile
+            (AuthUser userId name nick, userResponse) <- authGetProfile
                 pluginName
                 manager
                 token
-                "https://api.github.com/user"
+                "https://wordify.eu.auth0.com/userinfo"
 
             pure Creds
                 { credsPlugin = pluginName
-                , credsIdent = T.pack $ show userId
+                , credsIdent = userId
                 , credsExtra = setExtra token userResponse
                 }
         where
             oauth2 = OAuth2
                 { oauthClientId = clientId
                 , oauthClientSecret = clientSecret
-                , oauthOAuthorizeEndpoint = "https://mysite.com/oauth/authorize"
-                , oauthAccessTokenEndpoint = "https://mysite.com/oauth/token"
+                , oauthOAuthorizeEndpoint = "https://wordify.eu.auth0.com/authorize" `withQuery` [scopeParam " " ["auth", "read_user", "openid", "profile", "sub"]]
+                , oauthAccessTokenEndpoint = "https://wordify.eu.auth0.com/oauth/token"
                 , oauthCallback = Nothing
                 }

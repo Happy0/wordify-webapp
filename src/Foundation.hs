@@ -16,6 +16,7 @@ import Database.Persist.Sql (ConnectionPool, runSqlPool)
 import Text.Hamlet          (hamletFile)
 import Text.Jasmine         (minifym)
 import Control.Monad.Logger (LogSource)
+import Controllers.User.Model.AuthUser(AuthUser)
 
 -- Used only when in "auth-dummy-login" setting is enabled.
 import Yesod.Auth.Dummy
@@ -31,9 +32,22 @@ import Controllers.GameLobby.Model.GameLobby
 import Controllers.Game.Model.ServerGame
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
+import System.Environment
+
+import Auth0 (auth0Provider)
+import Yesod.Auth.OAuth2
+import Controllers.User.Persist(storeUser)
 
 data LocalisedGameSetup = GameSetup {localisedDictionary :: Dictionary
                             , localisedLetterBag :: LetterBag}
+
+data AuthDetails = AuthDetails {
+    clientId :: Text,
+    clientSecret :: Text
+}
+
+instance Show AuthDetails where
+    show (AuthDetails clientId clientSecret) = "ClientId: " ++ (unpack clientId) ++ " ClientSecret: *****"
 
 type LocalisedGameSetups = Map Text LocalisedGameSetup
 
@@ -53,6 +67,7 @@ data App = App
     , gameLobbies :: TVar (Map Text (TVar GameLobby))
     , games :: TVar (Map Text ServerGame)
     , randomGenerator :: TVar StdGen
+    , authDetails :: Either Text AuthDetails
     }
 
 data MenuItem = MenuItem
@@ -139,7 +154,6 @@ instance Yesod App where
         master <- getYesod
         mmsg <- getMessage
 
-        muser <- maybeAuthPair
         mcurrentRoute <- getCurrentRoute
 
         pc <- widgetToPageContent $ do
@@ -219,34 +233,30 @@ instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner appConnPool
 
 instance YesodAuth App where
-    type AuthId App = UserId
 
-    -- Where to send a user after successful login
-    loginDest :: App -> Route App
+    type AuthId App = Text
+    authenticate creds = do
+        let userProfile :: Either String AuthUser
+            userProfile = getUserResponseJSON creds
+
+        app <- getYesod
+
+        case userProfile of
+            Left _ -> return ()
+            Right profile -> liftIO $ do storeUser (appConnPool app) profile
+
+        return . Authenticated . credsIdent $ creds
+
     loginDest _ = HomeR
-    -- Where to send a user after logout
-    logoutDest :: App -> Route App
     logoutDest _ = HomeR
-    -- Override the above two destinations when a Referer: header is present
-    redirectToReferer :: App -> Bool
-    redirectToReferer _ = True
 
-    authenticate :: (MonadHandler m, HandlerSite m ~ App)
-                 => Creds App -> m (AuthenticationResult App)
-    authenticate creds = liftHandler $ runDB $ do
-        x <- getBy $ UniqueUser $ credsIdent creds
-        case x of
-            Just (Entity uid _) -> return $ Authenticated uid
-            Nothing -> Authenticated <$> insert User
-                { userIdent = credsIdent creds
-                , userPassword = Nothing
-                }
+    authPlugins app = case authDetails app of 
+        Right (AuthDetails clientId clientSercret) -> [ auth0Provider clientId clientSercret ]
+        Left err -> []
 
-    -- You can add other plugins like Google Email, email or OAuth here
-    authPlugins :: App -> [AuthPlugin App]
-    authPlugins app = [authOpenId Claimed []] ++ extraAuthPlugins
-        -- Enable authDummy login if enabled.
-        where extraAuthPlugins = [authDummy | appAuthDummyLogin $ appSettings app]
+    -- The default maybeAuthId assumes a Persistent database. We're going for a
+    -- simpler AuthId, so we'll just do a direct lookup in the session.
+    maybeAuthId = lookupSession "_ID"
 
 -- | Access function to determine if a user is logged in.
 isAuthenticated :: Handler AuthResult
@@ -255,8 +265,6 @@ isAuthenticated = do
     return $ case muid of
         Nothing -> Unauthorized "You must login to access this page"
         Just _ -> Authorized
-
-instance YesodAuthPersist App
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.

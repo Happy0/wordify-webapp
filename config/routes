@@ -9,6 +9,8 @@
 
 / HomeR GET
 
+/test LoginTestPageR GET
+
 /debug GameDebugR GET
 /games CreateGameR POST
 
