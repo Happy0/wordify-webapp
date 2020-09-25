@@ -37,7 +37,7 @@ getGameR gameId = do
     request <- getRequest
     app <- getYesod
     let cookies = reqCookies request
-    let maybePlayerId = L.lookup "id" cookies
+    maybePlayerId <- maybeAuthId
 
     {-- If this is a websocket request, the handler is short cutted here
         Once the client has loaded the page and javascript, the javascript for the page
