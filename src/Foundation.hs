@@ -264,6 +264,9 @@ instance YesodAuth App where
 
         return . Authenticated . credsIdent $ creds
 
+    onLogin :: (MonadHandler m, master ~ HandlerSite m) => m ()
+    onLogin = return ()
+
     redirectToReferer _ = True
 
     loginDest _ = HomeR
