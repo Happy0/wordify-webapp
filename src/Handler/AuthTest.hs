@@ -27,7 +27,6 @@ module Handler.AuthTest where
             [whamlet|
                 $maybe _ <- maid
                     <p>
-                        <p> Your ident is: #{show (fmap ident profileDetails)}
                         <p> Your name is: #{show (fmap name profileDetails)}
                         <a href=@{AuthR LogoutR}>Logout
                 $nothing

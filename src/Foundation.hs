@@ -97,9 +97,11 @@ mkYesodData "App" $(parseRoutesFile "config/routes")
 -- | A convenient synonym for creating forms.
 type Form x = Html -> MForm (HandlerFor App) (FormResult x, Widget)
 
+appHeader :: WidgetFor App ()
 appHeader =
     do
-      toWidget [hamlet|
+      maid <- maybeAuthId
+      toWidget [whamlet|
         <div style="padding: 5px 0px 15px 10px;border-bottom: 1px solid #e0e0e0;height: 30px;width: 100%;background: white;z-index: 1000;">
           <span>
             <a href=@{HomeR}> Home |
@@ -107,6 +109,7 @@ appHeader =
             <a href="javascript:gameGameLinkClicked()"> Create Game |
           <span>
             <a href="http://www.github.com/happy0/wordify-webapp"> Source Code
+          ^{loginLogout}
         |]
       toWidget [julius|
           var gameGameLinkClicked = function() {
@@ -116,6 +119,20 @@ appHeader =
       $(widgetFile "game-dialog")
       where
         numPlayerOptions = [2..4]
+
+loginLogout :: Widget
+loginLogout =
+    do
+        maid <- maybeAuthId
+
+        toWidget [hamlet|
+            $maybe _ <- maid
+                <span style="float: right; margin-right: 10px;">
+                    <a href=@{AuthR LogoutR}>Logout
+            $nothing
+                <span style="float: right; margin-right: 10px;">
+                    <a href=@{AuthR LoginR}>Login
+        |]
 
 -- | A convenient synonym for database access functions.
 type DB a = forall (m :: * -> *).
