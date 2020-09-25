@@ -24,6 +24,12 @@ module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage) where
     import Controllers.Game.Persist
     import System.Random.Shuffle
 
+    {-
+        Join the client to the game lobby. If the lobby is full as a result of the client joining (and it being a new user),
+        the game is started and added to the database and in memory list of games, and the lobby is removed from the server.
+
+        Returns a channel to subscribe to lobby events on, and the newly created game (if applicable)   
+    -}
     joinClient :: App -> T.Text -> ServerPlayer -> IO (Either LobbyInputError ClientLobbyJoinResult)
     joinClient app gameId serverPlayer =
         do

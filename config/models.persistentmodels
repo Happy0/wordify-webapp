@@ -40,6 +40,5 @@ ChatMessage
     message Text
 Player
     game Text
-    name Text
     playerId Text
     playerNumber Int

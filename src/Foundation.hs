@@ -105,8 +105,7 @@ appHeader =
         <div style="padding: 5px 0px 15px 10px;border-bottom: 1px solid #e0e0e0;height: 30px;width: 100%;background: white;z-index: 1000;">
           <span>
             <a href=@{HomeR}> Home |
-          <span>
-            <a href="javascript:gameGameLinkClicked()"> Create Game |
+          ^{createGameButton}
           <span>
             <a href="http://www.github.com/happy0/wordify-webapp"> Source Code
           ^{loginLogout}
@@ -119,6 +118,20 @@ appHeader =
       $(widgetFile "game-dialog")
       where
         numPlayerOptions = [2..4]
+
+-- For now just don't show 'create game' button if the user isn't logged in.
+-- Todo: Prompt the user to log in
+createGameButton :: Widget
+createGameButton = do
+    maid <- maybeAuthId
+    [whamlet|
+    $maybe _ <- maid
+        <span>
+            <a href="javascript:gameGameLinkClicked()"> Create Game |
+    $nothing
+        <span>
+    |]
+
 
 loginLogout :: Widget
 loginLogout =

@@ -13,6 +13,8 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
     import Controllers.Game.Api
     import Controllers.Game.Model.ServerGame
     import Controllers.Game.Model.ServerPlayer
+    import Controllers.User.Model.AuthUser
+    import Controllers.User.Persist
     import Control.Error.Util
     import Data.Conduit
     import qualified Data.Conduit.List as CL
@@ -114,7 +116,8 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
 
         case dbEntries of
             Right (Entity _ (M.Game _ bagText bagSeed maybeLocale), playerModels, moveModels) -> do
-                let serverPlayers = L.map playerFromEntity playerModels
+                -- This could be more efficient than individual fetches, but it doesn't matter for now
+                serverPlayers <- sequence $ L.map (playerFromEntity app) playerModels
 
                 runExceptT $ do
                     let locale = maybe "en" id maybeLocale
@@ -192,7 +195,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
         in flip mapM_ playersWithNumbers $ do
                     \(playerNumber, (ServerPlayer playerName identifier)) ->
                         insert $
-                            M.Player gameId playerName identifier playerNumber
+                            M.Player gameId identifier playerNumber
 
     persistGameUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
     persistGameUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
@@ -283,8 +286,15 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
                 return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
     moveFromEntity _ _ (m@M.Move {})  = error $ "you've dun goofed, see database logs (hopefully) "
 
-    playerFromEntity :: Entity M.Player -> ServerPlayer
-    playerFromEntity (Entity _ (M.Player gameId name playerId _)) = makeNewPlayer name playerId
+    playerFromEntity :: App -> Entity M.Player -> IO (ServerPlayer)
+    playerFromEntity app (Entity _ (M.Player gameId playerId _)) =
+        do
+            let pool = appConnPool app
+            user <- getUser pool playerId
+            case user of
+                -- User was deleted from database?
+                Nothing -> return $ makeNewPlayer Nothing playerId
+                Just (AuthUser ident realName nickname) -> return (makeNewPlayer (nickname <|> realName) playerId)
 
     dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
     dbTileRepresentationToTiles letterBag textRepresentation =

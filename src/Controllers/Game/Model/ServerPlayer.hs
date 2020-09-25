@@ -12,9 +12,9 @@ module Controllers.Game.Model.ServerPlayer (ServerPlayer(ServerPlayer),
     import System.Random
     import qualified Wordify.Rules.Player as G
 
-    data ServerPlayer = ServerPlayer {name :: Text, identifier :: Text}
+    data ServerPlayer = ServerPlayer {name :: Maybe Text, identifier :: Text}
 
-    makeNewPlayer :: Text -> Text -> ServerPlayer
+    makeNewPlayer :: Maybe Text -> Text -> ServerPlayer
     makeNewPlayer playerName gameId = ServerPlayer playerName gameId
 
     makeNewPlayerId :: StdGen -> (Text, StdGen)

@@ -121,7 +121,9 @@ module Controllers.Game.Game(
                 Nothing -> return $ InvalidCommand "Internal server error"
                 Just name -> do
                     let channel = broadcastChannel serverGame
-                    let message = PlayerChat $ ChatMessage name messageText
+                    -- TODO: Handle this properly
+                    let playerName = maybe "Anon" (id) name
+                    let message = PlayerChat $ ChatMessage playerName messageText
                     P.persistGameUpdate pool (gameId serverGame) message
                     atomically $ writeTChan channel message
                     return ChatSuccess

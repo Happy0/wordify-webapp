@@ -15,6 +15,7 @@ module Handler.GameLobby where
     import Data.Aeson
     import Model.Api
     import qualified Control.Monad as CM
+    import Control.Applicative
     import Control.Concurrent
     import Control.Monad.Loops
     import Controllers.Game.Api
@@ -25,6 +26,8 @@ module Handler.GameLobby where
     import qualified Data.Text.Encoding as E
     import System.Random
     import Network.Mail.Mime
+    import Controllers.User.Persist(getUser)
+    import Controllers.User.Model.AuthUser(AuthUser(AuthUser))
 
     {-
       Creates a new game lobby for inviting players to a game via a link.
@@ -42,28 +45,24 @@ module Handler.GameLobby where
           Left err -> invalidArgs [err]
           Right gameId -> return gameId
 
-    -- TODO: User accounts
-    playerFromCookie :: App -> Handler ServerPlayer
-    playerFromCookie app = do
-        currentPlayerId <- lookupCookie "id"
-        player <- atomically $ generatePlayer app
-        case currentPlayerId of
-            Just playerId -> return $ makeNewPlayer (name player) playerId
-            Nothing ->
-                do
-                    setCookie def {setCookieName = "id", setCookieValue = E.encodeUtf8 (identifier player)}
-                    return $ player
+    playerFromDatabase :: App -> Text -> Handler ServerPlayer
+    playerFromDatabase app playerId = do
+        let pool = appConnPool app
+        user <- liftIO $ getUser pool playerId
 
+        case user of 
+            Just (AuthUser ident realName nickname) ->
+                let playerName = nickname <|> realName
+                in return $ makeNewPlayer playerName playerId
+            Nothing -> return $ makeNewPlayer Nothing playerId
 
-    generatePlayer :: App -> STM ServerPlayer
-    generatePlayer app =
-        do
-            newPlayerIdGenerator <- readTVar $ (randomGenerator app)
-            let (playerId, newGen) = makeNewPlayerId newPlayerIdGenerator
-            let (suffix, nextGen) = randomString 4 newGen
+    renderNotLoggedInLobbyPage gameId = do
+        addStylesheet $ (StaticR css_lobby_css)
+        [whamlet|
+            <p> You must log in to join this game
+            <a href=@{AuthR LoginR}>Login
+        |]
 
-            writeTVar (randomGenerator app) nextGen
-            return $ makeNewPlayer ("Player" ++ pack suffix) playerId 
 
     {-
       Joins an existing lobby.
@@ -74,8 +73,17 @@ module Handler.GameLobby where
     getGameLobbyR :: Text -> Handler Html
     getGameLobbyR gameId =
         do
+            maid <- maybeAuthId
+            case maid of
+                Just userId -> handlerLobbyAuthenticated gameId userId
+                Nothing -> defaultLayout $ renderNotLoggedInLobbyPage gameId
+
+
+    handlerLobbyAuthenticated :: Text -> Text -> Handler Html
+    handlerLobbyAuthenticated gameId userId =
+        do
             app <- getYesod
-            player <- playerFromCookie app
+            player <- playerFromDatabase app userId
             let playerId = identifier player
 
             initialisationResult <- liftIO $ joinClient app gameId player
