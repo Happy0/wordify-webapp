@@ -3,7 +3,6 @@
 
 User
     ident Text
-    name Text Maybe
     nickname Text Maybe
     Primary ident
     UniqueText ident

@@ -12,9 +12,9 @@ module Controllers.User.Persist(storeUser, getUser) where
     withPool pool = flip runSqlPersistMPool pool
     
     storeUser :: Pool SqlBackend -> AuthUser -> IO ()
-    storeUser pool (AuthUser userId maybeName maybeNick) = do
+    storeUser pool (AuthUser userId maybeNick) = do
         withPool pool $ do
-            _ <- upsert (M.User userId maybeName maybeNick) []
+            _ <- upsert (M.User userId maybeNick) []
             return ()
 
 
@@ -24,4 +24,4 @@ module Controllers.User.Persist(storeUser, getUser) where
             userProfile <- selectFirst [M.UserIdent ==. userId] []
             case userProfile of
                 Nothing -> return Nothing
-                Just (Entity _ (M.User ident name nick)) -> return $ Just (AuthUser ident name nick)
+                Just (Entity _ (M.User ident nick)) -> return $ Just (AuthUser ident nick)

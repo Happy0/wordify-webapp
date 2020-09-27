@@ -14,7 +14,7 @@ module Auth0 (auth0Provider) where
     auth0Provider :: YesodAuth m => Text -> Text -> AuthPlugin m
     auth0Provider clientId clientSecret =
         authOAuth2 pluginName oauth2 $ \manager token -> do
-            (AuthUser userId name nick, userResponse) <- authGetProfile
+            (AuthUser userId nick, userResponse) <- authGetProfile
                 pluginName
                 manager
                 token

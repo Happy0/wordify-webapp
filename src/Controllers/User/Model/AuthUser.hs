@@ -1,4 +1,4 @@
-module Controllers.User.Model.AuthUser(AuthUser(AuthUser), ident, name, nickname) where
+module Controllers.User.Model.AuthUser(AuthUser(AuthUser), ident, nickname) where
 
     import Data.Aeson
     import Data.Text
@@ -8,9 +8,8 @@ module Controllers.User.Model.AuthUser(AuthUser(AuthUser), ident, name, nickname
         parseJSON (Object v) =
             do
                 sub <- v .: "sub"
-                name <- v .:? "name"
                 nick <- v .:? "nickname"
-                return (AuthUser sub name nick)
+                return (AuthUser sub nick)
         parseJSON _ = error "Unexpected format for JSON profile"
 
-    data AuthUser = AuthUser {ident:: Text, name:: Maybe Text, nickname :: Maybe Text} deriving Show
+    data AuthUser = AuthUser {ident:: Text, nickname :: Maybe Text} deriving Show

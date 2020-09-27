@@ -294,7 +294,7 @@ module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, pers
             case user of
                 -- User was deleted from database?
                 Nothing -> return $ makeNewPlayer Nothing playerId
-                Just (AuthUser ident realName nickname) -> return (makeNewPlayer (nickname <|> realName) playerId)
+                Just (AuthUser ident nickname) -> return (makeNewPlayer (nickname) playerId)
 
     dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
     dbTileRepresentationToTiles letterBag textRepresentation =

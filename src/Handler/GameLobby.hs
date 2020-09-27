@@ -51,9 +51,8 @@ module Handler.GameLobby where
         user <- liftIO $ getUser pool playerId
 
         case user of 
-            Just (AuthUser ident realName nickname) ->
-                let playerName = nickname <|> realName
-                in return $ makeNewPlayer playerName playerId
+            Just (AuthUser ident nickname) ->
+                return $ makeNewPlayer nickname playerId
             Nothing -> return $ makeNewPlayer Nothing playerId
 
     renderNotLoggedInLobbyPage gameId = do

@@ -10,7 +10,7 @@ module Handler.AuthTest where
     import           Data.Default                (def)
     import           Data.Text                   (Text)
     import Controllers.User.Persist(getUser)
-    import Controllers.User.Model.AuthUser(name, ident)
+    import Controllers.User.Model.AuthUser(ident)
 
     getLoginTestPageR :: Handler Html
     getLoginTestPageR = do
@@ -27,7 +27,6 @@ module Handler.AuthTest where
             [whamlet|
                 $maybe _ <- maid
                     <p>
-                        <p> Your name is: #{show (fmap name profileDetails)}
                         <a href=@{AuthR LogoutR}>Logout
                 $nothing
                     <p>
