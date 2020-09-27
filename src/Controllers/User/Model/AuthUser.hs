@@ -9,7 +9,7 @@ module Controllers.User.Model.AuthUser(AuthUser(AuthUser), ident, name, nickname
             do
                 sub <- v .: "sub"
                 name <- v .:? "name"
-                nick <- v .:? "nick"
+                nick <- v .:? "nickname"
                 return (AuthUser sub name nick)
         parseJSON _ = error "Unexpected format for JSON profile"
 
