@@ -69,6 +69,7 @@ renderGamePage app gameId maybePlayerId (Right serverGame) = do
       addStylesheet $ (StaticR css_round_css)
       addStylesheet $ (StaticR css_bootstrap_css)
       addScript $ (StaticR js_round_js)
+      addScript $ (StaticR js_touchpunch_js)
       toWidget
           [julius|
               jQuery.noConflict();
