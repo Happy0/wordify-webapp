@@ -61,6 +61,7 @@ import Control.Concurrent.Suspend
 import Data.Time.Clock
 import System.Environment
 import System.Random
+import Data.Char (isSpace)
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -145,7 +146,7 @@ loadGameBundles :: IO LocalisedGameSetups
 loadGameBundles =
     do
         localisations <- P.readFile "config/localisations.txt"
-        gameBundles <- mapM loadGameBundle $ splitOn ("\n" :: String) localisations
+        gameBundles <- mapM loadGameBundle $ filter (not . all isSpace) $ splitOn ("\n" :: String) localisations
         return $ M.fromList gameBundles
 
 loadGameBundle :: String -> IO (Text, LocalisedGameSetup)
