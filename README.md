@@ -1,3 +1,5 @@
+![Wordify board game](https://i.imgur.com/GH4KzBD.png "Wordify")
+
 ## Haskell Setup
 
 1. If you haven't already, [install Stack](https://haskell-lang.org/get-started)
