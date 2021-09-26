@@ -55,6 +55,7 @@ import Wordify.Rules.LetterBag
 import Data.FileEmbed
 import Control.Concurrent.Timer
 import Control.Error.Util
+import qualified Control.Monad as MO
 import Control.Monad.Trans.Except
 import Controllers.GameLobby.Model.GameLobby
 import Control.Concurrent.Suspend
@@ -62,6 +63,7 @@ import Data.Time.Clock
 import System.Environment
 import System.Random
 import Data.Char (isSpace)
+import OAuthDetails(OAuthDetails, buildOAuthDetails)
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -114,13 +116,15 @@ makeFoundation appSettings = do
     -- Return the foundation
     return $ mkFoundation pool
 
-getAuthDetails :: IO (Either Text AuthDetails)
-getAuthDetails = runExceptT $
+getAuthDetails :: IO (Either Text OAuthDetails)
+getAuthDetails = 
     do
-        clientId <- ExceptT $ note "Missing AUTH_CLIENT_ID environment variable" <$> (lookupEnv "AUTH_CLIENT_ID")
-        clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> (lookupEnv "AUTH_CLIENT_SECRET")
-        return $ AuthDetails (pack clientId) (pack clientSecret)
-
+         runExceptT $
+            do
+                clientId <- ExceptT $ note "Missing AUTH_CLIENT_ID environment variable" <$> (lookupEnv "AUTH_CLIENT_ID")
+                clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> (lookupEnv "AUTH_CLIENT_SECRET")
+                authBaseUri <- ExceptT $ note "Missing AUTH_BASE_URI environment variable" <$> (lookupEnv "AUTH_BASE_URI")
+                except $ buildOAuthDetails (pack authBaseUri) (pack clientId) (pack clientSecret)
 
 cleanIdleLobbies :: TVar (Map Text (TVar GameLobby)) -> IO ()
 cleanIdleLobbies lobbies = do

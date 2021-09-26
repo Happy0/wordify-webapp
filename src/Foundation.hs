@@ -37,6 +37,7 @@ import System.Environment
 import Auth0 (auth0Provider)
 import Yesod.Auth.OAuth2
 import Controllers.User.Persist(storeUser)
+import OAuthDetails(buildOAuthDetails, OAuthDetails)
 
 data LocalisedGameSetup = GameSetup {localisedDictionary :: Dictionary
                             , localisedLetterBag :: LetterBag}
@@ -67,7 +68,7 @@ data App = App
     , gameLobbies :: TVar (Map Text (TVar GameLobby))
     , games :: TVar (Map Text ServerGame)
     , randomGenerator :: TVar StdGen
-    , authDetails :: Either Text AuthDetails
+    , authDetails :: Either Text OAuthDetails
     }
 
 data MenuItem = MenuItem
@@ -273,7 +274,9 @@ instance YesodAuth App where
 
         case userProfile of
             Left _ -> return ()
-            Right profile -> liftIO $ do storeUser (appConnPool app) profile
+            Right profile -> liftIO $ do 
+                
+                storeUser (appConnPool app) profile
 
         return . Authenticated . credsIdent $ creds
 
@@ -286,7 +289,7 @@ instance YesodAuth App where
     logoutDest _ = HomeR
 
     authPlugins app = case authDetails app of 
-        Right (AuthDetails clientId clientSercret) -> [ auth0Provider clientId clientSercret ]
+        Right oAuthDetails -> [ auth0Provider oAuthDetails ]
         Left err -> []
 
     -- The default maybeAuthId assumes a Persistent database. We're going for a
