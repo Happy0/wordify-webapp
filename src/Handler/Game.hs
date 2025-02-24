@@ -31,11 +31,14 @@ import Controllers.Game.Game
 import Controllers.Game.Persist
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
+import InactivityTracker
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
     request <- getRequest
     app <- getYesod
+    app <- getYesod
+    liftIO $ trackRequestReceivedActivity (inactivityTracker app)
     let cookies = reqCookies request
     maybePlayerId <- maybeAuthId
 
@@ -135,30 +138,32 @@ gameApp app gameId maybePlayerId = do
       case result of
         Left err -> sendTextData (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
+          let inactivityTrackerState = inactivityTracker app
           let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
           channel <- atomically (dupTChan (broadcastChannel serverGame))
-          liftIO (keepClientUpdated connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
+          liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 
-keepClientUpdated :: C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
-keepClientUpdated connection pool gameId serverGame channel playerNumber = do
-    sendPreviousChatMessages pool gameId connection
+keepClientUpdated :: TVar InactivityTracker -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
+keepClientUpdated inactivityTracker connection pool gameId serverGame channel playerNumber = 
+    withTrackWebsocketActivity inactivityTracker $ do
+        sendPreviousChatMessages pool gameId connection
 
-    -- Send the moves again incase the client missed any inbetween loading the page and
-    -- connecting with the websocket
-    readTVarIO (game serverGame) >>= sendPreviousMoves connection
+        -- Send the moves again incase the client missed any inbetween loading the page and
+        -- connecting with the websocket
+        readTVarIO (game serverGame) >>= sendPreviousMoves connection
 
-    race_
-            (forever $
-                (atomically . readTChan) channel >>= C.sendTextData connection . toJSONResponse)
-            (forever $
-                do
-                    msg <- C.receiveData connection
-                    case eitherDecode msg of
-                        Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
-                        Right parsedCommand -> do
-                            response <- liftIO $ performRequest serverGame pool playerNumber parsedCommand
-                            C.sendTextData connection $ toJSONResponse $ response
-            )
+        race_
+                (forever $
+                    (atomically . readTChan) channel >>= C.sendTextData connection . toJSONResponse)
+                (forever $
+                    do
+                        msg <- C.receiveData connection
+                        case eitherDecode msg of
+                            Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
+                            Right parsedCommand -> do
+                                response <- liftIO $ performRequest serverGame pool playerNumber parsedCommand
+                                C.sendTextData connection $ toJSONResponse $ response
+                )
 
 sendPreviousMoves :: C.Connection -> G.Game -> IO ()
 sendPreviousMoves connection game = do

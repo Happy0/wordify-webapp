@@ -28,6 +28,8 @@ module Handler.GameLobby where
     import Network.Mail.Mime
     import Controllers.User.Persist(getUser)
     import Controllers.User.Model.AuthUser(AuthUser(AuthUser))
+    import InactivityTracker
+    import qualified Network.WebSockets.Connection as C
 
     {-
       Creates a new game lobby for inviting players to a game via a link.
@@ -38,8 +40,9 @@ module Handler.GameLobby where
     postCreateGameR ::  Handler Text
     postCreateGameR =
       do
-        CreateGameLobby numPlayers locale <- requireJsonBody :: Handler CreateGameLobby
         app <- getYesod
+        liftIO $ trackRequestReceivedActivity (inactivityTracker app)
+        CreateGameLobby numPlayers locale <- requireJsonBody :: Handler CreateGameLobby
         gameCreateResult <- liftIO (createGame app numPlayers locale)
         case gameCreateResult of
           Left err -> invalidArgs [err]
@@ -72,6 +75,8 @@ module Handler.GameLobby where
     getGameLobbyR :: Text -> Handler Html
     getGameLobbyR gameId =
         do
+            app <- getYesod
+            liftIO $ trackRequestReceivedActivity (inactivityTracker app)
             maid <- maybeAuthId
             case maid of
                 Just userId -> handlerLobbyAuthenticated gameId userId
@@ -82,6 +87,7 @@ module Handler.GameLobby where
     handlerLobbyAuthenticated gameId userId =
         do
             app <- getYesod
+            let inactivityTrackerState = inactivityTracker app
             player <- playerFromDatabase app userId
             let playerId = identifier player
 
@@ -98,7 +104,7 @@ module Handler.GameLobby where
                     redirect (GameR gameId)
                 else
                     do
-                        webSockets $ lobbyWebSocketHandler broadcastChannel gameId playerId
+                        webSockets $ lobbyWebSocketHandler inactivityTrackerState broadcastChannel gameId playerId
                         defaultLayout renderLobbyPage
 
     renderLobbyPage = do
@@ -170,12 +176,15 @@ module Handler.GameLobby where
 
           |]
 
-    lobbyWebSocketHandler :: TChan LobbyMessage -> T.Text -> T.Text -> WebSocketsT Handler ()
-    lobbyWebSocketHandler channel gameId playerId = do
+    lobbyWebSocketHandler :: TVar InactivityTracker -> TChan LobbyMessage -> T.Text -> T.Text -> WebSocketsT Handler ()
+    lobbyWebSocketHandler inactivityTrackerState channel gameId playerId = do
         {-
             We race a thread that sends pings to the client so that when the client closes its connection,
             our loop which reads from the message channel is closed due to the thread being cancelled.
         -}
-        race_
-            (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= sendTextData)
-            (whileM_ (isRight <$> sendPingE ("hello~" :: Text)) $ liftIO $ threadDelay 60000000)
+        connection <- ask
+
+        liftIO $ withTrackWebsocketActivity inactivityTrackerState $ do
+            race_
+                (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= C.sendTextData connection)
+                (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)

@@ -53,6 +53,7 @@ import qualified Data.Map as M
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 import Data.FileEmbed
+import Control.Concurrent
 import Control.Concurrent.Timer
 import Control.Error.Util
 import qualified Control.Monad as MO
@@ -64,6 +65,7 @@ import System.Environment
 import System.Random
 import Data.Char (isSpace)
 import OAuthDetails(OAuthDetails, buildOAuthDetails)
+import InactivityTracker
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -74,8 +76,8 @@ mkYesodDispatch "App" resourcesApp
 -- performs initialization and returns a foundation datatype value. This is also
 -- the place to put your migrate statements to have automatic database
 -- migrations handled by Yesod.
-makeFoundation :: AppSettings -> IO App
-makeFoundation appSettings = do
+makeFoundation :: AppSettings -> TVar InactivityTracker -> IO App
+makeFoundation appSettings inactivityTracker = do
     -- Some basic initializations: HTTP connection manager, logger, and static
     -- subsite.
     appHttpManager <- getGlobalManager
@@ -125,6 +127,13 @@ getAuthDetails =
                 clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> (lookupEnv "AUTH_CLIENT_SECRET")
                 authBaseUri <- ExceptT $ note "Missing AUTH_BASE_URI environment variable" <$> (lookupEnv "AUTH_BASE_URI")
                 except $ buildOAuthDetails (pack authBaseUri) (pack clientId) (pack clientSecret)
+
+getExitAppOnIdleConfig :: IO Bool
+getExitAppOnIdleConfig = do
+    exitOnIdle <- lookupEnv "EXIT_ON_IDLE"
+    case exitOnIdle of 
+        Nothing -> pure False
+        Just configValue -> pure ((toLower configValue) == "true")
 
 cleanIdleLobbies :: TVar (Map Text (TVar GameLobby)) -> IO ()
 cleanIdleLobbies lobbies = do
@@ -220,8 +229,9 @@ warpSettings foundation =
 -- | For yesod devel, return the Warp settings and WAI Application.
 getApplicationDev :: IO (Settings, Application)
 getApplicationDev = do
+    inactivityTracker <- makeInactivityTracker
     settings <- getAppSettings
-    foundation <- makeFoundation settings
+    foundation <- makeFoundation settings inactivityTracker
     wsettings <- getDevSettings $ warpSettings foundation
     app <- makeApplication foundation
     return (wsettings, app)
@@ -244,23 +254,28 @@ appMain = do
         -- allow environment variables to override
         useEnv
 
+    inactivityTracker <- makeInactivityTracker
+
     -- Generate the foundation from the settings
-    foundation <- makeFoundation settings
+    foundation <- makeFoundation settings inactivityTracker
 
     -- Generate a WAI Application from the foundation
     app <- makeApplication foundation
 
-    -- Run the application with Warp
-    runSettings (warpSettings foundation) app
+    exitAppOnIdle <- getExitAppOnIdleConfig
 
+    case exitAppOnIdle of 
+        True -> race_ (runSettings (warpSettings foundation) app) (pollUntilAppInactive inactivityTracker 1)
+        False -> (runSettings (warpSettings foundation) app)
 
 --------------------------------------------------------------
 -- Functions for DevelMain.hs (a way to run the app from GHCi)
 --------------------------------------------------------------
 getApplicationRepl :: IO (Int, App, Application)
 getApplicationRepl = do
+    inactivityTracker <- makeInactivityTracker
     settings <- getAppSettings
-    foundation <- makeFoundation settings
+    foundation <- makeFoundation settings inactivityTracker
     wsettings <- getDevSettings $ warpSettings foundation
     app1 <- makeApplication foundation
     return (getPort wsettings, foundation, app1)
@@ -275,7 +290,9 @@ shutdownApp _ = return ()
 
 -- | Run a handler
 handler :: Handler a -> IO a
-handler h = getAppSettings >>= makeFoundation >>= flip unsafeHandler h
+handler h = do
+    inactivityTracker <- makeInactivityTracker
+    getAppSettings >>= (\appSettings -> makeFoundation appSettings inactivityTracker) >>= flip unsafeHandler h
 
 -- | Run DB queries
 db :: ReaderT SqlBackend Handler a -> IO a

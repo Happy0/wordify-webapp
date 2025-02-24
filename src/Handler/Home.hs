@@ -16,9 +16,12 @@ import System.Random
 import Model.Api
 import Data.Aeson
 import Web.Cookie
+import InactivityTracker
 
 getHomeR :: Handler Html
 getHomeR = do
+    app <- getYesod
+    liftIO $ trackRequestReceivedActivity (inactivityTracker app)
     defaultLayout $ do
         toWidget
             [hamlet|

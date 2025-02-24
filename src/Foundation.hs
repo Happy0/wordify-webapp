@@ -38,6 +38,7 @@ import Auth0 (auth0Provider)
 import Yesod.Auth.OAuth2
 import Controllers.User.Persist(storeUser)
 import OAuthDetails(buildOAuthDetails, OAuthDetails)
+import InactivityTracker
 
 data LocalisedGameSetup = GameSetup {localisedDictionary :: Dictionary
                             , localisedLetterBag :: LetterBag}
@@ -69,6 +70,7 @@ data App = App
     , games :: TVar (Map Text ServerGame)
     , randomGenerator :: TVar StdGen
     , authDetails :: Either Text OAuthDetails
+    , inactivityTracker :: TVar InactivityTracker
     }
 
 data MenuItem = MenuItem
