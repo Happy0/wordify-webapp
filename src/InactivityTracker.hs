@@ -8,7 +8,9 @@ module InactivityTracker where
     import System.Exit
     import Control.Monad
     import Control.Exception
-
+    import Control.Monad.Loops
+    import Yesod.WebSockets
+    
     data InactivityTracker = InactivityTracker { lastRequestSecondsSinceUnixEpoch :: POSIXTime, openWebsockets :: Int }
 
     appIsInactive :: InactivityTracker -> POSIXTime -> Int -> Bool 
@@ -62,4 +64,8 @@ module InactivityTracker where
             case (appIsInactive inactivityState now shutdownAfterMinutesInactive) of
                 True -> putStrLn "Exiting due to app inactivity" >> return ()
                 False -> pollUntilAppInactive inActivityTrackerTvar shutdownAfterMinutesInactive
+
+    raceUntilInactive :: (TVar InactivityTracker) -> IO () -> IO ()
+    raceUntilInactive inactivityTracker action = 
+        race_ (pollUntilAppInactive inactivityTracker 1) action
 

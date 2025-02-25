@@ -264,9 +264,11 @@ appMain = do
 
     exitAppOnIdle <- getExitAppOnIdleConfig
 
+    let runApp = runSettings (warpSettings foundation) app
+
     case exitAppOnIdle of 
-        True -> race_ (runSettings (warpSettings foundation) app) (pollUntilAppInactive inactivityTracker 1)
-        False -> (runSettings (warpSettings foundation) app)
+        True -> raceUntilInactive inactivityTracker runApp
+        False -> runApp
 
 --------------------------------------------------------------
 -- Functions for DevelMain.hs (a way to run the app from GHCi)

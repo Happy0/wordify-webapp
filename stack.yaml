@@ -20,7 +20,7 @@
 resolver: lts-13.24
 
 docker:
-  enable: true
+  enable: false
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -36,17 +36,15 @@ docker:
 #  - auto-update
 #  - wai
 packages:
-- .
+  - .
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 # extra-deps: []
 extra-deps:
-- suspend-0.2.0.0@sha256:0d98526558b773c3ff792664bc45d7a083a32eedb6206d4101a7570869c75a28
-- timers-0.2.0.3@sha256:ec91266e5ed73e958857fd07332ed547ea01205133769fba51cc40577549ffe9
-- wordify-0.1.0.0
-
-
+  - suspend-0.2.0.0@sha256:0d98526558b773c3ff792664bc45d7a083a32eedb6206d4101a7570869c75a28
+  - timers-0.2.0.3@sha256:ec91266e5ed73e958857fd07332ed547ea01205133769fba51cc40577549ffe9
+  - wordify-0.1.0.0
 # Override default flag values for local packages and extra-deps
 # flags: {}
 
