@@ -1,67 +1,65 @@
 module InactivityTracker where
-    
-    import Data.Time.Clock.POSIX
-    import Control.Concurrent
-    import Prelude
-    import Control.Concurrent.STM.TVar
-    import Control.Concurrent.STM
-    import System.Exit
-    import Control.Monad
-    import Control.Exception
-    import Control.Monad.Loops
-    import Yesod.WebSockets
-    
-    data InactivityTracker = InactivityTracker { lastRequestSecondsSinceUnixEpoch :: POSIXTime, openWebsockets :: Int }
 
-    appIsInactive :: InactivityTracker -> POSIXTime -> Int -> Bool 
-    appIsInactive (InactivityTracker lastRequestSecondsSinceUnixEpoch openWebsockets) currentSecondsSinceUnixEpoch shutdownAfterMinutesInactive = 
-        case openWebsockets of 
-            0 -> (floor (currentSecondsSinceUnixEpoch - lastRequestSecondsSinceUnixEpoch)) >= (shutdownAfterMinutesInactive * 60)
-            _ -> False
+import Control.Concurrent
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TVar
+import Control.Exception
+import Control.Monad
+import Control.Monad.Loops
+import Data.Time.Clock.POSIX
+import System.Exit
+import Yesod.WebSockets
+import Prelude
 
-    trackWebsocketConnect :: InactivityTracker -> InactivityTracker
-    trackWebsocketConnect (InactivityTracker lastRequestSecondsSinceUnixEpoch openWebsockets) =
-        InactivityTracker lastRequestSecondsSinceUnixEpoch (openWebsockets + 1)
+data InactivityTracker = InactivityTracker {lastRequestSecondsSinceUnixEpoch :: POSIXTime, openWebsockets :: Int}
 
-    trackWebsocketDisconnect :: InactivityTracker -> InactivityTracker
-    trackWebsocketDisconnect (InactivityTracker lastRequestSecondsSinceUnixEpoch openWebsockets) =
-        InactivityTracker lastRequestSecondsSinceUnixEpoch (openWebsockets - 1)
+appIsInactive :: InactivityTracker -> POSIXTime -> Int -> Bool
+appIsInactive (InactivityTracker lastRequestSecondsSinceUnixEpoch openWebsockets) currentSecondsSinceUnixEpoch shutdownAfterMinutesInactive =
+  case openWebsockets of
+    0 -> floor (currentSecondsSinceUnixEpoch - lastRequestSecondsSinceUnixEpoch) >= (shutdownAfterMinutesInactive * 60)
+    _ -> False
 
-    trackRequestReceived :: POSIXTime -> InactivityTracker -> InactivityTracker
-    trackRequestReceived currentSecondsSinceUnixEpoch activityState =
-        InactivityTracker currentSecondsSinceUnixEpoch (openWebsockets activityState)
+trackWebsocketConnect :: InactivityTracker -> InactivityTracker
+trackWebsocketConnect (InactivityTracker lastRequestSecondsSinceUnixEpoch openWebsockets) =
+  InactivityTracker lastRequestSecondsSinceUnixEpoch (openWebsockets + 1)
 
-    trackRequestReceivedActivity :: TVar InactivityTracker -> IO ()
-    trackRequestReceivedActivity inactivityTracker = 
-        do
-            secondsSinceUnixEpoch <- getPOSIXTime
-            atomically $ modifyTVar' inactivityTracker (trackRequestReceived secondsSinceUnixEpoch)
+trackWebsocketDisconnect :: InactivityTracker -> InactivityTracker
+trackWebsocketDisconnect (InactivityTracker lastRequestSecondsSinceUnixEpoch openWebsockets) =
+  InactivityTracker lastRequestSecondsSinceUnixEpoch (openWebsockets - 1)
 
-    withTrackWebsocketActivity :: TVar InactivityTracker -> IO () -> IO ()
-    withTrackWebsocketActivity inactivityTracker action = do
-        bracket
-            (atomically $ modifyTVar' inactivityTracker trackWebsocketConnect)
-            (\_ -> atomically $ modifyTVar' inactivityTracker trackWebsocketDisconnect)
-            (\_ -> action)
-    
-    makeInactivityTracker :: IO (TVar InactivityTracker)
-    makeInactivityTracker = 
-        do
-            secondsSinceUnixEpoch <- getPOSIXTime
-            newTVarIO (InactivityTracker secondsSinceUnixEpoch 0)
+trackRequestReceived :: POSIXTime -> InactivityTracker -> InactivityTracker
+trackRequestReceived currentSecondsSinceUnixEpoch activityState =
+  InactivityTracker currentSecondsSinceUnixEpoch (openWebsockets activityState)
 
-    pollUntilAppInactive :: TVar InactivityTracker -> Int -> IO ()
-    pollUntilAppInactive inActivityTrackerTvar shutdownAfterMinutesInactive =
-        do
-            _ <- threadDelay (shutdownAfterMinutesInactive * 60000000)
-            now <- getPOSIXTime
-            inactivityState <- readTVarIO inActivityTrackerTvar
+trackRequestReceivedActivity :: TVar InactivityTracker -> IO ()
+trackRequestReceivedActivity inactivityTracker =
+  do
+    secondsSinceUnixEpoch <- getPOSIXTime
+    atomically $ modifyTVar' inactivityTracker (trackRequestReceived secondsSinceUnixEpoch)
 
-            case (appIsInactive inactivityState now shutdownAfterMinutesInactive) of
-                True -> putStrLn "Exiting due to app inactivity" >> return ()
-                False -> pollUntilAppInactive inActivityTrackerTvar shutdownAfterMinutesInactive
+withTrackWebsocketActivity :: TVar InactivityTracker -> IO () -> IO ()
+withTrackWebsocketActivity inactivityTracker action = do
+  bracket_
+    (atomically $ modifyTVar' inactivityTracker trackWebsocketConnect)
+    (atomically $ modifyTVar' inactivityTracker trackWebsocketDisconnect)
+    action
 
-    raceUntilInactive :: (TVar InactivityTracker) -> IO () -> IO ()
-    raceUntilInactive inactivityTracker action = 
-        race_ (pollUntilAppInactive inactivityTracker 1) action
+makeInactivityTracker :: IO (TVar InactivityTracker)
+makeInactivityTracker =
+  do
+    secondsSinceUnixEpoch <- getPOSIXTime
+    newTVarIO (InactivityTracker secondsSinceUnixEpoch 0)
 
+pollUntilAppInactive :: TVar InactivityTracker -> Int -> IO ()
+pollUntilAppInactive inActivityTrackerTvar shutdownAfterMinutesInactive =
+  do
+    _ <- threadDelay (shutdownAfterMinutesInactive * 60000000)
+    now <- getPOSIXTime
+    inactivityState <- readTVarIO inActivityTrackerTvar
+
+    if appIsInactive inactivityState now shutdownAfterMinutesInactive
+      then putStrLn "Exiting due to app inactivity"
+      else pollUntilAppInactive inActivityTrackerTvar shutdownAfterMinutesInactive
+
+raceUntilInactive :: TVar InactivityTracker -> IO () -> IO ()
+raceUntilInactive inactivityTracker = race_ (pollUntilAppInactive inactivityTracker 1)
