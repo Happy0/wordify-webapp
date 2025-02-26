@@ -20,6 +20,8 @@ RUN stack build --copy-bins --local-bin-path "bin"
 FROM ubuntu:24.04 as app
 COPY --from=build bin bin
 
+RUN apt-get update && apt-get install -y libgnutls30 netbase libstdc++6 ca-certificates
+
 COPY config config
 COPY static static
 COPY templates templates
