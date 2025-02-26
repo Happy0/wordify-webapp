@@ -11,7 +11,7 @@ RUN apt-get install --assume-yes libtinfo-dev
 # non-ASCII characters.
 ENV LANG C.UTF-8
 
-RUN mkdir -p "mnt"
+RUN mkdir -p "/data"
 RUN mkdir -p "wordifyApp"
 
 COPY . "wordifyApp"
@@ -19,4 +19,4 @@ WORKDIR "/wordifyApp"
 
 RUN stack build --copy-bins --local-bin-path bin
 
-CMD YESOD_SQLITE_DATABASE="../mnt/wordify-webapp.sqlite3" EXIT_ON_IDLE=true ./bin/wordify-webapp +RTS -I0 -RTS
+CMD YESOD_HOST=0.0.0.0 YESOD_PORT=8080 YESOD_SQLITE_DATABASE="/data/wordify-webapp.sqlite3" EXIT_ON_IDLE=true ./bin/wordify-webapp +RTS -I0 -RTS
