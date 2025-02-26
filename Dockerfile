@@ -25,4 +25,4 @@ COPY static static
 COPY templates templates
 COPY ui ui
 
-CMD YESOD_HOST=0.0.0.0 YESOD_PORT=8080 YESOD_SQLITE_DATABASE="/data/wordify-webapp.sqlite3" EXIT_ON_IDLE=true SESSION_BACKEND_CERTIFICATE_DIRECTORY="/data" ./bin/wordify-webapp +RTS -I0 -RTS
+CMD YESOD_HOST=0.0.0.0 YESOD_PORT=8080 YESOD_SQLITE_DATABASE="/data/wordify-webapp.sqlite3" SESSION_BACKEND_CERTIFICATE_DIRECTORY="/data" ./bin/wordify-webapp
