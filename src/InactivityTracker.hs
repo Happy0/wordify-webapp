@@ -41,11 +41,7 @@ module InactivityTracker where
     withTrackWebsocketActivity inactivityTracker action = do
         bracket
             (atomically $ modifyTVar' inactivityTracker trackWebsocketConnect)
-            (\_ -> do 
-                atomically $ modifyTVar' inactivityTracker trackWebsocketDisconnect
-                state <- readTVarIO inactivityTracker
-                putStrLn ("number of websocket connections: " ++ ( show $ openWebsockets state))
-            )
+            (\_ -> atomically $ modifyTVar' inactivityTracker trackWebsocketDisconnect)
             (\_ -> action)
     
     makeInactivityTracker :: IO (TVar InactivityTracker)
