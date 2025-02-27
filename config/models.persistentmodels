@@ -41,3 +41,17 @@ Player
     game Text
     playerId Text
     playerNumber Int
+
+Lobby
+    gameId Text
+    originalLetterBag Text
+    letterBagSeed Text
+    bagLocale Text Maybe
+    numberOfPlayers Int
+    createdAt UTCTime
+    Primary gameId
+
+LobbyPlayer
+    game Text
+    playerId Text
+    playerNumber Int

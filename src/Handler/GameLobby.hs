@@ -1,115 +1,110 @@
 module Handler.GameLobby where
 
-    import Import
-    import Foundation
-    import Yesod.Core
-    import Yesod.WebSockets
-    import qualified Data.Map as M
-    import Controllers.Game.Model.ServerPlayer
-    import Controllers.Game.Model.ServerGame
-    import Model.Api
-    import Controllers.GameLobby.Model.GameLobby
-    import Controllers.GameLobby.GameLobby
-    import qualified Data.Text as T
-    import Controllers.GameLobby.Api
-    import Data.Aeson
-    import Model.Api
-    import qualified Control.Monad as CM
-    import Control.Applicative
-    import Control.Concurrent
-    import Control.Monad.Loops
-    import Controllers.Game.Api
-    import Controllers.GameLobby.Api
-    import Controllers.GameLobby.CreateGame
-    import Data.Either
-    import Web.Cookie
-    import qualified Data.Text.Encoding as E
-    import System.Random
-    import Network.Mail.Mime
-    import Controllers.User.Persist(getUser)
-    import Controllers.User.Model.AuthUser(AuthUser(AuthUser))
-    import InactivityTracker
-    import qualified Network.WebSockets.Connection as C
+import Control.Applicative
+import Control.Concurrent
+import qualified Control.Monad as CM
+import Control.Monad.Loops
+import Controllers.Game.Api
+import Controllers.Game.Model.ServerGame
+import Controllers.Game.Model.ServerPlayer
+import Controllers.GameLobby.Api
+import Controllers.GameLobby.CreateGame
+import Controllers.GameLobby.GameLobby
+import Controllers.GameLobby.Model.GameLobby
+import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
+import Controllers.User.Persist (getUser)
+import Data.Aeson
+import Data.Either
+import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as E
+import Foundation
+import Import
+import InactivityTracker
+import Model.Api
+import Network.Mail.Mime
+import qualified Network.WebSockets.Connection as C
+import System.Random
+import Web.Cookie
+import Yesod.Core
+import Yesod.WebSockets
 
-    {-
-      Creates a new game lobby for inviting players to a game via a link.
+{-
+  Creates a new game lobby for inviting players to a game via a link.
 
-      Returns the gameId of the new game lobby for the client to use to join
-      the new lobby.
-    -}
-    postCreateGameR ::  Handler Text
-    postCreateGameR =
-      do
-        app <- getYesod
-        liftIO $ trackRequestReceivedActivity (inactivityTracker app)
-        CreateGameLobby numPlayers locale <- requireJsonBody :: Handler CreateGameLobby
-        gameCreateResult <- liftIO (createGame app numPlayers locale)
-        case gameCreateResult of
-          Left err -> invalidArgs [err]
-          Right gameId -> return gameId
+  Returns the gameId of the new game lobby for the client to use to join
+  the new lobby.
+-}
+postCreateGameR :: Handler Text
+postCreateGameR =
+  do
+    app <- getYesod
+    liftIO $ trackRequestReceivedActivity (inactivityTracker app)
+    CreateGameLobby numPlayers locale <- requireJsonBody :: Handler CreateGameLobby
+    gameCreateResult <- liftIO (createGame app numPlayers locale)
+    case gameCreateResult of
+      Left err -> invalidArgs [err]
+      Right gameId -> return gameId
 
-    playerFromDatabase :: App -> Text -> Handler ServerPlayer
-    playerFromDatabase app playerId = do
-        let pool = appConnPool app
-        user <- liftIO $ getUser pool playerId
+playerFromDatabase :: App -> Text -> Handler ServerPlayer
+playerFromDatabase app playerId = do
+  let pool = appConnPool app
+  user <- liftIO $ getUser pool playerId
 
-        case user of 
-            Just (AuthUser ident nickname) ->
-                return $ makeNewPlayer nickname playerId
-            Nothing -> return $ makeNewPlayer Nothing playerId
+  case user of
+    Just (AuthUser ident nickname) ->
+      return $ makeNewPlayer nickname playerId
+    Nothing -> return $ makeNewPlayer Nothing playerId
 
-    renderNotLoggedInLobbyPage gameId = do
-        addStylesheet $ (StaticR css_lobby_css)
-        [whamlet|
+renderNotLoggedInLobbyPage gameId = do
+  addStylesheet $ (StaticR css_lobby_css)
+  [whamlet|
             <p> You must log in to join this game
             <a href=@{AuthR LoginR}>Login
         |]
 
+{-
+  Joins an existing lobby.
 
-    {-
-      Joins an existing lobby.
+  If the game is in progress, redirects to the game. If an error occurs,
+  returns an error page.
+-}
+getGameLobbyR :: Text -> Handler Html
+getGameLobbyR gameId =
+  do
+    app <- getYesod
+    liftIO $ trackRequestReceivedActivity (inactivityTracker app)
+    maid <- maybeAuthId
+    case maid of
+      Just userId -> handlerLobbyAuthenticated gameId userId
+      Nothing -> defaultLayout $ renderNotLoggedInLobbyPage gameId
 
-      If the game is in progress, redirects to the game. If an error occurs,
-      returns an error page.
-    -}
-    getGameLobbyR :: Text -> Handler Html
-    getGameLobbyR gameId =
-        do
-            app <- getYesod
-            liftIO $ trackRequestReceivedActivity (inactivityTracker app)
-            maid <- maybeAuthId
-            case maid of
-                Just userId -> handlerLobbyAuthenticated gameId userId
-                Nothing -> defaultLayout $ renderNotLoggedInLobbyPage gameId
+handlerLobbyAuthenticated :: Text -> Text -> Handler Html
+handlerLobbyAuthenticated gameId userId =
+  do
+    app <- getYesod
+    let inactivityTrackerState = inactivityTracker app
+    player <- playerFromDatabase app userId
+    let playerId = identifier player
 
+    initialisationResult <- liftIO $ joinClient app gameId player
+    case initialisationResult of
+      Left GameLobbyDoesNotExist -> redirect (GameR gameId)
+      Left InvalidPlayerID -> invalidArgs ["Invalid player ID given by browser"]
+      Right joinResult@(ClientLobbyJoinResult broadcastChannel _ _) -> do
+        if (gameStarted joinResult)
+          then -- If the game was created, the last connected client wouldn't get the 'Game Started'
+          -- event over the websocket because this second request for the websocket connection would no
+          -- longer see the game in the lobby list resulting in a HTTP redirect given to the websocket
+          -- which it cannot handle
+            redirect (GameR gameId)
+          else do
+            webSockets $ lobbyWebSocketHandler inactivityTrackerState broadcastChannel gameId playerId
+            defaultLayout renderLobbyPage
 
-    handlerLobbyAuthenticated :: Text -> Text -> Handler Html
-    handlerLobbyAuthenticated gameId userId =
-        do
-            app <- getYesod
-            let inactivityTrackerState = inactivityTracker app
-            player <- playerFromDatabase app userId
-            let playerId = identifier player
-
-            initialisationResult <- liftIO $ joinClient app gameId player
-            case initialisationResult of
-              Left GameLobbyDoesNotExist -> redirect (GameR gameId)
-              Left InvalidPlayerID -> invalidArgs ["Invalid player ID given by browser"]
-              Right joinResult@(ClientLobbyJoinResult broadcastChannel _) -> do
-                if (gameStarted joinResult) then
-                    -- If the game was created, the last connected client wouldn't get the 'Game Started'
-                    -- event over the websocket because this second request for the websocket connection would no
-                    -- longer see the game in the lobby list resulting in a HTTP redirect given to the websocket
-                    -- which it cannot handle
-                    redirect (GameR gameId)
-                else
-                    do
-                        webSockets $ lobbyWebSocketHandler inactivityTrackerState broadcastChannel gameId playerId
-                        defaultLayout renderLobbyPage
-
-    renderLobbyPage = do
-      addStylesheet $ (StaticR css_lobby_css)
-      [whamlet|
+renderLobbyPage = do
+  addStylesheet $ (StaticR css_lobby_css)
+  [whamlet|
           <div #lobby>
               <div #url-box>
                   <p .url-box-text> To invite players to the game, tell them to visit the following URL:
@@ -120,8 +115,8 @@ module Handler.GameLobby where
                           <button .copy data-rel="lobby-url" > copy
                   <p .url-box-text> The game will begin once enough players have visited the URL.
       |]
-      toWidget
-          [julius|
+  toWidget
+    [julius|
               // Copied from: https://github.com/ornicar/lila/blob/67c1fc62b6c8d3041af15cf25bdf7a38fff5c383/public/javascripts/big.js#L687
               $('#lobby').on('click', 'button.copy', function() {
                   var prev = $('#' + $(this).data('rel'));
@@ -176,15 +171,16 @@ module Handler.GameLobby where
 
           |]
 
-    lobbyWebSocketHandler :: TVar InactivityTracker -> TChan LobbyMessage -> T.Text -> T.Text -> WebSocketsT Handler ()
-    lobbyWebSocketHandler inactivityTrackerState channel gameId playerId = do
-        {-
-            We race a thread that sends pings to the client so that when the client closes its connection,
-            our loop which reads from the message channel is closed due to the thread being cancelled.
-        -}
-        connection <- ask
+lobbyWebSocketHandler :: TVar InactivityTracker -> TChan LobbyMessage -> T.Text -> T.Text -> WebSocketsT Handler ()
+lobbyWebSocketHandler inactivityTrackerState channel gameId playerId = do
+  {-
+      We race a thread that sends pings to the client so that when the client closes its connection,
+      our loop which reads from the message channel is closed due to the thread being cancelled.
+  -}
+  connection <- ask
 
-        liftIO $ withTrackWebsocketActivity inactivityTrackerState $ do
-            race_
-                (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= C.sendTextData connection)
-                (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
+  liftIO $
+    withTrackWebsocketActivity inactivityTrackerState $ do
+      race_
+        (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= C.sendTextData connection)
+        (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
