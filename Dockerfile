@@ -1,10 +1,11 @@
-FROM ubuntu:24.04 as build
+FROM ubuntu:24.10 as build
 
 RUN apt-get update
 
 COPY . .
 
 # Build dependencies
+
 RUN apt-get install --assume-yes curl
 RUN curl -sSL https://get.haskellstack.org/ | sh
 RUN apt-get install --assume-yes libtinfo-dev
@@ -17,7 +18,7 @@ RUN mkdir -p "/data"
 
 RUN stack build --copy-bins --local-bin-path "bin"
 
-FROM ubuntu:24.04 as app
+FROM ubuntu:24.10 as app
 COPY --from=build bin bin
 
 RUN apt-get update && apt-get install -y libgnutls30 netbase libstdc++6 ca-certificates
