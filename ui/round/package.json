@@ -4,11 +4,11 @@
     "description": "A game round in the web application.",
     "main": "src/main.js",
     "devDependencies": {
-        "browserify": "~9.0.8",
-        "gulp": "^3.9.1",
+        "browserify": "~17.0.0",
+        "gulp": "^4.0.2",
         "gulp-util": "~3.0.4",
         "vinyl-source-stream": "~1.1.0",
-        "watchify": "3.1.1"
+        "watchify": "3.11.1"
     },
     "dependencies": {
         "mithril": "0.2.0",
