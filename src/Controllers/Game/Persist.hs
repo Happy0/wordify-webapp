@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, persistGameUpdate, loadLobby, persistNewLobby, persistNewLobbyPlayer, deleteLobby) where
+module Controllers.Game.Persist (withGame, getGame, getChatMessages, persistNewGame, persistGameUpdate, loadLobby, persistNewLobby, persistNewLobbyPlayer, deleteLobby) where
 
 import Control.Applicative
 import Control.Concurrent

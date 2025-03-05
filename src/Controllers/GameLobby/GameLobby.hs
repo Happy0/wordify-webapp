@@ -42,7 +42,7 @@ joinClient app gameId serverPlayer =
           _ <- startGame app gameId broadcastChannel startedGame
           return result
       Right (ClientLobbyJoinResult broadcastChannel _ previouslyJoined) -> do
-        when (not previouslyJoined) $ persistNewLobbyPlayer (appConnPool app) gameId serverPlayer
+        unless previouslyJoined $ persistNewLobbyPlayer (appConnPool app) gameId serverPlayer
         return result
 
 updateLobbyState :: App -> T.Text -> ServerPlayer -> STM (Either LobbyInputError ClientLobbyJoinResult)

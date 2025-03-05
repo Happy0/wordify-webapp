@@ -1,43 +1,53 @@
-module Controllers.Game.Model.ServerGame (ServerGame,
-                                          makeServerGame,
-                                          gameId,
-                                          game,
-                                          playing,
-                                          broadcastChannel,
-                                          numConnections,
-                                          increaseConnectionsByOne,
-                                          decreaseConnectionsByOne,
-                                          getServerPlayer) where
-    import Prelude
-    import Wordify.Rules.Game
-    import Controllers.Game.Model.ServerPlayer
-    import Controllers.Game.Api
-    import Control.Concurrent.STM.TChan
-    import qualified Data.List.Safe as SL
-    import Control.Concurrent.STM.TVar
-    import Control.Monad.STM
-    import Data.Text
+module Controllers.Game.Model.ServerGame
+  ( ServerGame,
+    makeServerGame,
+    gameId,
+    game,
+    playing,
+    broadcastChannel,
+    numConnections,
+    increaseConnectionsByOne,
+    decreaseConnectionsByOne,
+    getServerPlayer,
+  )
+where
 
-    data ServerGame = ServerGame {
-                          gameId :: Text,
-                          game :: TVar Game,
-                          playing :: [ServerPlayer],
-                          broadcastChannel :: (TChan GameMessage),
-                          numConnections :: TVar Int
-                        }
+import Control.Concurrent.STM.TChan
+import Control.Concurrent.STM.TVar
+import Control.Monad.STM
+import Controllers.Common.CacheableSharedResource
+import Controllers.Game.Api
+import Controllers.Game.Model.ServerPlayer
+import qualified Data.List.Safe as SL
+import Data.Text
+import Wordify.Rules.Game
+import Prelude
 
-    makeServerGame :: Text -> TVar Game -> [ServerPlayer] -> (TChan GameMessage) -> STM ServerGame
-    makeServerGame gameId game players messageChannel = do
-      connections <- newTVar 0
-      return (ServerGame gameId game players messageChannel connections)
+data ServerGame = ServerGame
+  { gameId :: Text,
+    game :: TVar Game,
+    playing :: [ServerPlayer],
+    broadcastChannel :: (TChan GameMessage),
+    numConnections :: TVar Int
+  }
 
-    getServerPlayer :: ServerGame -> Int -> Maybe ServerPlayer
-    getServerPlayer serverGame playerNumber = playing serverGame SL.!! (playerNumber - 1)
+instance CacheableSharedResource ServerGame where
+  decreaseSharersByOne serverGame = decreaseConnectionsByOne serverGame >> readTVar (numConnections serverGame)
+  increaseSharersByOne serverGame = increaseConnectionsByOne serverGame >> readTVar (numConnections serverGame)
+  numberOfSharers serverGame = readTVar (numConnections serverGame)
 
-    increaseConnectionsByOne :: ServerGame -> STM ()
-    increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ
+makeServerGame :: Text -> TVar Game -> [ServerPlayer] -> (TChan GameMessage) -> STM ServerGame
+makeServerGame gameId game players messageChannel = do
+  connections <- newTVar 0
+  return (ServerGame gameId game players messageChannel connections)
 
-    decreaseConnectionsByOne :: ServerGame -> STM ()
-    decreaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) decreaseByOne
-      where
-        decreaseByOne i = i - 1
+getServerPlayer :: ServerGame -> Int -> Maybe ServerPlayer
+getServerPlayer serverGame playerNumber = playing serverGame SL.!! (playerNumber - 1)
+
+increaseConnectionsByOne :: ServerGame -> STM ()
+increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ
+
+decreaseConnectionsByOne :: ServerGame -> STM ()
+decreaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) decreaseByOne
+  where
+    decreaseByOne i = i - 1
