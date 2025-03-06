@@ -115,15 +115,16 @@ makeFoundation appSettings inactivityTracker = do
 
   authDetails <- getAuthDetails
 
+  -- The App {..} syntax is an example of record wild cards. For more
+  -- information, see:
+  -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
+  let mkFoundation appConnPool games = App {..}
+
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let mkFoundation appConnPool games = App {..}
-  -- The App {..} syntax is an example of record wild cards. For more
-  -- information, see:
-  -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
   let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
