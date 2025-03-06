@@ -28,12 +28,12 @@ makeResourceCache loadResourceOp = do
   cleanUpMap <- newTVarIO M.empty
   pure $ ResourceCache resourceCache cleanUpMap loadResourceOp
 
-useCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> a -> (a -> IO ()) -> IO ()
-useCacheableResource (ResourceCache cache _ _) resourceId resource operation =
-  bracket_
-    (handlerSharerJoin resource)
-    (operation resource)
-    (handleSharerLeave cache resource resourceId)
+useCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> Either err a -> (Either err a -> IO c) -> IO c
+useCacheableResource (ResourceCache cache _ _) resourceId (Left resourceLoadErr) operation =
+  operation
+    (Left resourceLoadErr)
+useCacheableResource (ResourceCache cache _ _) resourceId (Right resource) operation =
+  bracket_ (handlerSharerJoin resource) (handleSharerLeave cache resource resourceId) (operation (Right resource))
   where
     handlerSharerJoin = atomically . increaseSharersByOne
     handleSharerLeave cache resource resourceId = atomically $ do
@@ -55,11 +55,7 @@ loadCacheableResource (ResourceCache cache _ loadResourceOp) resourceId = do
             modifyTVar cache $ M.insert resourceId cachedResource
             pure $ Right cachedResource
 
-withCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> (a -> IO ()) -> IO (Either err ())
+withCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> (Either err a -> IO c) -> IO c
 withCacheableResource cache resourceId op = do
   resource <- loadCacheableResource cache resourceId
-  case resource of
-    Left err -> pure (Left err)
-    Right loadedResource -> do
-      useCacheableResource cache resourceId loadedResource op
-      return (Right ())
+  useCacheableResource cache resourceId resource op

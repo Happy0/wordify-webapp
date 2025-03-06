@@ -107,7 +107,6 @@ makeFoundation appSettings inactivityTracker = do
 
   localisedGameSetups <- loadGameBundles
   gameLobbies <- newTVarIO M.empty
-  games <- newTVarIO M.empty
   stdGen <- getStdGen
   randomGenerator <- newTVarIO stdGen
 
@@ -124,6 +123,8 @@ makeFoundation appSettings inactivityTracker = do
       -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
       tempFoundation = mkFoundation $ error "connPool forced in tempFoundation"
       logFunc = messageLoggerSource tempFoundation appLogger
+
+  games <- makeResourceCache (loadGame pool)
 
   -- Create the database connection pool
   pool <-
