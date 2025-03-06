@@ -114,7 +114,6 @@ createGame app gameId lobby =
     randomNumberGenerator <- readTVar (playerIdGenerator lobby)
     -- We shuffle so that who gets to go first is randomised.
     let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
-    numConnections <- newTVar 0
     makeServerGame gameId newGame shuffledPlayers newChannel
   where
     players = lobbyPlayers lobby

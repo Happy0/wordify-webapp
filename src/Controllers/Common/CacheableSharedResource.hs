@@ -8,6 +8,7 @@ import Control.Monad
 import Control.Monad.STM
 import Data.Either
 import Data.Int
+import Data.List as L
 import Data.Map as M
 import Data.Pool
 import Data.Text
@@ -34,12 +35,13 @@ startBroomLoop :: CacheableSharedResource a => ResourceCache err a -> IO ()
 startBroomLoop resourceCache = forever $ do
   now <- getCurrentTime
   potentiallyStaleItems <- readTVarIO (cleanUpMap resourceCache)
-  let potentiallyStaleItemsList = M.toList potentiallyStaleItems
 
+  let potentiallyStaleItemsList = M.toList potentiallyStaleItems
   forM_ potentiallyStaleItemsList $ \(resourceId, cacheExpiryTime) -> do
     when (now >= cacheExpiryTime) $ atomically $ removeIfNoSharers resourceCache resourceId
 
   threadDelay (1 * 60000000)
+  startBroomLoop resourceCache
 
 scheduleCacheCleanup :: ResourceCache err a -> UTCTime -> Text -> STM ()
 scheduleCacheCleanup (ResourceCache cache cleanUpMap _) now resourceId = do
