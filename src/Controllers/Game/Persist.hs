@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (withGame, getChatMessages, persistNewGame, persistGameUpdate, loadLobby, persistNewLobby, persistNewLobbyPlayer, deleteLobby) where
+module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, persistGameUpdate, loadLobby, persistNewLobby, persistNewLobbyPlayer, deleteLobby) where
 
 import Control.Applicative
 import Control.Concurrent
@@ -40,45 +40,11 @@ import Wordify.Rules.Pos
 import Wordify.Rules.Tile
 import Prelude
 
-withGame ::
-  (MonadIO m, MonadThrow m, MonadUnliftIO m) =>
-  App ->
-  Text ->
-  (Either Text ServerGame -> m c) ->
-  m c
-withGame app gameId withGameAction = runResourceT $ do
-  (releaseKey, maybeGame) <- allocate (loadGame app gameId) maybeReleaseGame
-  result <- lift $ withGameAction maybeGame
-  return result
-  where
-    -- allocate (loadGame app dictionary letterBag gameId) maybeReleaseGame withGameAction
-    -- TODO: Store the locale of the game in the database
-
-    maybeReleaseGame :: Either Text ServerGame -> IO ()
-    maybeReleaseGame (Left _) = putStrLn "release err" >> return ()
-    maybeReleaseGame (Right game) = do
-      connections <- readTVarIO (numConnections game)
-      atomically $ do
-        decreaseConnectionsByOne game
-        connections <- readTVar $ numConnections game
-
-        if connections == 0
-          then do
-            let gameCache = games app
-            modifyTVar gameCache (Mp.delete gameId)
-          else return ()
-
 loadLobby :: App -> Text -> IO (Either Text (TVar GameLobby))
 loadLobby app gameId = runExceptT $ getLobbyFromCache <|> getLobbyFromDatabase
   where
     getLobbyFromCache = ExceptT (atomically (loadLobbyFromCache app gameId))
     getLobbyFromDatabase = ExceptT (loadLobbyFromDatabase app gameId (gameLobbies app))
-
-loadGame :: App -> Text -> IO (Either Text ServerGame)
-loadGame app gameId = runExceptT $ getGameFromCache <|> getGameFromDatabase
-  where
-    getGameFromCache = ExceptT (atomically (loadGameFromCache app gameId))
-    getGameFromDatabase = ExceptT (loadFromDatabase app gameId (games app))
 
 loadLobbyFromCache :: App -> Text -> STM (Either Text (TVar GameLobby))
 loadLobbyFromCache app gameId = do
@@ -105,31 +71,6 @@ loadLobbyFromDatabase app gameId gameCache =
             modifyTVar gameCache $ Mp.insert gameId lobbyTvar
             -- increaseConnectionsByOne serverGame
             return (Right lobbyTvar)
-
-loadGameFromCache :: App -> Text -> STM (Either Text ServerGame)
-loadGameFromCache app gameId = do
-  let gameCache = games app
-  maybeGame <- Mp.lookup gameId <$> readTVar gameCache
-  forM_ maybeGame increaseConnectionsByOne
-  return (note "Game does not exist" maybeGame)
-
-loadFromDatabase ::
-  App ->
-  Text ->
-  TVar (Mp.Map Text ServerGame) ->
-  IO (Either Text ServerGame)
-loadFromDatabase app gameId gameCache =
-  do
-    eitherGame <- getGame app gameId
-    case eitherGame of
-      Left err -> return $ Left err
-      Right serverGame -> atomically $ runExceptT (cachedGame <|> gameInsertedToCache)
-        where
-          cachedGame = ExceptT (loadGameFromCache app gameId)
-          gameInsertedToCache = ExceptT $ do
-            modifyTVar gameCache $ Mp.insert gameId serverGame
-            increaseConnectionsByOne serverGame
-            return (Right serverGame)
 
 getChatMessages gameId =
   selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
@@ -171,9 +112,8 @@ getLobby app gameId = do
         return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt
     Left err -> return $ Left err
 
-getGame :: App -> Text -> IO (Either Text ServerGame)
-getGame app gameId = do
-  let pool = appConnPool app
+getGame :: ConnectionPool -> LocalisedGameSetups -> Text -> IO (Either Text ServerGame)
+getGame pool localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
     maybeGame <- selectFirst [M.GameGameId ==. gameId] []
     case maybeGame of
@@ -186,11 +126,11 @@ getGame app gameId = do
   case dbEntries of
     Right (Entity _ (M.Game _ bagText bagSeed maybeLocale), playerModels, moveModels) -> do
       -- This could be more efficient than individual fetches, but it doesn't matter for now
-      serverPlayers <- sequence $ L.map (playerFromEntity app) playerModels
+      serverPlayers <- mapM (playerFromEntity pool) playerModels
 
       runExceptT $ do
         let locale = maybe "en" id maybeLocale
-        let maybeLocalisedSetup = Mp.lookup locale (localisedGameSetups app)
+        let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
         GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
         tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
@@ -382,10 +322,9 @@ moveFromEntity
       return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
 moveFromEntity _ _ (m@M.Move {}) = error $ "you've dun goofed, see database logs (hopefully) "
 
-playerFromEntity :: App -> Entity M.Player -> IO ServerPlayer
-playerFromEntity app (Entity _ (M.Player gameId playerId _)) =
+playerFromEntity :: ConnectionPool -> Entity M.Player -> IO ServerPlayer
+playerFromEntity pool (Entity _ (M.Player gameId playerId _)) =
   do
-    let pool = appConnPool app
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?

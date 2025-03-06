@@ -14,6 +14,7 @@ module Foundation where
 
 import Auth0 (auth0Provider)
 import Control.Monad.Logger (LogSource)
+import Controllers.Common.CacheableSharedResource
 import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser)
@@ -67,7 +68,7 @@ data App = App
     localisedGameSetups :: LocalisedGameSetups,
     -- TODO: https://hackage.haskell.org/package/stm-containers
     gameLobbies :: TVar (Map Text (TVar GameLobby)),
-    games :: TVar (Map Text ServerGame),
+    games :: ResourceCache Text ServerGame,
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
     inactivityTracker :: TVar InactivityTracker

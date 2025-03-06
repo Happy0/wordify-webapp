@@ -34,12 +34,15 @@ import Control.Error.Util
 import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
+import Controllers.Common.CacheableSharedResource
+import Controllers.Game.Persist (getGame)
 import Controllers.GameLobby.Model.GameLobby
 import Data.Char (isSpace)
 import Data.FileEmbed
 import Data.List.Split
 import qualified Data.Map as M
 import Data.Time.Clock
+import Database.Persist
 import Database.Persist.Sqlite
   ( createSqlitePool,
     runSqlPool,
@@ -107,23 +110,23 @@ makeFoundation appSettings inactivityTracker = do
 
   localisedGameSetups <- loadGameBundles
   gameLobbies <- newTVarIO M.empty
-  games <- newTVarIO M.empty
   stdGen <- getStdGen
   randomGenerator <- newTVarIO stdGen
 
   authDetails <- getAuthDetails
+
+  -- The App {..} syntax is an example of record wild cards. For more
+  -- information, see:
+  -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
+  let mkFoundation appConnPool games = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let mkFoundation appConnPool = App {..}
-      -- The App {..} syntax is an example of record wild cards. For more
-      -- information, see:
-      -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-      tempFoundation = mkFoundation $ error "connPool forced in tempFoundation"
-      logFunc = messageLoggerSource tempFoundation appLogger
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation")
+  let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool
   pool <-
@@ -132,11 +135,13 @@ makeFoundation appSettings inactivityTracker = do
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
 
+  games <- makeResourceCache (getGame pool localisedGameSetups)
+
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
   -- Return the foundation
-  return $ mkFoundation pool
+  return $ mkFoundation pool games
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =
