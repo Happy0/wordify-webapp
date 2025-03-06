@@ -34,12 +34,15 @@ import Control.Error.Util
 import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
+import Controllers.Common.CacheableSharedResource
+import Controllers.Game.Persist (getGame)
 import Controllers.GameLobby.Model.GameLobby
 import Data.Char (isSpace)
 import Data.FileEmbed
 import Data.List.Split
 import qualified Data.Map as M
 import Data.Time.Clock
+import Database.Persist
 import Database.Persist.Sqlite
   ( createSqlitePool,
     runSqlPool,
@@ -124,14 +127,14 @@ makeFoundation appSettings inactivityTracker = do
       tempFoundation = mkFoundation $ error "connPool forced in tempFoundation"
       logFunc = messageLoggerSource tempFoundation appLogger
 
-  games <- makeResourceCache (loadGame pool)
-
   -- Create the database connection pool
   pool <-
     flip runLoggingT logFunc $
       createSqlitePool
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
+
+  games <- makeResourceCache (getGame pool localisedGameSetups)
 
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc

@@ -1,4 +1,4 @@
-module Controllers.Common.CacheableSharedResource (makeResourceCache, withCacheableResource, ResourceCache (ResourceCache), CacheableSharedResource (decreaseSharersByOne, increaseSharersByOne, numberOfSharers)) where
+module Controllers.Common.CacheableSharedResource (makeResourceCache, withCacheableResource, getCacheableResource, ResourceCache (ResourceCache), CacheableSharedResource (decreaseSharersByOne, increaseSharersByOne, numberOfSharers)) where
 
 import Control.Concurrent.STM (TVar, modifyTVar)
 import Control.Concurrent.STM.TVar
@@ -28,18 +28,20 @@ makeResourceCache loadResourceOp = do
   cleanUpMap <- newTVarIO M.empty
   pure $ ResourceCache resourceCache cleanUpMap loadResourceOp
 
+handlerSharerJoin = atomically . increaseSharersByOne
+
+handleSharerLeave cache resource resourceId = atomically $ do
+  newSharerCount <- decreaseSharersByOne resource
+  when (newSharerCount == 0) $ void (removeFromCache cache resourceId)
+
+removeFromCache cache resourceId = M.delete resourceId <$> readTVar cache
+
 useCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> Either err a -> (Either err a -> IO c) -> IO c
 useCacheableResource (ResourceCache cache _ _) resourceId (Left resourceLoadErr) operation =
   operation
     (Left resourceLoadErr)
 useCacheableResource (ResourceCache cache _ _) resourceId (Right resource) operation =
   bracket_ (handlerSharerJoin resource) (handleSharerLeave cache resource resourceId) (operation (Right resource))
-  where
-    handlerSharerJoin = atomically . increaseSharersByOne
-    handleSharerLeave cache resource resourceId = atomically $ do
-      newSharerCount <- decreaseSharersByOne resource
-      when (newSharerCount == 0) $ void (removeFromCache cache resourceId)
-    removeFromCache cache resourceId = M.delete resourceId <$> readTVar cache
 
 loadCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> IO (Either err a)
 loadCacheableResource (ResourceCache cache _ loadResourceOp) resourceId = do
@@ -59,3 +61,11 @@ withCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Tex
 withCacheableResource cache resourceId op = do
   resource <- loadCacheableResource cache resourceId
   useCacheableResource cache resourceId resource op
+
+getCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> IO (Either err a)
+getCacheableResource resourceCache resourceId = do
+  resource <- loadCacheableResource resourceCache resourceId
+  case resource of
+    Left err -> pure $ Left err
+    Right resource ->
+      bracket_ (handlerSharerJoin resource) (handleSharerLeave (cache resourceCache) resource resourceId) (pure (Right resource))

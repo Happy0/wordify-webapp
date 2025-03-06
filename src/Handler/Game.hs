@@ -1,7 +1,7 @@
 module Handler.Game where
 
 import Control.Concurrent
-import Controllers.Common.CacheableSharedResource (withCacheableResource)
+import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import Controllers.Game.Api
 import Controllers.Game.Game
 import Controllers.Game.Model.ServerGame
@@ -35,7 +35,6 @@ getGameR :: Text -> Handler Html
 getGameR gameId = do
   request <- getRequest
   app <- getYesod
-  app <- getYesod
   liftIO $ trackRequestReceivedActivity (inactivityTracker app)
   let cookies = reqCookies request
   maybePlayerId <- maybeAuthId
@@ -45,7 +44,9 @@ getGameR gameId = do
       initiates the websocket request which arrives here -}
   webSockets $ gameApp app gameId maybePlayerId
 
-  liftIO $ withCacheableResource (games app) gameId (renderGamePage app gameId maybePlayerId)
+  game <- liftIO $ getCacheableResource (games app) gameId
+
+  renderGamePage app gameId maybePlayerId game
 
 renderGamePage :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -117,28 +118,18 @@ renderGamePage app gameId maybePlayerId (Right serverGame) = do
           <div #scrabbleground>
       |]
 
-getGameDebugR :: Handler Html
-getGameDebugR = do
-  app <- getYesod
-  gameSize <- liftIO $ M.size <$> (readTVarIO $ games app)
-  lobbiesSize <- liftIO $ M.size <$> (readTVarIO $ gameLobbies app)
-  defaultLayout $ do
-    [whamlet|
-            <div> Games: #{gameSize}
-            <div> Lobbies: #{lobbiesSize}
-        |]
-
 gameApp :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
 gameApp app gameId maybePlayerId = do
   connection <- ask
-  withGame app gameId $ \result ->
-    case result of
-      Left err -> sendTextData (toJSONResponse (InvalidCommand err))
-      Right serverGame -> do
-        let inactivityTrackerState = inactivityTracker app
-        let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
-        channel <- atomically (dupTChan (broadcastChannel serverGame))
-        liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
+  liftIO $
+    withCacheableResource (games app) gameId $ \result ->
+      case result of
+        Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
+        Right serverGame -> do
+          let inactivityTrackerState = inactivityTracker app
+          let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+          channel <- atomically (dupTChan (broadcastChannel serverGame))
+          liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 
 keepClientUpdated :: TVar InactivityTracker -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
 keepClientUpdated inactivityTracker connection pool gameId serverGame channel playerNumber =
