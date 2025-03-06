@@ -180,7 +180,7 @@ instance Yesod App where
   makeSessionBackend :: App -> IO (Maybe SessionBackend)
   makeSessionBackend _ = do
     certificateDirectory <- getSessionBackendCertificateDirectory
-    Just <$> defaultClientSessionBackend 120 (certificateDirectory ++ "/client_session_key.aes")
+    Just <$> defaultClientSessionBackend 4320 (certificateDirectory ++ "/client_session_key.aes")
 
   -- Yesod Middleware allows you to run code before and after each handler function.
   -- The defaultYesodMiddleware adds the response header "Vary: Accept, Accept-Language" and performs authorization checks.
