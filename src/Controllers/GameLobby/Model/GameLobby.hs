@@ -18,7 +18,8 @@ where
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
-import Controllers.Game.Model.ServerGame
+import Controllers.Common.CacheableSharedResource
+import qualified Controllers.Game.Model.ServerGame as S
 import Controllers.Game.Model.ServerPlayer
 import Controllers.GameLobby.Api
 import Data.List
@@ -33,19 +34,25 @@ data ClientLobbyJoinResult = ClientLobbyJoinResult
   { -- For listening and sending events to the game lobby from the client
     broadcastChannel :: TChan LobbyMessage,
     -- If the lobby was made full as a result of the client join, the newly created server game
-    createdGame :: Maybe ServerGame,
+    createdGame :: Maybe S.ServerGame,
     previouslyJoined :: Bool
   }
 
 data GameLobby = GameLobby
   { pendingGame :: Game,
-    lobbyPlayers :: [ServerPlayer],
+    lobbyPlayers :: TVar [ServerPlayer],
     awaiting :: Int,
     channel :: TChan LobbyMessage,
     -- TODO: rename this to 'lobbyGenerator'
     playerIdGenerator :: TVar StdGen,
-    openedAt :: UTCTime
+    openedAt :: UTCTime,
+    numConnections :: TVar Int
   }
+
+instance CacheableSharedResource GameLobby where
+  decreaseSharersByOne gameLobby = decreaseConnectionsByOne gameLobby >> readTVar (numConnections gameLobby)
+  increaseSharersByOne gameLobby = increaseConnectionsByOne gameLobby >> readTVar (numConnections gameLobby)
+  numberOfSharers gameLobby = readTVar (numConnections gameLobby)
 
 gameStarted :: ClientLobbyJoinResult -> Bool
 gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)
@@ -53,18 +60,28 @@ gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)
 duplicateBroadcastChannel :: GameLobby -> STM (TChan LobbyMessage)
 duplicateBroadcastChannel gameLobby = dupTChan . channel $ gameLobby
 
-addPlayer :: GameLobby -> ServerPlayer -> GameLobby
-addPlayer gameLobby newPlayer =
-  let newPlayers = (lobbyPlayers gameLobby) ++ [newPlayer]
-   in updatePlayers gameLobby newPlayers
+addPlayer :: GameLobby -> ServerPlayer -> STM GameLobby
+addPlayer lobby newPlayer = do
+  currentPlayers <- readTVar (lobbyPlayers lobby)
 
-lobbyIsFull :: GameLobby -> Bool
-lobbyIsFull lobby = length (lobbyPlayers lobby) == (awaiting lobby)
+  let newPlayers = currentPlayers ++ [newPlayer]
+  writeTVar (lobbyPlayers lobby) newPlayers
+  pure $ lobby
 
-updatePlayers :: GameLobby -> [ServerPlayer] -> GameLobby
-updatePlayers lobby players = lobby {lobbyPlayers = players}
+lobbyIsFull :: GameLobby -> STM Bool
+lobbyIsFull lobby = do
+  players <- readTVar (lobbyPlayers lobby)
+  pure $ length players == awaiting lobby
 
-inLobby :: GameLobby -> T.Text -> Bool
-inLobby lobby playerIdentifier = isJust (find isPlayer (lobbyPlayers lobby))
+inLobby :: GameLobby -> T.Text -> STM Bool
+inLobby lobby playerIdentifier = isJust . find isPlayer <$> readTVar (lobbyPlayers lobby)
   where
     isPlayer player = (identifier player) == playerIdentifier
+
+increaseConnectionsByOne :: GameLobby -> STM ()
+increaseConnectionsByOne gameLobby = modifyTVar (numConnections gameLobby) succ
+
+decreaseConnectionsByOne :: GameLobby -> STM ()
+decreaseConnectionsByOne gameLobby = modifyTVar (numConnections gameLobby) decreaseByOne
+  where
+    decreaseByOne i = i - 1

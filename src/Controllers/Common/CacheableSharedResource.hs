@@ -6,6 +6,7 @@ import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
 import Control.Monad
 import Control.Monad.STM
+import Control.Monad.Trans.Resource (ResourceT)
 import Data.Either
 import Data.Int
 import Data.List as L
@@ -14,6 +15,7 @@ import Data.Pool
 import Data.Text
 import Data.Time
 import Database.Persist.Sql (SqlBackend)
+import UnliftIO.Resource
 import Prelude
 
 data ResourceCache err a = ResourceCache {cache :: TVar (Map Text a), cleanUpMap :: TVar (Map Text UTCTime), loadResourceOp :: Text -> IO (Either err a)}
@@ -99,15 +101,25 @@ loadCacheableResource (ResourceCache cache _ loadResourceOp) resourceId = do
             modifyTVar cache $ M.insert resourceId cachedResource
             pure $ Right cachedResource
 
-withCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> (Either err a -> IO c) -> IO c
+withCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> (Either err a -> IO ()) -> IO ()
 withCacheableResource cache resourceId op = do
   resource <- loadCacheableResource cache resourceId
   useCacheableResource cache resourceId resource op
 
-getCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> IO (Either err a)
-getCacheableResource resourceCache resourceId = do
-  resource <- loadCacheableResource resourceCache resourceId
-  case resource of
-    Left err -> pure $ Left err
-    Right resource ->
-      bracket_ (handlerSharerJoin resourceCache resource resourceId) (handleSharerLeave resourceCache resource resourceId) (pure (Right resource))
+getCacheableResource :: MonadResource m => CacheableSharedResource a => ResourceCache err a -> Text -> m (ReleaseKey, Either err a)
+getCacheableResource resourceCache resourceId =
+  allocate (allocateResource resourceCache resourceId) (deAllocateResource resourceCache)
+  where
+    allocateResource :: CacheableSharedResource a => ResourceCache err a -> Text -> IO (Either err a)
+    allocateResource resourceCache resourceId = do
+      loadResult <- loadCacheableResource resourceCache resourceId
+
+      case loadResult of
+        Right resource -> handlerSharerJoin resourceCache resource resourceId >> pure loadResult
+        Left err -> pure $ Left err
+
+    deAllocateResource :: CacheableSharedResource a => ResourceCache err a -> Either err a -> IO ()
+    deAllocateResource resourceCache resource = do
+      case resource of
+        Left _ -> pure ()
+        Right sharedResource -> handleSharerLeave resourceCache sharedResource resourceId

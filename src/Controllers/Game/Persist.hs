@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, persistGameUpdate, loadLobby, persistNewLobby, persistNewLobbyPlayer, deleteLobby) where
+module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
 
 import Control.Applicative
 import Control.Concurrent
@@ -40,38 +40,6 @@ import Wordify.Rules.Pos
 import Wordify.Rules.Tile
 import Prelude
 
-loadLobby :: App -> Text -> IO (Either Text (TVar GameLobby))
-loadLobby app gameId = runExceptT $ getLobbyFromCache <|> getLobbyFromDatabase
-  where
-    getLobbyFromCache = ExceptT (atomically (loadLobbyFromCache app gameId))
-    getLobbyFromDatabase = ExceptT (loadLobbyFromDatabase app gameId (gameLobbies app))
-
-loadLobbyFromCache :: App -> Text -> STM (Either Text (TVar GameLobby))
-loadLobbyFromCache app gameId = do
-  let gameCache = gameLobbies app
-  maybeLobby <- Mp.lookup gameId <$> readTVar gameCache
-  -- forM_ maybeLobby increaseConnectionsByOne
-  return (note "Lobby does not exist" maybeLobby)
-
-loadLobbyFromDatabase ::
-  App ->
-  Text ->
-  TVar (Mp.Map Text (TVar GameLobby)) ->
-  IO (Either Text (TVar GameLobby))
-loadLobbyFromDatabase app gameId gameCache =
-  do
-    eitherGame <- getLobby app gameId
-    case eitherGame of
-      Left x -> (putStrLn (show x)) >> (return $ Left x)
-      Right lobby -> atomically $ runExceptT (cachedLobby <|> gameInsertedToCache)
-        where
-          cachedLobby = ExceptT (loadLobbyFromCache app gameId)
-          gameInsertedToCache = ExceptT $ do
-            lobbyTvar <- newTVar lobby
-            modifyTVar gameCache $ Mp.insert gameId lobbyTvar
-            -- increaseConnectionsByOne serverGame
-            return (Right lobbyTvar)
-
 getChatMessages gameId =
   selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
     $= chatMessageFromEntity
@@ -82,10 +50,8 @@ deleteLobby app gameId = do
     deleteWhere [M.LobbyGameId ==. gameId]
     deleteWhere [M.LobbyPlayerGame ==. gameId]
 
-getLobby :: App -> Text -> IO (Either Text GameLobby)
-getLobby app gameId = do
-  let pool = appConnPool app
-  putStrLn $ show gameId
+getLobby :: ConnectionPool -> LocalisedGameSetups -> Text -> IO (Either Text GameLobby)
+getLobby pool localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
     maybeLobby <- selectFirst [M.LobbyGameId ==. gameId] []
     case maybeLobby of
@@ -96,20 +62,22 @@ getLobby app gameId = do
 
   case dbEntries of
     Right (Entity _ (M.Lobby gameId originalLetterBag letterBagSeed maybeLocale numPlayers createdAt), playerModels) -> do
-      serverPlayers <- sequence $ L.map (playerFromLobbyEntity app) playerModels
+      players <- sequence $ L.map (playerFromLobbyEntity pool) playerModels
+      serverPlayers <- newTVarIO players
       channel <- newBroadcastTChanIO
       playerIdGenerator <- getStdGen
       playerIdGeneratorTvar <- newTVarIO playerIdGenerator
       runExceptT $ do
         let locale = maybe "en" id maybeLocale
         -- This could be more efficient than individual fetches, but it doesn't matter for now
-        let maybeLocalisedSetup = Mp.lookup locale (localisedGameSetups app)
+        let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
         GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         lobbyPlayers <- hoistEither $ makeGameStatePlayers numPlayers
         tiles <- hoistEither $ dbTileRepresentationToTiles bag originalLetterBag
         let bag = makeBagUsingGenerator tiles (read (unpack letterBagSeed) :: StdGen)
         pendingGame <- hoistEither $ mapLeft (pack . show) (makeGame lobbyPlayers bag dictionary)
-        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt
+        numConnections <- liftIO $ newTVarIO 0
+        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt numConnections
     Left err -> return $ Left err
 
 getGame :: ConnectionPool -> LocalisedGameSetups -> Text -> IO (Either Text ServerGame)
@@ -331,10 +299,9 @@ playerFromEntity pool (Entity _ (M.Player gameId playerId _)) =
       Nothing -> return $ makeNewPlayer Nothing playerId
       Just (AuthUser ident nickname) -> return (makeNewPlayer (nickname) playerId)
 
-playerFromLobbyEntity :: App -> Entity M.LobbyPlayer -> IO ServerPlayer
-playerFromLobbyEntity app (Entity _ (M.LobbyPlayer gameId playerId _)) =
+playerFromLobbyEntity :: ConnectionPool -> Entity M.LobbyPlayer -> IO ServerPlayer
+playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _)) =
   do
-    let pool = appConnPool app
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?

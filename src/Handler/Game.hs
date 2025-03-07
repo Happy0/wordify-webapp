@@ -44,9 +44,9 @@ getGameR gameId = do
       initiates the websocket request which arrives here -}
   webSockets $ gameApp app gameId maybePlayerId
 
-  game <- liftIO $ getCacheableResource (games app) gameId
-
-  renderGamePage app gameId maybePlayerId game
+  runResourceT $ do
+    (_, game) <- getCacheableResource (games app) gameId
+    lift $ renderGamePage app gameId maybePlayerId game
 
 renderGamePage :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -127,7 +127,7 @@ gameApp app gameId maybePlayerId = do
         Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
           let inactivityTrackerState = inactivityTracker app
-          let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+          let maybePlayerNumber = maybePlayerId >>= getPlayerNumber serverGame
           channel <- atomically (dupTChan (broadcastChannel serverGame))
           liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 

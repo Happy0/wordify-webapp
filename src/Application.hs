@@ -35,7 +35,7 @@ import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
 import Controllers.Common.CacheableSharedResource
-import Controllers.Game.Persist (getGame)
+import Controllers.Game.Persist (getGame, getLobby)
 import Controllers.GameLobby.Model.GameLobby
 import Data.Char (isSpace)
 import Data.FileEmbed
@@ -118,14 +118,14 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games = App {..}
+  let mkFoundation appConnPool games gameLobbies = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool
@@ -136,12 +136,13 @@ makeFoundation appSettings inactivityTracker = do
         (sqlPoolSize $ appDatabaseConf appSettings)
 
   games <- makeResourceCache (getGame pool localisedGameSetups)
+  gameLobbies <- makeResourceCache (getLobby pool localisedGameSetups)
 
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
   -- Return the foundation
-  return $ mkFoundation pool games
+  return $ mkFoundation pool games gameLobbies
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =

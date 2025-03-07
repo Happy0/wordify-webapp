@@ -1,9 +1,13 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 module Handler.GameLobby where
 
 import Control.Applicative
 import Control.Concurrent
 import qualified Control.Monad as CM
 import Control.Monad.Loops
+import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
@@ -11,6 +15,7 @@ import Controllers.GameLobby.Api
 import Controllers.GameLobby.CreateGame
 import Controllers.GameLobby.GameLobby
 import Controllers.GameLobby.Model.GameLobby
+import qualified Controllers.GameLobby.Model.GameLobby as GL
 import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
 import Controllers.User.Persist (getUser)
 import Data.Aeson
@@ -83,26 +88,26 @@ handlerLobbyAuthenticated :: Text -> Text -> Handler Html
 handlerLobbyAuthenticated gameId userId =
   do
     app <- getYesod
-    let inactivityTrackerState = inactivityTracker app
     player <- playerFromDatabase app userId
     let playerId = identifier player
+    webSockets $ lobbyWebSocketHandler app gameId playerId
 
-    initialisationResult <- liftIO $ joinClient app gameId player
-    case initialisationResult of
-      Left GameLobbyDoesNotExist -> redirect (GameR gameId)
-      Left InvalidPlayerID -> invalidArgs ["Invalid player ID given by browser"]
-      Right joinResult@(ClientLobbyJoinResult broadcastChannel _ _) -> do
-        if (gameStarted joinResult)
-          then -- If the game was created, the last connected client wouldn't get the 'Game Started'
-          -- event over the websocket because this second request for the websocket connection would no
-          -- longer see the game in the lobby list resulting in a HTTP redirect given to the websocket
-          -- which it cannot handle
-            redirect (GameR gameId)
-          else do
-            webSockets $ lobbyWebSocketHandler inactivityTrackerState broadcastChannel gameId playerId
-            defaultLayout renderLobbyPage
+    runResourceT $ do
+      (_, lobby) <- getCacheableResource (gameLobbies app) gameId
+      case lobby of
+        Left _ -> lift $ redirectHandler gameId
+        Right gameLobby -> do
+          join <- liftIO $ joinClient app gameLobby gameId player
+          lift $ renderLobbyPage join gameId
 
-renderLobbyPage = do
+redirectHandler :: Text -> Handler Html
+redirectHandler gameId = redirect (GameR gameId)
+
+renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> Text -> Handler Html
+renderLobbyPage (Left InvalidPlayerID) gameId = invalidArgs ["Invalid player ID given by browser"]
+renderLobbyPage (Left _) gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _)) gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _)) gameId = defaultLayout $ do
   addStylesheet $ (StaticR css_lobby_css)
   [whamlet|
           <div #lobby>
@@ -171,16 +176,20 @@ renderLobbyPage = do
 
           |]
 
-lobbyWebSocketHandler :: TVar InactivityTracker -> TChan LobbyMessage -> T.Text -> T.Text -> WebSocketsT Handler ()
-lobbyWebSocketHandler inactivityTrackerState channel gameId playerId = do
+lobbyWebSocketHandler :: App -> T.Text -> T.Text -> WebSocketsT Handler ()
+lobbyWebSocketHandler app gameId playerId = do
   {-
       We race a thread that sends pings to the client so that when the client closes its connection,
       our loop which reads from the message channel is closed due to the thread being cancelled.
   -}
   connection <- ask
-
   liftIO $
-    withTrackWebsocketActivity inactivityTrackerState $ do
-      race_
-        (forever $ (atomically $ toJSONResponse . handleChannelMessage <$> readTChan channel) >>= C.sendTextData connection)
-        (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
+    withTrackWebsocketActivity (inactivityTracker app) $
+      withCacheableResource (gameLobbies app) gameId $ \lobby ->
+        case lobby of
+          Left err -> putStrLn err >> return ()
+          Right lobby -> do
+            lobbyChannel <- atomically $ dupTChan (channel lobby)
+            race_
+              (forever $ atomically (toJSONResponse . handleChannelMessage <$> readTChan lobbyChannel) >>= C.sendTextData connection)
+              (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)

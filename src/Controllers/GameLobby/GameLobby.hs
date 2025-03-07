@@ -7,10 +7,11 @@ import Control.Monad
 import Control.Monad.STM
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
+import Controllers.Common.CacheableSharedResource
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
-import Controllers.Game.Persist (deleteLobby, loadLobby, persistNewGame, persistNewLobbyPlayer)
+import Controllers.Game.Persist (deleteLobby, persistNewGame, persistNewLobbyPlayer)
 import Controllers.GameLobby.Api
 import Controllers.GameLobby.Model.GameLobby
 import Data.Either
@@ -20,6 +21,7 @@ import qualified Data.Text as T
 import Foundation
 import Model.Api
 import System.Random.Shuffle
+import UnliftIO.Resource
 import Prelude
 
 {-
@@ -28,12 +30,10 @@ import Prelude
 
     Returns a channel to subscribe to lobby events on, and the newly created game (if applicable)
 -}
-joinClient :: App -> T.Text -> ServerPlayer -> IO (Either LobbyInputError ClientLobbyJoinResult)
-joinClient app gameId serverPlayer =
+joinClient :: App -> GameLobby -> T.Text -> ServerPlayer -> IO (Either LobbyInputError ClientLobbyJoinResult)
+joinClient app gameLobby gameId serverPlayer =
   do
-    -- TODO - use return value rather than getting it from the cache again
-    _ <- loadLobby app gameId
-    result <- atomically $ updateLobbyState app gameId serverPlayer
+    result <- atomically $ updateLobbyState app gameLobby serverPlayer gameId
 
     case result of
       Left errorMessage -> return $ Left errorMessage
@@ -41,16 +41,21 @@ joinClient app gameId serverPlayer =
         do
           _ <- startGame app gameId broadcastChannel startedGame
           return result
-      Right (ClientLobbyJoinResult broadcastChannel _ previouslyJoined) -> do
-        unless previouslyJoined $ persistNewLobbyPlayer (appConnPool app) gameId serverPlayer
-        return result
+      Right (ClientLobbyJoinResult broadcastChannel _ previouslyJoined) ->
+        unless
+          previouslyJoined
+          ( persistNewLobbyPlayer
+              (appConnPool app)
+              gameId
+              serverPlayer
+          )
+          >> pure result
 
-updateLobbyState :: App -> T.Text -> ServerPlayer -> STM (Either LobbyInputError ClientLobbyJoinResult)
-updateLobbyState app gameId serverPlayer =
-  runExceptT $ do
-    lobbyVar <- getGameLobby gameId (gameLobbies app)
-    result <- lift $ handleJoinClient app gameId lobbyVar serverPlayer
-    return result
+updateLobbyState :: App -> GameLobby -> ServerPlayer -> T.Text -> STM (Either LobbyInputError ClientLobbyJoinResult)
+updateLobbyState app lobby serverPlayer gameId = do
+  lobbyFull <- lobbyIsFull lobby
+
+  if lobbyFull then pure $ Left LobbyAlreadyFull else Right <$> handleJoinClient app gameId lobby serverPlayer
 
 startGame :: App -> T.Text -> TChan LobbyMessage -> ServerGame -> IO ()
 startGame app gameId channel serverGame = do
@@ -65,13 +70,13 @@ handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
 handleChannelMessage (LobbyFull gameId) = StartGame gameId
 
-handleJoinClient :: App -> T.Text -> TVar GameLobby -> ServerPlayer -> STM ClientLobbyJoinResult
+handleJoinClient :: App -> T.Text -> GameLobby -> ServerPlayer -> STM ClientLobbyJoinResult
 handleJoinClient app gameId gameLobby serverPlayer =
   do
-    lobby <- readTVar gameLobby
-    channel <- duplicateBroadcastChannel lobby
+    channel <- duplicateBroadcastChannel gameLobby
 
-    if inLobby lobby (identifier serverPlayer)
+    playerInLobby <- inLobby gameLobby (identifier serverPlayer)
+    if playerInLobby
       then return $ ClientLobbyJoinResult channel Nothing True
       else handleJoinNewPlayer app gameId serverPlayer gameLobby
 
@@ -79,32 +84,22 @@ handleJoinClient app gameId gameLobby serverPlayer =
     Creates a new player, adds them to the lobby, notifying the players
     of the new arrival via the broadcast channel and returns the new player.
 -}
-handleJoinNewPlayer :: App -> T.Text -> ServerPlayer -> TVar GameLobby -> STM ClientLobbyJoinResult
+handleJoinNewPlayer :: App -> T.Text -> ServerPlayer -> GameLobby -> STM ClientLobbyJoinResult
 handleJoinNewPlayer app gameId newPlayer gameLobby =
   do
-    lobby <- readTVar gameLobby
-    let newLobby = addPlayer lobby newPlayer
-    writeTVar gameLobby newLobby
-    writeTChan (channel lobby) $ PlayerJoined newPlayer
+    newLobby <- addPlayer gameLobby newPlayer
+    writeTChan (channel gameLobby) $ PlayerJoined newPlayer
     maybeServerGame <- handleLobbyFull app newLobby gameId
     channel <- duplicateBroadcastChannel newLobby
 
     return (ClientLobbyJoinResult channel maybeServerGame False)
 
 handleLobbyFull :: App -> GameLobby -> T.Text -> STM (Maybe ServerGame)
-handleLobbyFull app lobby gameId
-  | lobbyIsFull lobby =
-    do
-      removeGameLobby app gameId
-      serverGame <- (createGame app gameId lobby)
-      return $ Just serverGame
-  | otherwise =
-    return Nothing
-
-removeGameLobby :: App -> T.Text -> STM ()
-removeGameLobby app gameId =
-  let lobbies = gameLobbies app
-   in modifyTVar lobbies $ M.delete gameId
+handleLobbyFull app lobby gameId = do
+  lobbyFull <- lobbyIsFull lobby
+  if lobbyFull
+    then Just <$> (createGame app gameId lobby)
+    else return Nothing
 
 createGame :: App -> T.Text -> GameLobby -> STM ServerGame
 createGame app gameId lobby =
@@ -112,11 +107,10 @@ createGame app gameId lobby =
     newChannel <- newBroadcastTChan
     newGame <- newTVar (pendingGame lobby)
     randomNumberGenerator <- readTVar (playerIdGenerator lobby)
+    players <- readTVar (lobbyPlayers lobby)
+
     -- We shuffle so that who gets to go first is randomised.
     let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
     makeServerGame gameId newGame shuffledPlayers newChannel
   where
     players = lobbyPlayers lobby
-
-getGameLobby :: T.Text -> TVar (M.Map T.Text (TVar GameLobby)) -> ExceptT LobbyInputError STM (TVar GameLobby)
-getGameLobby gameId lobbies = ExceptT (note GameLobbyDoesNotExist . M.lookup gameId <$> readTVar lobbies)

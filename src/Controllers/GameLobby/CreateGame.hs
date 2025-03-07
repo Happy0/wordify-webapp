@@ -1,6 +1,6 @@
 module Controllers.GameLobby.CreateGame (createGame) where
 
-import ClassyPrelude.Yesod (getYesod)
+import ClassyPrelude.Yesod (getYesod, newTVarIO)
 import Control.Concurrent.STM
 import Control.Error.Util
 import Control.Monad
@@ -32,12 +32,12 @@ createGame app numPlayers locale =
     do
       newGameId <- lift $ T.pack . fst . randomString 8 <$> getStdGen
       newGame <- setupGame app locale numPlayers
-      initialLobby <- lift $ addGameLobby app newGameId newGame numPlayers
+      initialLobby <- lift $ createGameLobby app newGameId newGame numPlayers
       _ <- lift $ persistNewLobby (appConnPool app) newGameId locale initialLobby
       return newGameId
 
-addGameLobby :: App -> Text -> Game -> Int -> IO GameLobby
-addGameLobby app gameId game numPlayers =
+createGameLobby :: App -> Text -> Game -> Int -> IO GameLobby
+createGameLobby app gameId game numPlayers =
   do
     generator <- getStdGen
     timeCreated <- getCurrentTime
@@ -45,9 +45,9 @@ addGameLobby app gameId game numPlayers =
       let lobbies = gameLobbies app
       broadcastChan <- newBroadcastTChan
       newGenerator <- newTVar generator
-      let initialLobby = GameLobby game [] numPlayers broadcastChan newGenerator timeCreated
-      gameLobby <- newTVar initialLobby
-      modifyTVar lobbies $ M.insert gameId gameLobby
+      serverPlayers <- newTVar []
+      numConnections <- newTVar 0
+      let initialLobby = GameLobby game serverPlayers numPlayers broadcastChan newGenerator timeCreated numConnections
       return initialLobby
 
 setupGame :: App -> Locale -> Int -> (ExceptT Text IO Game)
