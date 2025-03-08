@@ -76,7 +76,7 @@ lobbyIsFull lobby = do
 inLobby :: GameLobby -> T.Text -> STM Bool
 inLobby lobby playerIdentifier = isJust . find isPlayer <$> readTVar (lobbyPlayers lobby)
   where
-    isPlayer player = (identifier player) == playerIdentifier
+    isPlayer player = (playerId player) == playerIdentifier
 
 increaseConnectionsByOne :: GameLobby -> STM ()
 increaseConnectionsByOne gameLobby = modifyTVar (numConnections gameLobby) succ

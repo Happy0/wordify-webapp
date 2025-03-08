@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
+module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
 
 import Control.Applicative
 import Control.Concurrent
@@ -36,6 +36,7 @@ import Wordify.Rules.Dictionary
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
+import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
 import Prelude
@@ -80,6 +81,32 @@ getLobby pool localisedGameSetups gameId = do
         return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt numConnections
     Left err -> return $ Left err
 
+getLobbyPlayer :: ConnectionPool -> Text -> Text -> IO (Maybe ServerPlayer)
+getLobbyPlayer pool gameId playerId = do
+  playerEntity <- withPool pool $ selectFirst [M.LobbyPlayerGame ==. gameId, M.LobbyPlayerPlayerId ==. playerId] []
+
+  case playerEntity of
+    Nothing -> pure Nothing
+    Just entity -> Just <$> playerFromLobbyEntity pool entity
+
+addDisplayNames :: [ServerPlayer] -> [P.Player] -> [P.Player]
+addDisplayNames serverPlayers gameStatePlayers = Prelude.zipWith addDisplayName serverPlayers gameStatePlayers
+  where
+    -- TODO: expose function to modify name of player in game state in wordify lib
+    addDisplayName serverPlayer gameStatePlayer =
+      let serverName = maybe (P.name gameStatePlayer) T.unpack (name serverPlayer)
+       in let player = P.makePlayer serverName
+           in let playerWithTiles = P.giveTiles player (P.tilesOnRack gameStatePlayer)
+               in let playerWithScore = P.increaseScore playerWithTiles (P.score gameStatePlayer)
+                   in let playerWithEndBonus = P.giveEndWinBonus playerWithScore (P.endBonus playerWithScore)
+                       in playerWithEndBonus
+
+setDisplayNames :: [P.Player] -> Game -> Game
+setDisplayNames [player1, player2] game = game {player1 = player1, player2 = player2}
+setDisplayNames [player1, player2, player3] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Nothing)}
+setDisplayNames [player1, player2, player3, player4] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Just player4)}
+setDisplayNames _ game = game
+
 getGame :: ConnectionPool -> LocalisedGameSetups -> Text -> IO (Either Text ServerGame)
 getGame pool localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
@@ -104,8 +131,10 @@ getGame pool localisedGameSetups gameId = do
         tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
         let letterBag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
         game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers letterBag dictionary)
+        let playersWithNamesAdded = addDisplayNames serverPlayers (players game)
+        let gameWithDisplayNamesSet = setDisplayNames playersWithNamesAdded game
 
-        currentGame <- hoistEither $ playThroughGame game letterBag moveModels
+        currentGame <- hoistEither $ playThroughGame gameWithDisplayNamesSet letterBag moveModels
         currentGameVar <- liftIO $ newTVarIO currentGame
 
         channel <- liftIO $ newBroadcastTChanIO
@@ -170,6 +199,7 @@ withPool pool = flip runSqlPersistMPool pool
 persistGameState :: Pool SqlBackend -> Text -> Text -> ServerGame -> IO (Key M.Game)
 persistGameState pool gameId locale serverGame = do
   gameState <- readTVarIO (game serverGame)
+  gamePlayers <- readTVarIO $ (playing serverGame)
   let History letterBag _ = history gameState
   withPool pool $ do
     gameDbId <-
@@ -180,22 +210,22 @@ persistGameState pool gameId locale serverGame = do
           (pack $ show (getGenerator letterBag))
           (Just locale)
 
-    persistPlayers gameId (playing serverGame)
+    persistPlayers gameId gamePlayers
     return gameDbId
 
 persistLobbyPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
    in flip mapM_ playersWithNumbers $ do
-        \(playerNumber, (ServerPlayer playerName identifier)) ->
+        \(playerNumber, (ServerPlayer playerName identifier gameId active lastActive)) ->
           insert $
-            M.LobbyPlayer gameId identifier playerNumber
+            M.LobbyPlayer gameId identifier playerNumber lastActive
 
 persistPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
    in flip mapM_ playersWithNumbers $ do
-        \(playerNumber, (ServerPlayer playerName identifier)) ->
+        \(playerNumber, (ServerPlayer playerName identifier gameId active lastActive)) ->
           insert $
-            M.Player gameId identifier playerNumber
+            M.Player gameId identifier playerNumber lastActive
 
 persistGameUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
 persistGameUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
@@ -291,22 +321,22 @@ moveFromEntity
 moveFromEntity _ _ (m@M.Move {}) = error $ "you've dun goofed, see database logs (hopefully) "
 
 playerFromEntity :: ConnectionPool -> Entity M.Player -> IO ServerPlayer
-playerFromEntity pool (Entity _ (M.Player gameId playerId _)) =
+playerFromEntity pool (Entity _ (M.Player gameId playerId _ lastActive)) =
   do
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing playerId
-      Just (AuthUser ident nickname) -> return (makeNewPlayer (nickname) playerId)
+      Nothing -> return $ makeNewPlayer Nothing playerId gameId False Nothing
+      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId False lastActive)
 
 playerFromLobbyEntity :: ConnectionPool -> Entity M.LobbyPlayer -> IO ServerPlayer
-playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _)) =
+playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive)) =
   do
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing playerId
-      Just (AuthUser ident nickname) -> return (makeNewPlayer (nickname) playerId)
+      Nothing -> return $ makeNewPlayer Nothing playerId gameId False Nothing
+      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname playerId gameId False lastActive)
 
 dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =

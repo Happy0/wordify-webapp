@@ -16,7 +16,7 @@ import Controllers.GameLobby.CreateGame
 import Controllers.GameLobby.GameLobby
 import Controllers.GameLobby.Model.GameLobby
 import qualified Controllers.GameLobby.Model.GameLobby as GL
-import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
+import Controllers.User.Model.AuthUser (AuthUser (AuthUser, nickname))
 import Controllers.User.Persist (getUser)
 import Data.Aeson
 import Data.Either
@@ -51,16 +51,6 @@ postCreateGameR =
       Left err -> invalidArgs [err]
       Right gameId -> return gameId
 
-playerFromDatabase :: App -> Text -> Handler ServerPlayer
-playerFromDatabase app playerId = do
-  let pool = appConnPool app
-  user <- liftIO $ getUser pool playerId
-
-  case user of
-    Just (AuthUser ident nickname) ->
-      return $ makeNewPlayer nickname playerId
-    Nothing -> return $ makeNewPlayer Nothing playerId
-
 renderNotLoggedInLobbyPage gameId = do
   addStylesheet $ (StaticR css_lobby_css)
   [whamlet|
@@ -88,8 +78,7 @@ handlerLobbyAuthenticated :: Text -> Text -> Handler Html
 handlerLobbyAuthenticated gameId userId =
   do
     app <- getYesod
-    player <- playerFromDatabase app userId
-    let playerId = identifier player
+    let playerId = userId
     webSockets $ lobbyWebSocketHandler app gameId playerId
 
     runResourceT $ do
@@ -97,7 +86,7 @@ handlerLobbyAuthenticated gameId userId =
       case lobby of
         Left _ -> lift $ redirectHandler gameId
         Right gameLobby -> do
-          join <- liftIO $ joinClient app gameLobby gameId player
+          join <- liftIO $ joinClient app gameLobby gameId userId
           lift $ renderLobbyPage join gameId
 
 redirectHandler :: Text -> Handler Html

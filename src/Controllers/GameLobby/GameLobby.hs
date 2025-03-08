@@ -11,9 +11,11 @@ import Controllers.Common.CacheableSharedResource
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
-import Controllers.Game.Persist (deleteLobby, persistNewGame, persistNewLobbyPlayer)
+import Controllers.Game.Persist (deleteLobby, getLobbyPlayer, persistNewGame, persistNewLobbyPlayer)
 import Controllers.GameLobby.Api
 import Controllers.GameLobby.Model.GameLobby
+import Controllers.User.Model.AuthUser
+import Controllers.User.Persist
 import Data.Either
 import qualified Data.List as L
 import qualified Data.Map as M
@@ -22,6 +24,8 @@ import Foundation
 import Model.Api
 import System.Random.Shuffle
 import UnliftIO.Resource
+import qualified Wordify.Rules.Game as G
+import qualified Wordify.Rules.Player as P
 import Prelude
 
 {-
@@ -30,9 +34,10 @@ import Prelude
 
     Returns a channel to subscribe to lobby events on, and the newly created game (if applicable)
 -}
-joinClient :: App -> GameLobby -> T.Text -> ServerPlayer -> IO (Either LobbyInputError ClientLobbyJoinResult)
-joinClient app gameLobby gameId serverPlayer =
+joinClient :: App -> GameLobby -> T.Text -> T.Text -> IO (Either LobbyInputError ClientLobbyJoinResult)
+joinClient app gameLobby gameId userId =
   do
+    serverPlayer <- getLobbyServerPlayer app gameLobby gameId userId
     result <- atomically $ updateLobbyState app gameLobby serverPlayer gameId
 
     case result of
@@ -50,6 +55,22 @@ joinClient app gameLobby gameId serverPlayer =
               serverPlayer
           )
           >> pure result
+
+getLobbyServerPlayer :: App -> GameLobby -> T.Text -> T.Text -> IO ServerPlayer
+getLobbyServerPlayer app gameLobby gameId userId = do
+  existingPlayer <- existingServerPlayer app gameId userId
+  case existingPlayer of
+    Just player -> pure $ player
+    Nothing ->
+      do
+        let pool = appConnPool app
+        user <- getUser pool userId
+        case user of
+          Just (AuthUser ident nickname) -> pure $ makeNewPlayer nickname gameId ident False Nothing
+          Nothing -> pure $ makeNewPlayer Nothing userId gameId False Nothing
+
+existingServerPlayer :: App -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
+existingServerPlayer app gameId userId = getLobbyPlayer (appConnPool app) gameId userId
 
 updateLobbyState :: App -> GameLobby -> ServerPlayer -> T.Text -> STM (Either LobbyInputError ClientLobbyJoinResult)
 updateLobbyState app lobby serverPlayer gameId = do
@@ -75,7 +96,7 @@ handleJoinClient app gameId gameLobby serverPlayer =
   do
     channel <- duplicateBroadcastChannel gameLobby
 
-    playerInLobby <- inLobby gameLobby (identifier serverPlayer)
+    playerInLobby <- inLobby gameLobby (playerId serverPlayer)
     if playerInLobby
       then return $ ClientLobbyJoinResult channel Nothing True
       else handleJoinNewPlayer app gameId serverPlayer gameLobby
@@ -104,13 +125,13 @@ handleLobbyFull app lobby gameId = do
 createGame :: App -> T.Text -> GameLobby -> STM ServerGame
 createGame app gameId lobby =
   do
-    newChannel <- newBroadcastTChan
-    newGame <- newTVar (pendingGame lobby)
-    randomNumberGenerator <- readTVar (playerIdGenerator lobby)
     players <- readTVar (lobbyPlayers lobby)
+    let initialGameState = pendingGame lobby
+
+    newChannel <- newBroadcastTChan
+    newGame <- newTVar initialGameState
+    randomNumberGenerator <- readTVar (playerIdGenerator lobby)
 
     -- We shuffle so that who gets to go first is randomised.
     let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
     makeServerGame gameId newGame shuffledPlayers newChannel
-  where
-    players = lobbyPlayers lobby

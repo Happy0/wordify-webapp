@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 module Handler.Game where
 
 import Control.Concurrent
@@ -27,7 +30,8 @@ import Wordify.Rules.Dictionary
 import qualified Wordify.Rules.Game as G
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
-import Wordify.Rules.Player
+import Wordify.Rules.Player (Player (endBonus))
+import qualified Wordify.Rules.Player as P
 import Yesod.Core
 import Yesod.WebSockets
 
@@ -51,10 +55,13 @@ getGameR gameId = do
 renderGamePage :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
 renderGamePage app gameId maybePlayerId (Right serverGame) = do
-  let maybePlayerNumber = maybePlayerId >>= (getPlayerNumber serverGame)
+  maybePlayerNumber <- case maybePlayerId of
+    Nothing -> pure Nothing
+    Just playerId -> atomically $ getPlayerNumber serverGame playerId
 
   gameSoFar <- liftIO (readTVarIO (game serverGame))
-  let rack = tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
+
+  let rack = P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
   let players = G.players gameSoFar
   let playing = G.playerNumber gameSoFar
   let numTilesRemaining = (bagSize (G.bag gameSoFar))
@@ -127,7 +134,11 @@ gameApp app gameId maybePlayerId = do
         Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
           let inactivityTrackerState = inactivityTracker app
-          let maybePlayerNumber = maybePlayerId >>= getPlayerNumber serverGame
+
+          maybePlayerNumber <- case maybePlayerId of
+            Nothing -> pure Nothing
+            Just playerId -> atomically $ getPlayerNumber serverGame playerId
+
           channel <- atomically (dupTChan (broadcastChannel serverGame))
           liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
 
@@ -198,7 +209,7 @@ sendPreviousChatMessages pool gameId connection = do
     flip runSqlPersistMPool pool $
       getChatMessages gameId $$ CL.map toJSONResponse $= (CL.mapM_ (liftIO . C.sendTextData connection))
 
-getPlayerNumber :: ServerGame -> Text -> Maybe Int
-getPlayerNumber serverGame playerId = fst <$> (L.find (\(ind, player) -> playerId == identifier player) $ zip [1 .. 4] players)
-  where
-    players = playing serverGame
+getPlayerNumber :: ServerGame -> Text -> STM (Maybe Int)
+getPlayerNumber serverGame findPlayerID = do
+  players <- readTVar (playing serverGame)
+  return $ fst <$> L.find (\(ind, player) -> findPlayerID == playerId player) (zip [1 .. 4] players)

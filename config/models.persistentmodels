@@ -41,6 +41,7 @@ Player
     game Text
     playerId Text
     playerNumber Int
+    lastActive UTCTime Maybe
 
 Lobby
     gameId Text
@@ -55,3 +56,4 @@ LobbyPlayer
     game Text
     playerId Text
     playerNumber Int
+    lastActive UTCTime Maybe

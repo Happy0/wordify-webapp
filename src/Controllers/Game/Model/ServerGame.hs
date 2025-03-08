@@ -12,6 +12,7 @@ module Controllers.Game.Model.ServerGame
   )
 where
 
+import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
@@ -26,7 +27,7 @@ import Prelude
 data ServerGame = ServerGame
   { gameId :: Text,
     game :: TVar Game,
-    playing :: [ServerPlayer],
+    playing :: TVar [ServerPlayer],
     broadcastChannel :: (TChan GameMessage),
     numConnections :: TVar Int
   }
@@ -39,10 +40,26 @@ instance CacheableSharedResource ServerGame where
 makeServerGame :: Text -> TVar Game -> [ServerPlayer] -> (TChan GameMessage) -> STM ServerGame
 makeServerGame gameId game players messageChannel = do
   connections <- newTVar 0
-  return (ServerGame gameId game players messageChannel connections)
+  initialPlayerState <- newTVar players
+  return (ServerGame gameId game initialPlayerState messageChannel connections)
 
-getServerPlayer :: ServerGame -> Int -> Maybe ServerPlayer
-getServerPlayer serverGame playerNumber = playing serverGame SL.!! (playerNumber - 1)
+setPlayerActive :: ServerGame -> Text -> UTCTime -> STM ()
+setPlayerActive serverGame playerId atTime = undefined
+
+setPlayerInactive :: ServerGame -> Text -> UTCTime -> STM ()
+setPlayerInactive serverGame playerId atTime = undefined
+
+updatePlayerActive :: [ServerPlayer] -> Text -> UTCTime -> [ServerPlayer]
+updatePlayerActive players activePlayer atTime = undefined
+
+updatePlayerInactive :: [ServerPlayer] -> Text -> UTCTime -> [ServerPlayer]
+updatePlayerInactive players inactivePlayer atTime = undefined
+
+getServerPlayer :: ServerGame -> Int -> STM (Maybe ServerPlayer)
+getServerPlayer serverGame playerNumber =
+  do
+    playingx <- readTVar (playing serverGame)
+    return (playingx SL.!! (playerNumber - 1))
 
 increaseConnectionsByOne :: ServerGame -> STM ()
 increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ

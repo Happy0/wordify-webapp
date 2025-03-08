@@ -1,24 +1,24 @@
 module Controllers.Game.Model.ServerPlayer
   ( ServerPlayer (ServerPlayer),
     name,
-    identifier,
+    playerId,
     makeNewPlayer,
     makeGameStatePlayers,
     makeNewPlayerId,
   )
 where
 
-import Control.Applicative
+import ClassyPrelude (UTCTime)
 import Data.Text as T
 import Network.Mail.Mime
 import System.Random
 import qualified Wordify.Rules.Player as G
 import Prelude
 
-data ServerPlayer = ServerPlayer {name :: Maybe Text, identifier :: Text}
+data ServerPlayer = ServerPlayer {name :: Maybe Text, playerId :: Text, gameId :: Text, active :: Bool, lastActive :: (Maybe UTCTime)}
 
-makeNewPlayer :: Maybe Text -> Text -> ServerPlayer
-makeNewPlayer playerName gameId = ServerPlayer playerName gameId
+makeNewPlayer :: Maybe Text -> Text -> Text -> Bool -> Maybe UTCTime -> ServerPlayer
+makeNewPlayer playerName gameId playerId isActive lastActive = ServerPlayer playerName playerId gameId isActive lastActive
 
 makeNewPlayerId :: StdGen -> (Text, StdGen)
 makeNewPlayerId generator =
