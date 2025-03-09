@@ -102,10 +102,16 @@ addDisplayNames serverPlayers gameStatePlayers = Prelude.zipWith addDisplayName 
                        in playerWithEndBonus
 
 setDisplayNames :: [P.Player] -> Game -> Game
-setDisplayNames [player1, player2] game = game {player1 = player1, player2 = player2}
-setDisplayNames [player1, player2, player3] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Nothing)}
-setDisplayNames [player1, player2, player3, player4] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Just player4)}
+setDisplayNames players@[player1, player2] game = game {player1 = player1, player2 = player2, currentPlayer = getCurrentPlayer game players (playerNumber game)}
+setDisplayNames players@[player1, player2, player3] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Nothing), currentPlayer = getCurrentPlayer game players (playerNumber game)}
+setDisplayNames players@[player1, player2, player3, player4] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Just player4), currentPlayer = getCurrentPlayer game players (playerNumber game)}
 setDisplayNames _ game = game
+
+getCurrentPlayer game (player1 : x) 1 = player1
+getCurrentPlayer game (player1 : player2 : x) 2 = player2
+getCurrentPlayer game (player1 : player2 : player3 : x) 3 = player3
+getCurrentPlayer game (player1 : player2 : player3 : player4 : x) 4 = player4
+getCurrentPlayer game _ _ = currentPlayer game
 
 getGame :: ConnectionPool -> LocalisedGameSetups -> Text -> IO (Either Text ServerGame)
 getGame pool localisedGameSetups gameId = do
