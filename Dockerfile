@@ -1,4 +1,4 @@
-FROM ubuntu:25.04 as build
+FROM debian:latest as build
 
 RUN apt-get update
 
@@ -18,7 +18,7 @@ RUN mkdir -p "/data"
 
 RUN stack build --copy-bins --local-bin-path "bin"
 
-FROM ubuntu:25.04 as app
+FROM debian:latest as app
 COPY --from=build bin bin
 
 RUN apt-get update && apt-get install -y libgnutls30 netbase libstdc++6 ca-certificates
