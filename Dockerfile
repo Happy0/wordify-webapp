@@ -1,14 +1,8 @@
-FROM ubuntu:25.04 as build
+FROM fpco/stack-build:lts-23.11 as build
 
 RUN apt-get update
 
 COPY . .
-
-# Build dependencies
-
-RUN apt-get install --assume-yes curl
-RUN curl -sSL https://get.haskellstack.org/ | sh
-RUN apt-get install --assume-yes libtinfo-dev
 
 # Without this haddock crashes for modules containing
 # non-ASCII characters.
