@@ -342,7 +342,7 @@ playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive
     case user of
       -- User was deleted from database?
       Nothing -> return $ makeNewPlayer Nothing playerId gameId False Nothing
-      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname playerId gameId False lastActive)
+      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId False lastActive)
 
 dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =
