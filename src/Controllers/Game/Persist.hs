@@ -174,6 +174,7 @@ mapLeft _ (Right r) = Right r
 
 persistNewLobby :: Pool SqlBackend -> Text -> Text -> GameLobby -> IO ()
 persistNewLobby pool gameId locale gameLobby = do
+  let History letterBag _ = history (pendingGame gameLobby)
   let game = pendingGame gameLobby
 
   withPool pool $ do
@@ -181,7 +182,7 @@ persistNewLobby pool gameId locale gameLobby = do
       insert $
         M.Lobby
           gameId
-          (tilesToDbRepresentation (tiles (bag game)))
+          (tilesToDbRepresentation (tiles letterBag))
           (pack $ show (getGenerator (bag game)))
           (Just locale)
           (awaiting gameLobby)
