@@ -24,7 +24,12 @@ Game
     originalLetterBag Text
     letterBagSeed Text
     bagLocale Text Maybe
+    createdAt UTCTime
+    finishedAt UTCTime Maybe
+    lastMoveMadeAt UTCTime Maybe
+    currentMoveNumber Int
     Primary gameId
+
 Move
     game Text
     moveNumber Int
@@ -32,13 +37,15 @@ Move
     startX Int Maybe
     startY Int Maybe
     isHorizontal Bool Maybe
+
 ChatMessage
     game Text
     createdAt UTCTime
     sentBy Text
     message Text
+
 Player
-    game Text
+    gameId Text
     playerId Text
     playerNumber Int
     lastActive UTCTime Maybe

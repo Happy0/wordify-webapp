@@ -120,12 +120,12 @@ getGame pool localisedGameSetups gameId = do
     case maybeGame of
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just gameModel -> do
-        players <- selectList [M.PlayerGame ==. gameId] []
+        players <- selectList [M.PlayerGameId ==. gameId] []
         moves <- selectList [M.MoveGame ==. gameId] []
         return $ Right (gameModel, players, L.map entityVal moves)
 
   case dbEntries of
-    Right (Entity _ (M.Game _ bagText bagSeed maybeLocale), playerModels, moveModels) -> do
+    Right (Entity _ (M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber), playerModels, moveModels) -> do
       -- This could be more efficient than individual fetches, but it doesn't matter for now
       serverPlayers <- mapM (playerFromEntity pool) playerModels
 
@@ -141,10 +141,8 @@ getGame pool localisedGameSetups gameId = do
         let gameWithDisplayNamesSet = setDisplayNames playersWithNamesAdded game
 
         currentGame <- hoistEither $ playThroughGame gameWithDisplayNamesSet letterBag moveModels
-        currentGameVar <- liftIO $ newTVarIO currentGame
 
-        channel <- liftIO $ newBroadcastTChanIO
-        liftIO $ atomically (makeServerGame gameId currentGameVar serverPlayers channel)
+        liftIO $ atomically (makeServerGame gameId currentGame serverPlayers gameCreatedAt lastMoveMadeAt gameFinishedAt)
     Left err -> return $ Left err
 
 playThroughGame :: Game -> LetterBag -> [M.Move] -> Either Text Game
@@ -205,9 +203,9 @@ withPool pool = flip runSqlPersistMPool pool
 
 persistGameState :: Pool SqlBackend -> Text -> Text -> ServerGame -> IO (Key M.Game)
 persistGameState pool gameId locale serverGame = do
-  gameState <- readTVarIO (game serverGame)
-  gamePlayers <- readTVarIO $ (playing serverGame)
+  ServerGameSnapshot gameId gameState gamePlayers created lastMove finished <- atomically $ makeServerGameSnapshot serverGame
   let History letterBag _ = history gameState
+  let currentMove = Prelude.length (movesMade gameState) -1
   withPool pool $ do
     gameDbId <-
       insert $
@@ -216,6 +214,10 @@ persistGameState pool gameId locale serverGame = do
           (tilesToDbRepresentation (tiles letterBag))
           (pack $ show (getGenerator letterBag))
           (Just locale)
+          created
+          finished
+          lastMove
+          currentMove
 
     persistPlayers gameId gamePlayers
     return gameDbId
@@ -333,7 +335,7 @@ playerFromEntity pool (Entity _ (M.Player gameId playerId _ lastActive)) =
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing playerId gameId False Nothing
+      Nothing -> return $ makeNewPlayer Nothing playerId gameId False lastActive
       Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId False lastActive)
 
 playerFromLobbyEntity :: ConnectionPool -> Entity M.LobbyPlayer -> IO ServerPlayer
