@@ -205,7 +205,7 @@ persistGameState :: Pool SqlBackend -> Text -> Text -> ServerGame -> IO (Key M.G
 persistGameState pool gameId locale serverGame = do
   ServerGameSnapshot gameId gameState gamePlayers created lastMove finished <- atomically $ makeServerGameSnapshot serverGame
   let History letterBag _ = history gameState
-  let currentMove = Prelude.length (movesMade gameState) -1
+  let currentMove = Prelude.length (movesMade gameState) + 1
   withPool pool $ do
     gameDbId <-
       insert $
@@ -239,18 +239,22 @@ persistPlayers gameId players =
 persistGameUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
 persistGameUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
 persistGameUpdate pool gameId (PlayerBoardMove moveNumber placed _ _ _ _) =
-  persistBoardMove pool gameId moveNumber placed
-persistGameUpdate pool gameId (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId moveNumber
+  persistBoardMove pool gameId moveNumber placed False
+persistGameUpdate pool gameId (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId moveNumber False
 persistGameUpdate pool gameId (PlayerExchangeMove moveNumber _ exchanged _) =
   persistExchangeMove pool gameId moveNumber exchanged
-persistGameUpdate pool gameId (GameEnd moveNumber placed moveSummary) =
+persistGameUpdate pool gameId (GameEnd moveNumber placed moveSummary) = do
+  -- TODO: move to own function
+  now <- getCurrentTime
   case placed of
-    Nothing -> persistPassMove pool gameId moveNumber
-    Just placed -> persistBoardMove pool gameId moveNumber placed
+    Nothing -> persistPassMove pool gameId moveNumber True
+    Just placed -> persistBoardMove pool gameId moveNumber placed True
 persistGameUpdate _ _ _ = return ()
 
-persistBoardMove :: Pool SqlBackend -> Text -> Int -> [(Pos, Tile)] -> IO ()
-persistBoardMove pool gameId moveNumber placed = do
+persistBoardMove :: Pool SqlBackend -> Text -> Int -> [(Pos, Tile)] -> Bool -> IO ()
+persistBoardMove pool gameId moveNumber placed endsGame = do
+  now <- getCurrentTime
+
   let move =
         M.Move
           gameId
@@ -260,26 +264,36 @@ persistBoardMove pool gameId moveNumber placed = do
           (Just $ yPos min)
           (Just isHorizontal)
 
-  withPool pool $ do
-    insert move
-    return ()
+  persistMoveUpdate pool move now endsGame
   where
     placedSorted = L.sort placed
     positions = L.map fst placedSorted
     (min, max) = (L.minimum positions, L.maximum positions)
     isHorizontal = (yPos min == yPos max)
 
-persistPassMove :: Pool SqlBackend -> Text -> Int -> IO ()
-persistPassMove pool gameId moveNumber =
-  withPool pool $ do
-    insert (M.Move gameId moveNumber Nothing Nothing Nothing Nothing)
-    return ()
+persistPassMove :: Pool SqlBackend -> Text -> Int -> Bool -> IO ()
+persistPassMove pool gameId moveNumber endsGame = do
+  now <- getCurrentTime
+  persistMoveUpdate pool (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) now endsGame
 
 persistExchangeMove :: Pool SqlBackend -> Text -> Int -> [Tile] -> IO ()
-persistExchangeMove pool gameId moveNumber tiles =
+persistExchangeMove pool gameId moveNumber tiles = do
+  now <- getCurrentTime
+  persistMoveUpdate pool (M.Move gameId moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing) now False
+
+persistMoveUpdate :: Pool SqlBackend -> M.Move -> UTCTime -> Bool -> IO ()
+persistMoveUpdate pool move@(M.Move gameId moveNumber _ _ _ _) now endsGame = do
   withPool pool $ do
-    insert (M.Move gameId moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing)
+    _ <- insert move
     return ()
+
+  updateLastMoveSummary pool gameId now moveNumber endsGame
+
+updateLastMoveSummary :: Pool SqlBackend -> Text -> UTCTime -> Int -> Bool -> IO ()
+updateLastMoveSummary pool gameId now currentMoveNumber endsGame = withPool pool $ do
+  let endTime = if endsGame then Just now else Nothing
+  _ <- update (M.GameKey gameId) [M.GameCurrentMoveNumber =. currentMoveNumber, M.GameLastMoveMadeAt =. Just now, M.GameFinishedAt =. endTime]
+  return ()
 
 persistChatMessage :: Pool SqlBackend -> Text -> ChatMessage -> IO ()
 persistChatMessage pool gameId (ChatMessage user message) = do
