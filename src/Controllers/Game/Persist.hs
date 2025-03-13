@@ -1,16 +1,10 @@
 module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
 
 import Control.Applicative
-import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Error.Util
-import Control.Exception
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Resource
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
@@ -28,11 +22,9 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import Database.Persist.Sql
 import Foundation
-import Model (LobbyPlayer (LobbyPlayer))
 import qualified Model as M
 import System.Random
 import Wordify.Rules.Board
-import Wordify.Rules.Dictionary
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
