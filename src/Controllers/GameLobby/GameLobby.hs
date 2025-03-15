@@ -40,7 +40,7 @@ joinClient :: App -> GameLobby -> T.Text -> T.Text -> IO (Either LobbyInputError
 joinClient app gameLobby gameId userId =
   do
     now <- getCurrentTime
-    serverPlayer <- getLobbyServerPlayer app gameLobby gameId userId
+    serverPlayer <- makeLobbyServerPlayer app gameLobby gameId userId
     result <- atomically $ updateLobbyState app gameLobby serverPlayer gameId now
 
     case result of
@@ -59,21 +59,14 @@ joinClient app gameLobby gameId userId =
           )
           >> pure result
 
-getLobbyServerPlayer :: App -> GameLobby -> T.Text -> T.Text -> IO ServerPlayer
-getLobbyServerPlayer app gameLobby gameId userId = do
-  existingPlayer <- existingServerPlayer app gameId userId
-  case existingPlayer of
-    Just player -> pure $ player
-    Nothing ->
-      do
-        let pool = appConnPool app
-        user <- getUser pool userId
-        case user of
-          Just (AuthUser ident nickname) -> pure $ makeNewPlayer nickname gameId ident False Nothing
-          Nothing -> pure $ makeNewPlayer Nothing gameId userId False Nothing
-
-existingServerPlayer :: App -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
-existingServerPlayer app gameId userId = getLobbyPlayer (appConnPool app) gameId userId
+makeLobbyServerPlayer :: App -> GameLobby -> T.Text -> T.Text -> IO ServerPlayer
+makeLobbyServerPlayer app gameLobby gameId userId =
+  do
+    let pool = appConnPool app
+    user <- getUser pool userId
+    case user of
+      Just (AuthUser ident nickname) -> pure $ makeNewPlayer nickname gameId ident False Nothing
+      Nothing -> pure $ makeNewPlayer Nothing gameId userId False Nothing
 
 updateLobbyState :: App -> GameLobby -> ServerPlayer -> T.Text -> UTCTime -> STM (Either LobbyInputError ClientLobbyJoinResult)
 updateLobbyState app lobby serverPlayer gameId now = do
@@ -111,12 +104,12 @@ handleJoinClient app gameId gameLobby serverPlayer now =
 handleJoinNewPlayer :: App -> T.Text -> ServerPlayer -> GameLobby -> UTCTime -> STM ClientLobbyJoinResult
 handleJoinNewPlayer app gameId newPlayer gameLobby now =
   do
-    newLobby <- addPlayer gameLobby newPlayer
+    playerAdded <- addPlayer gameLobby newPlayer
     writeTChan (channel gameLobby) $ PlayerJoined newPlayer
-    maybeServerGame <- handleLobbyFull app newLobby gameId now
-    channel <- duplicateBroadcastChannel newLobby
+    maybeServerGame <- handleLobbyFull app gameLobby gameId now
+    channel <- duplicateBroadcastChannel gameLobby
 
-    return (ClientLobbyJoinResult channel maybeServerGame False)
+    return (ClientLobbyJoinResult channel maybeServerGame (not playerAdded))
 
 handleLobbyFull :: App -> GameLobby -> T.Text -> UTCTime -> STM (Maybe ServerGame)
 handleLobbyFull app lobby gameId now = do

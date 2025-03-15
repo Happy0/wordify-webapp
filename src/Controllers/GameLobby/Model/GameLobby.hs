@@ -60,13 +60,19 @@ gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)
 duplicateBroadcastChannel :: GameLobby -> STM (TChan LobbyMessage)
 duplicateBroadcastChannel gameLobby = dupTChan . channel $ gameLobby
 
-addPlayer :: GameLobby -> ServerPlayer -> STM GameLobby
+addPlayer :: GameLobby -> ServerPlayer -> STM Bool
 addPlayer lobby newPlayer = do
   currentPlayers <- readTVar (lobbyPlayers lobby)
 
-  let newPlayers = currentPlayers ++ [newPlayer]
-  writeTVar (lobbyPlayers lobby) newPlayers
-  pure $ lobby
+  if ((not $ playerAlreadyExists currentPlayers (playerId newPlayer)))
+    then do
+      let newPlayers = currentPlayers ++ [newPlayer]
+      writeTVar (lobbyPlayers lobby) newPlayers
+      return True
+    else return False
+  where
+    playerAlreadyExists :: [ServerPlayer] -> T.Text -> Bool
+    playerAlreadyExists serverPlayers id = isJust $ find (\x -> playerId x == id) serverPlayers
 
 lobbyIsFull :: GameLobby -> STM Bool
 lobbyIsFull lobby = do
