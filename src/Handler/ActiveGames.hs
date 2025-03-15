@@ -16,6 +16,10 @@ renderNotLoggedInPage =
             <a href=@{AuthR LoginR}>Login
         |]
 
+renderPlayerMoveNote :: Bool -> Widget
+renderPlayerMoveNote False = [whamlet| <span> |]
+renderPlayerMoveNote True = [whamlet| <span> (Your move) |]
+
 renderActiveGamePage :: (GameRepository a) => a -> T.Text -> Handler Html
 renderActiveGamePage gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
@@ -23,8 +27,8 @@ renderActiveGamePage gameRepository userId = do
     toWidget $
       [whamlet|
                 <p> Shut it... This totally an acceptable rendering of a game list... YOU'RE a bad front end developer
-                $forall GameSummary gameId latestActivity _ <- activeGames
-                    <p><a href=@{GameR gameId}> #{gameId}
+                $forall GameSummary gameId latestActivity playerToMove <- activeGames
+                    <p><span><a href=@{GameR gameId}> #{gameId} ^{renderPlayerMoveNote playerToMove}
                 |]
 
 getActiveGamesR :: Handler Html
