@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 
-module Repository.SQL.SqlGameRepository (SqlPool, GameRepository (getActiveUserGames)) where
+module Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend), GameRepository (getActiveUserGames)) where
 
 import Control.Monad.IO.Class (MonadIO)
 import Data.Maybe
@@ -8,16 +8,14 @@ import Data.Pool
 import Database.Esqueleto ((^.))
 import qualified Database.Esqueleto as E
 import Database.Persist.Sql
-import Import (GameId, YesodPersist (runDB))
 import qualified Model as M
 import Repository.GameRepository (GameRepository, GameSummary (GameSummary), UserId, getActiveUserGames)
-import System.IO
 import Prelude
 
-data SqlPool = SqlPool (Pool SqlBackend)
+data GameRepositorySQLBackend = GameRepositorySQLBackend (Pool SqlBackend)
 
-instance GameRepository SqlPool where
-  getActiveUserGames (SqlPool pool) userId = withPool pool (activeUserGames userId)
+instance GameRepository GameRepositorySQLBackend where
+  getActiveUserGames (GameRepositorySQLBackend pool) userId = withPool pool (activeUserGames userId)
 
 activeUserGames :: (Monad m, MonadIO m) => UserId -> E.SqlPersistT m [GameSummary]
 activeUserGames userId = do
