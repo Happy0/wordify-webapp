@@ -28,6 +28,7 @@ getActiveUserGamesEntities userId =
     E.from $ \(player `E.InnerJoin` game) -> do
       E.on (player ^. M.PlayerGameId E.==. game ^. M.GameGameId)
       E.where_ (player ^. M.PlayerPlayerId E.==. E.val userId)
+      E.orderBy [E.desc (game ^. M.GameLastMoveMadeAt)]
       return (player, game)
 
 toGameSummaries :: [(E.Entity M.Player, E.Entity M.Game)] -> [GameSummary]
