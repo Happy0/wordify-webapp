@@ -15,4 +15,4 @@
 /games/#Text/lobby GameLobbyR GET
 /games/#Text GameR GET
 
-/active-games ActiveGamesR GET
+/my-games ActiveGamesR GET

@@ -145,7 +145,7 @@ createMyGamesButton = do
   [whamlet|
     $maybe _ <- maid
         <span>
-            <a href=@{ActiveGamesR}> My Active Games |
+            <a href=@{ActiveGamesR}> My Games |
     $nothing
         <span>
     |]
