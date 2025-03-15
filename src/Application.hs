@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -49,6 +48,7 @@ import Database.Persist.Sqlite
     sqlDatabase,
     sqlPoolSize,
   )
+import Handler.ActiveGames
 import Handler.AuthTest
 import Handler.Common
 import Handler.Game

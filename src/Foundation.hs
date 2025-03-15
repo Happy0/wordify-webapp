@@ -110,6 +110,7 @@ appHeader =
         <div style="padding: 5px 0px 15px 10px;border-bottom: 1px solid #e0e0e0;height: 30px;width: 100%;background: white;z-index: 1000;">
           <span>
             <a href=@{HomeR}> Home |
+          ^{createMyGamesButton}
           ^{createGameButton}
           <span>
             <a href="http://www.github.com/happy0/wordify-webapp"> Source Code
@@ -134,6 +135,17 @@ createGameButton = do
     $maybe _ <- maid
         <span>
             <a href="javascript:gameGameLinkClicked()"> Create Game |
+    $nothing
+        <span>
+    |]
+
+createMyGamesButton :: Widget
+createMyGamesButton = do
+  maid <- maybeAuthId
+  [whamlet|
+    $maybe _ <- maid
+        <span>
+            <a href=@{ActiveGamesR}> My Games |
     $nothing
         <span>
     |]
