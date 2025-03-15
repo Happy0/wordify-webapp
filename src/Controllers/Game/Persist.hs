@@ -343,7 +343,7 @@ playerFromEntity pool (Entity _ (M.Player gameId playerId _ lastActive)) =
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing playerId gameId False lastActive
+      Nothing -> return $ makeNewPlayer Nothing gameId playerId False lastActive
       Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId False lastActive)
 
 playerFromLobbyEntity :: ConnectionPool -> Entity M.LobbyPlayer -> IO ServerPlayer
@@ -352,7 +352,7 @@ playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing playerId gameId False Nothing
+      Nothing -> return $ makeNewPlayer Nothing gameId playerId False Nothing
       Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId False lastActive)
 
 dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]

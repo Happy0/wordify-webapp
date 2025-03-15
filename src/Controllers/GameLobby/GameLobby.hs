@@ -70,7 +70,7 @@ getLobbyServerPlayer app gameLobby gameId userId = do
         user <- getUser pool userId
         case user of
           Just (AuthUser ident nickname) -> pure $ makeNewPlayer nickname gameId ident False Nothing
-          Nothing -> pure $ makeNewPlayer Nothing userId gameId False Nothing
+          Nothing -> pure $ makeNewPlayer Nothing gameId userId False Nothing
 
 existingServerPlayer :: App -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
 existingServerPlayer app gameId userId = getLobbyPlayer (appConnPool app) gameId userId
