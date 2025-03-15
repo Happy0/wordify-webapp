@@ -41,9 +41,9 @@ toGameSummaries playerGameSummaries =
     extractValues ((E.Entity _ player, E.Entity _ game)) = (player, game)
 
     toSummary :: M.Player -> M.Game -> GameSummary
-    toSummary (M.Player _ _ playerNumber _) (M.Game gameId _ _ _ _ _ lastMoveMade currentMoveNumber) =
+    toSummary (M.Player _ _ playerNumber _) (M.Game gameId _ _ _ _ _ lastMoveMade currentMoveNumber _) =
       GameSummary gameId lastMoveMade False -- TODO: use this field properly
     isNotFinished :: M.Game -> Bool
-    isNotFinished (M.Game gameId _ _ _ _ finishedAt lastMoveMade currentMoveNumber) = isNothing finishedAt
+    isNotFinished (M.Game gameId _ _ _ _ finishedAt lastMoveMade currentMoveNumber _) = isNothing finishedAt
 
 withPool pool = flip runSqlPersistMPool pool

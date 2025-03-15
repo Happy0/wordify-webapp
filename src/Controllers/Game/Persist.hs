@@ -117,7 +117,7 @@ getGame pool localisedGameSetups gameId = do
         return $ Right (gameModel, players, L.map entityVal moves)
 
   case dbEntries of
-    Right (Entity _ (M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber), playerModels, moveModels) -> do
+    Right (Entity _ (M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _), playerModels, moveModels) -> do
       -- This could be more efficient than individual fetches, but it doesn't matter for now
       serverPlayers <- mapM (playerFromEntity pool) playerModels
 
@@ -198,6 +198,7 @@ persistGameState pool gameId locale serverGame = do
   ServerGameSnapshot gameId gameState gamePlayers created lastMove finished <- atomically $ makeServerGameSnapshot serverGame
   let History letterBag _ = history gameState
   let currentMove = Prelude.length (movesMade gameState) + 1
+  let boardRepresentation = T.pack (Prelude.take 255 (repeat ','))
   withPool pool $ do
     gameDbId <-
       insert $
@@ -210,6 +211,7 @@ persistGameState pool gameId locale serverGame = do
           finished
           lastMove
           currentMove
+          boardRepresentation
 
     persistPlayers gameId gamePlayers
     return gameDbId

@@ -28,6 +28,7 @@ Game
     finishedAt UTCTime Maybe
     lastMoveMadeAt UTCTime Maybe
     currentMoveNumber Int
+    board Text
     Primary gameId
 
 Move
