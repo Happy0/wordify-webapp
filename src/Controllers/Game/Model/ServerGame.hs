@@ -1,6 +1,6 @@
 module Controllers.Game.Model.ServerGame
   ( ServerGame,
-    ServerGameSnapshot (ServerGameSnapshot),
+    ServerGameSnapshot (ServerGameSnapshot, snapshotGameId, gameState),
     makeNewServerGame,
     makeServerGame,
     makeServerGameSnapshot,
@@ -28,7 +28,7 @@ import Wordify.Rules.Game
 import Prelude
 
 data ServerGameSnapshot = ServerGameSnapshot
-  { id :: Text,
+  { snapshotGameId :: Text,
     gameState :: Game,
     players :: [ServerPlayer],
     created :: UTCTime,

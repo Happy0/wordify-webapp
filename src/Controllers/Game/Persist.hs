@@ -23,6 +23,7 @@ import Data.Time.Clock
 import Database.Persist.Sql
 import Foundation
 import qualified Model as M
+import Repository.GameRepository (GameSummary)
 import System.Random
 import Wordify.Rules.Board
 import Wordify.Rules.Game
@@ -230,25 +231,23 @@ persistPlayers gameId players =
           insert $
             M.Player gameId identifier playerNumber lastActive
 
-persistGameUpdate :: Pool SqlBackend -> Text -> GameMessage -> IO ()
-persistGameUpdate pool gameId (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
-persistGameUpdate pool gameId (PlayerBoardMove moveNumber placed _ _ _ _) =
-  persistBoardMove pool gameId moveNumber placed False
-persistGameUpdate pool gameId (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId moveNumber False
-persistGameUpdate pool gameId (PlayerExchangeMove moveNumber _ exchanged _) =
-  persistExchangeMove pool gameId moveNumber exchanged
-persistGameUpdate pool gameId (GameEnd moveNumber placed moveSummary) = do
+persistGameUpdate :: Pool SqlBackend -> Text -> Game -> GameMessage -> IO ()
+persistGameUpdate pool gameId _ (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
+persistGameUpdate pool gameId gameState (PlayerBoardMove moveNumber placed _ _ _ _) =
+  persistBoardMove pool gameId gameState placed
+persistGameUpdate pool gameId gameState (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId gameState
+persistGameUpdate pool gameId gameState (PlayerExchangeMove moveNumber _ exchanged _) =
+  persistExchangeMove pool gameId gameState exchanged
+persistGameUpdate pool gameId gameState (GameEnd moveNumber placed moveSummary) = do
   -- TODO: move to own function
   now <- getCurrentTime
   case placed of
-    Nothing -> persistPassMove pool gameId moveNumber True
-    Just placed -> persistBoardMove pool gameId moveNumber placed True
-persistGameUpdate _ _ _ = return ()
+    Nothing -> persistPassMove pool gameId gameState
+    Just placed -> persistBoardMove pool gameId gameState placed
+persistGameUpdate _ _ _ _ = return ()
 
-persistBoardMove :: Pool SqlBackend -> Text -> Int -> [(Pos, Tile)] -> Bool -> IO ()
-persistBoardMove pool gameId moveNumber placed endsGame = do
-  now <- getCurrentTime
-
+persistBoardMove :: Pool SqlBackend -> Text -> Game -> [(Pos, Tile)] -> IO ()
+persistBoardMove pool gameId gameState placed = do
   let move =
         M.Move
           gameId
@@ -258,36 +257,55 @@ persistBoardMove pool gameId moveNumber placed endsGame = do
           (Just $ yPos min)
           (Just isHorizontal)
 
-  persistMoveUpdate pool move now endsGame
+  persistMoveUpdate pool gameId gameState move
   where
+    moveNumber = L.length (movesMade gameState)
     placedSorted = L.sort placed
     positions = L.map fst placedSorted
     (min, max) = (L.minimum positions, L.maximum positions)
-    isHorizontal = (yPos min == yPos max)
+    isHorizontal = yPos min == yPos max
 
-persistPassMove :: Pool SqlBackend -> Text -> Int -> Bool -> IO ()
-persistPassMove pool gameId moveNumber endsGame = do
-  now <- getCurrentTime
-  persistMoveUpdate pool (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) now endsGame
+persistPassMove :: Pool SqlBackend -> Text -> Game -> IO ()
+persistPassMove pool gameId gameState = do
+  persistMoveUpdate pool gameId gameState (M.Move gameId moveNumber Nothing Nothing Nothing Nothing)
+  where
+    moveNumber = L.length (movesMade gameState)
 
-persistExchangeMove :: Pool SqlBackend -> Text -> Int -> [Tile] -> IO ()
-persistExchangeMove pool gameId moveNumber tiles = do
-  now <- getCurrentTime
-  persistMoveUpdate pool (M.Move gameId moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing) now False
+persistExchangeMove :: Pool SqlBackend -> Text -> Game -> [Tile] -> IO ()
+persistExchangeMove pool gameId gameState tiles = do
+  persistMoveUpdate pool gameId gameState (M.Move gameId moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing)
+  where
+    moveNumber = L.length (movesMade gameState)
 
-persistMoveUpdate :: Pool SqlBackend -> M.Move -> UTCTime -> Bool -> IO ()
-persistMoveUpdate pool move@(M.Move gameId moveNumber _ _ _ _) now endsGame = do
+persistMoveUpdate :: Pool SqlBackend -> Text -> Game -> M.Move -> IO ()
+persistMoveUpdate pool gameId gameState move@(M.Move _ moveNumber _ _ _ _) = do
   withPool pool $ do
     _ <- insert move
     return ()
 
-  updateLastMoveSummary pool gameId now moveNumber endsGame
+  updateGameSummary pool gameId gameState
 
-updateLastMoveSummary :: Pool SqlBackend -> Text -> UTCTime -> Int -> Bool -> IO ()
-updateLastMoveSummary pool gameId now currentMoveNumber endsGame = withPool pool $ do
-  let endTime = if endsGame then Just now else Nothing
-  _ <- update (M.GameKey gameId) [M.GameCurrentMoveNumber =. currentMoveNumber, M.GameLastMoveMadeAt =. Just now, M.GameFinishedAt =. endTime]
-  return ()
+updateGameSummary :: Pool SqlBackend -> Text -> Game -> IO ()
+updateGameSummary pool gameId gameState = do
+  now <- getCurrentTime
+  withPool pool $ do
+    let finishedAt = if gameFinished gameState then Just now else Nothing
+    let boardRepresentation = gameBoardTextRepresentation gameState
+    let currentMoveNumber = L.length (movesMade gameState) + 1
+    _ <-
+      -- TODO: make this a conditional update based on the lastMove timestamp being greater than the previous
+      update
+        (M.GameKey gameId)
+        [ M.GameCurrentMoveNumber =. currentMoveNumber,
+          M.GameLastMoveMadeAt =. Just now,
+          M.GameFinishedAt =. finishedAt,
+          M.GameBoard =. T.pack boardRepresentation
+        ]
+
+    return ()
+  where
+    gameFinished game = gameStatus game == Finished
+    gameBoardTextRepresentation = textRepresentation . board
 
 persistChatMessage :: Pool SqlBackend -> Text -> ChatMessage -> IO ()
 persistChatMessage pool gameId (ChatMessage user message) = do

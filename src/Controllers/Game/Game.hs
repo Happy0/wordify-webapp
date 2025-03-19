@@ -62,20 +62,25 @@ handleMove ::
   IO ServerResponse
 handleMove serverGame pool playerMoving move moveOutcomeHandler =
   do
-    gameState <- readTVarIO (game serverGame)
-    if (playerNumber gameState) /= playerMoving
+    gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
+    let currentGameState = gameState gameSnapshot
+    if playerNumber currentGameState /= playerMoving
       then return $ InvalidCommand "Not your move"
       else do
         let channel = broadcastChannel serverGame
-        let moveOutcome = makeMove gameState move
+        let moveOutcome = makeMove currentGameState move
         case moveOutcome of
           Left err -> return $ moveOutcomeHandler $ Left err
           Right transition -> do
             let eventMessage = transitionToMessage transition
-            P.persistGameUpdate pool (gameId serverGame) eventMessage
+            let newGameState = newGame transition
+
+            P.persistGameUpdate pool (snapshotGameId gameSnapshot) newGameState eventMessage
+
             atomically $ do
+              writeTVar (game serverGame) newGameState
               writeTChan channel eventMessage
-              writeTVar (game serverGame) $ newGame transition
+
             return $ moveOutcomeHandler moveOutcome
 
 handleBoardMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
@@ -118,7 +123,7 @@ handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe Int -> Text -> IO Se
 handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
 handleChatMessage serverGame pool (Just playerNumber) messageText =
   do
-    serverPlayer <- atomically (getServerPlayer serverGame playerNumber)
+    (serverPlayer, gameSnapshot) <- atomically $ (,) <$> getServerPlayer serverGame playerNumber <*> makeServerGameSnapshot serverGame
     let playerName = serverPlayer >>= SP.name
 
     case playerName of
@@ -126,6 +131,6 @@ handleChatMessage serverGame pool (Just playerNumber) messageText =
       Just playerName -> do
         let channel = broadcastChannel serverGame
         let message = PlayerChat $ ChatMessage playerName messageText
-        P.persistGameUpdate pool (gameId serverGame) message
+        P.persistGameUpdate pool (gameId serverGame) (gameState gameSnapshot) message
         atomically $ writeTChan channel message
         return ChatSuccess
