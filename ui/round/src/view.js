@@ -225,7 +225,7 @@ module.exports = function(ctrl) {
             m('div', {class: 'main row-fluid'},
               m('div', {},
                  [
-                        m('span', {class: 'col-md-3'}, m('div', {style: 'height: 100%;'}, [renderScoreBoard(), renderMoveHistory()])),
+                        m('span', {class: 'col-md-3'}, m('div', {}, [renderScoreBoard(), renderMoveHistory()])),
                         m('span', {class: 'col-md-6'},  [renderMiddleColumn()]),
                         m('span', {class: 'col-md-3'}, [renderChatBox()])
                  ]))

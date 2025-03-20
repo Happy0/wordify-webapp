@@ -61,6 +61,7 @@
 }
 
 .round-table {
+    height: 100%;
     position:relative;
     margin:auto;
     overflow: auto;
