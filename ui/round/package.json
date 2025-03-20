@@ -3,6 +3,9 @@
     "version": "0.0.1",
     "description": "A game round in the web application.",
     "main": "src/main.js",
+    "overrides": {
+        "graceful-fs": "^4.2.11"
+    },
     "devDependencies": {
         "browserify": "~9.0.8",
         "gulp": "^3.9.1",
