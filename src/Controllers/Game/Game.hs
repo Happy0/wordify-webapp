@@ -16,6 +16,7 @@ import qualified Data.Map as M
 import Data.Pool
 import Data.Text
 import Database.Persist.Sql
+import Model (User)
 import Wordify.Rules.FormedWord
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
@@ -25,6 +26,12 @@ import Wordify.Rules.Pos
 import Wordify.Rules.ScrabbleError
 import Wordify.Rules.Tile
 import Prelude
+
+handlePlayerConnect :: ServerGame -> Maybe User -> IO ()
+handlePlayerConnect serverGame user = undefined
+
+handlePlayerDisconnect :: ServerGame -> Maybe User -> IO ()
+handlePlayerDisconnect serverGame user = undefined
 
 performRequest :: ServerGame -> Pool SqlBackend -> Maybe Int -> ClientMessage -> IO ServerResponse
 performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool player placed

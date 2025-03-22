@@ -3,8 +3,10 @@ var merge = require('merge');
 module.exports = function(opts) {
 
     var defaults = {
+        connections: {},
         rack : [{}, {}, {}, {}, {}, {}, {}],
         moveHistory : [],
+        // [{"name": "fulano", "score": 10, "​endBonus": 0}]
         players : [],
         penalties : [0,0,0,0], // Penalties / bonuses for tiles remaining on rack once the game has ended
         playerToMove : 1,

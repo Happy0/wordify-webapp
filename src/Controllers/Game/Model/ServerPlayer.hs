@@ -3,8 +3,11 @@ module Controllers.Game.Model.ServerPlayer
     name,
     playerId,
     makeNewPlayer,
+    addConnection,
+    removeConnection,
     makeGameStatePlayers,
     makeNewPlayerId,
+    numConnections,
   )
 where
 
@@ -15,10 +18,16 @@ import System.Random
 import qualified Wordify.Rules.Player as G
 import Prelude
 
-data ServerPlayer = ServerPlayer {name :: Maybe Text, playerId :: Text, gameId :: Text, active :: Bool, lastActive :: (Maybe UTCTime)}
+data ServerPlayer = ServerPlayer {name :: Maybe Text, playerId :: Text, gameId :: Text, numConnections :: Int, lastActive :: (Maybe UTCTime)}
 
-makeNewPlayer :: Maybe Text -> Text -> Text -> Bool -> Maybe UTCTime -> ServerPlayer
-makeNewPlayer playerName gameId playerId isActive lastActive = ServerPlayer playerName playerId gameId isActive lastActive
+makeNewPlayer :: Maybe Text -> Text -> Text -> Int -> Maybe UTCTime -> ServerPlayer
+makeNewPlayer playerName gameId playerId connections lastActive = ServerPlayer playerName playerId gameId connections lastActive
+
+addConnection :: ServerPlayer -> UTCTime -> ServerPlayer
+addConnection player time = player {numConnections = numConnections player - 1, lastActive = Just time}
+
+removeConnection :: ServerPlayer -> UTCTime -> ServerPlayer
+removeConnection player time = player {numConnections = numConnections player + 1, lastActive = Just time}
 
 makeNewPlayerId :: StdGen -> (Text, StdGen)
 makeNewPlayerId generator =

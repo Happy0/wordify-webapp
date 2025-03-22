@@ -4,6 +4,10 @@ module Controllers.Game.Model.ServerGame
     makeNewServerGame,
     makeServerGame,
     makeServerGameSnapshot,
+    updateGameFinishedAt,
+    updateLastMoveMade,
+    increasePlayerConnections,
+    decreasePlayerConnections,
     gameId,
     game,
     playing,
@@ -11,26 +15,33 @@ module Controllers.Game.Model.ServerGame
     numConnections,
     increaseConnectionsByOne,
     decreaseConnectionsByOne,
-    getServerPlayer,
   )
 where
 
-import ClassyPrelude (UTCTime)
+import ClassyPrelude (UTCTime, whenM)
+import qualified ClassyPrelude.Conduit as L
+import ClassyPrelude.Yesod (Value (Bool))
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
+import Control.Monad (when)
 import Control.Monad.STM
 import Controllers.Common.CacheableSharedResource
 import Controllers.Game.Api
-import Controllers.Game.Model.ServerPlayer
+import qualified Controllers.Game.Model.ServerPlayer as SP
+import Data.Conduit.Combinators (iterM)
+import qualified Data.List as L
 import qualified Data.List.Safe as SL
+import Data.Maybe
 import Data.Text
+import GHC.Conc (TVar (TVar))
+import Model (User (User))
 import Wordify.Rules.Game
 import Prelude
 
 data ServerGameSnapshot = ServerGameSnapshot
   { snapshotGameId :: Text,
     gameState :: Game,
-    players :: [ServerPlayer],
+    players :: [SP.ServerPlayer],
     created :: UTCTime,
     lastMove :: Maybe UTCTime,
     finished :: Maybe UTCTime
@@ -39,7 +50,7 @@ data ServerGameSnapshot = ServerGameSnapshot
 data ServerGame = ServerGame
   { gameId :: Text,
     game :: TVar Game,
-    playing :: TVar [ServerPlayer],
+    playing :: [TVar SP.ServerPlayer],
     broadcastChannel :: (TChan GameMessage),
     numConnections :: TVar Int,
     createdAt :: UTCTime,
@@ -54,26 +65,26 @@ instance CacheableSharedResource ServerGame where
 
 makeServerGameSnapshot :: ServerGame -> STM ServerGameSnapshot
 makeServerGameSnapshot (ServerGame id game playing _ _ createdAt lastMoveMadeAt finishedAt) = do
-  players <- readTVar playing
+  players <- mapM readTVar playing
   gameState <- readTVar game
   lastMoveMade <- readTVar lastMoveMadeAt
   finished <- readTVar finishedAt
   return $ ServerGameSnapshot id gameState players createdAt lastMoveMade finished
 
-makeNewServerGame :: Text -> Game -> [ServerPlayer] -> UTCTime -> STM ServerGame
+makeNewServerGame :: Text -> Game -> [SP.ServerPlayer] -> UTCTime -> STM ServerGame
 makeNewServerGame gameId initialGameState players createdAt = do
   connections <- newTVar 0
-  initialPlayerState <- newTVar players
+  initialPlayerState <- L.mapM newTVar players
   lastMoveMadeAt <- newTVar Nothing
   finishedAt <- newTVar Nothing
   game <- newTVar initialGameState
   messageChannel <- newBroadcastTChan
   return (ServerGame gameId game initialPlayerState messageChannel connections createdAt lastMoveMadeAt finishedAt)
 
-makeServerGame :: Text -> Game -> [ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> STM ServerGame
+makeServerGame :: Text -> Game -> [SP.ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> STM ServerGame
 makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedAt = do
   connections <- newTVar 0
-  currentPlayerState <- newTVar serverPlayers
+  currentPlayerState <- mapM newTVar serverPlayers
   lastMoveMade <- newTVar lastMoveMadeAt
   finished <- newTVar finishedAt
   game <- newTVar gameState
@@ -81,28 +92,45 @@ makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedA
   return (ServerGame gameId game currentPlayerState messageChannel connections createdAt lastMoveMade finished)
 
 updateLastMoveMade :: ServerGame -> UTCTime -> STM ()
-updateLastMoveMade serverGame moveTime = undefined
+updateLastMoveMade serverGame moveTime = writeTVar (lastMoveMadeAt serverGame) (Just moveTime)
 
 updateGameFinishedAt :: ServerGame -> UTCTime -> STM ()
-updateGameFinishedAt serverGame finishTime = undefined
+updateGameFinishedAt serverGame finishTime = writeTVar (finishedAt serverGame) (Just finishTime)
 
-setPlayerActive :: ServerGame -> Text -> UTCTime -> STM ()
-setPlayerActive serverGame playerId atTime = undefined
+increasePlayerConnections :: ServerGame -> User -> UTCTime -> STM (Maybe Int)
+increasePlayerConnections serverGame user now = do
+  player <- getServerPlayer serverGame user
 
-setPlayerInactive :: ServerGame -> Text -> UTCTime -> STM ()
-setPlayerInactive serverGame playerId atTime = undefined
+  case player of
+    Nothing -> return Nothing
+    Just p -> do
+      modifyTVar p (`SP.addConnection` now)
+      Just . SP.numConnections <$> readTVar p
 
-updatePlayerActive :: [ServerPlayer] -> Text -> UTCTime -> [ServerPlayer]
-updatePlayerActive players activePlayer atTime = undefined
+decreasePlayerConnections :: ServerGame -> User -> UTCTime -> STM (Maybe Int)
+decreasePlayerConnections serverGame user now = do
+  player <- getServerPlayer serverGame user
 
-updatePlayerInactive :: [ServerPlayer] -> Text -> UTCTime -> [ServerPlayer]
-updatePlayerInactive players inactivePlayer atTime = undefined
+  case player of
+    Nothing -> return Nothing
+    Just p -> do
+      modifyTVar p (`SP.removeConnection` now)
+      Just . SP.numConnections <$> readTVar p
 
-getServerPlayer :: ServerGame -> Int -> STM (Maybe ServerPlayer)
-getServerPlayer serverGame playerNumber =
-  do
-    playingx <- readTVar (playing serverGame)
-    return (playingx SL.!! (playerNumber - 1))
+getServerPlayer :: ServerGame -> User -> STM (Maybe (TVar SP.ServerPlayer))
+getServerPlayer serverGame user = findTvar (isUser user) (playing serverGame)
+  where
+    findTvar :: (a -> Bool) -> [TVar a] -> STM (Maybe (TVar a))
+    findTvar pred [] = pure Nothing
+    findTvar pred (item : items) = do
+      x <- readTVar item
+      if pred x then return (Just item) else findTvar pred items
+
+    isUserM :: User -> TVar SP.ServerPlayer -> STM Bool
+    isUserM user playerTvar = isUser user <$> readTVar playerTvar
+
+    isUser :: User -> SP.ServerPlayer -> Bool
+    isUser (User userId _) serverPlayer = userId == SP.playerId serverPlayer
 
 increaseConnectionsByOne :: ServerGame -> STM ()
 increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ

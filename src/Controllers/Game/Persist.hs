@@ -1,5 +1,6 @@
 module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
 
+import ClassyPrelude (mapConcurrently)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -120,7 +121,7 @@ getGame pool localisedGameSetups gameId = do
   case dbEntries of
     Right (Entity _ (M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _), playerModels, moveModels) -> do
       -- This could be more efficient than individual fetches, but it doesn't matter for now
-      serverPlayers <- mapM (playerFromEntity pool) playerModels
+      serverPlayers <- mapConcurrently (playerFromEntity pool) playerModels
 
       runExceptT $ do
         let locale = maybe "en" id maybeLocale
