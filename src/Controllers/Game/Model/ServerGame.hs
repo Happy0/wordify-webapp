@@ -21,21 +21,18 @@ module Controllers.Game.Model.ServerGame
   )
 where
 
-import ClassyPrelude (UTCTime, whenM)
-import ClassyPrelude.Yesod (Value (Bool))
+import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
-import Control.Monad (when)
 import Control.Monad.STM
 import Controllers.Common.CacheableSharedResource
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerPlayer (ServerPlayer (ServerPlayer))
 import qualified Controllers.Game.Model.ServerPlayer as SP
-import Data.Conduit.Combinators (iterM)
+import Controllers.User.Model.AuthUser
 import qualified Data.List as L
 import Data.Maybe
 import Data.Text
-import GHC.Conc (TVar (TVar))
 import Model (User (User))
 import qualified Wordify.Rules.Game as G
 import Prelude
@@ -103,7 +100,7 @@ updateLastMoveMade serverGame moveTime = writeTVar (lastMoveMadeAt serverGame) (
 updateGameFinishedAt :: ServerGame -> UTCTime -> STM ()
 updateGameFinishedAt serverGame finishTime = writeTVar (finishedAt serverGame) (Just finishTime)
 
-increasePlayerConnections :: ServerGame -> User -> UTCTime -> STM (Maybe Int)
+increasePlayerConnections :: ServerGame -> AuthUser -> UTCTime -> STM (Maybe Int)
 increasePlayerConnections serverGame user now = do
   let player = getServerPlayer serverGame user
 
@@ -113,7 +110,7 @@ increasePlayerConnections serverGame user now = do
       modifyTVar p (`SP.addConnection` now)
       Just . SP.numConnections <$> readTVar p
 
-decreasePlayerConnections :: ServerGame -> User -> UTCTime -> STM (Maybe Int)
+decreasePlayerConnections :: ServerGame -> AuthUser -> UTCTime -> STM (Maybe Int)
 decreasePlayerConnections serverGame user now = do
   let player = getServerPlayer serverGame user
 
@@ -123,17 +120,17 @@ decreasePlayerConnections serverGame user now = do
       modifyTVar p (`SP.removeConnection` now)
       Just . SP.numConnections <$> readTVar p
 
-getServerPlayer :: ServerGame -> User -> Maybe (TVar SP.ServerPlayer)
+getServerPlayer :: ServerGame -> AuthUser -> Maybe (TVar SP.ServerPlayer)
 getServerPlayer serverGame user = snd <$> L.find (isUser user) (playing serverGame)
   where
-    isUser :: User -> (Text, TVar SP.ServerPlayer) -> Bool
-    isUser (User userId _) (playerId, _) = userId == playerId
+    isUser :: AuthUser -> (Text, TVar SP.ServerPlayer) -> Bool
+    isUser (AuthUser userId _) (playerId, _) = userId == playerId
 
-getServerPlayerSnapshot :: ServerGameSnapshot -> User -> Maybe SP.ServerPlayer
+getServerPlayerSnapshot :: ServerGameSnapshot -> AuthUser -> Maybe SP.ServerPlayer
 getServerPlayerSnapshot gameSnapshot user = L.find (isUser user) (players gameSnapshot)
   where
-    isUser :: User -> SP.ServerPlayer -> Bool
-    isUser (User userId _) serverPlayer = SP.playerId serverPlayer == userId
+    isUser :: AuthUser -> SP.ServerPlayer -> Bool
+    isUser (AuthUser userId _) serverPlayer = SP.playerId serverPlayer == userId
 
 increaseConnectionsByOne :: ServerGame -> STM ()
 increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ
@@ -143,7 +140,7 @@ decreaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) dec
   where
     decreaseByOne i = i - 1
 
-getPlayerNumber :: ServerGame -> User -> Maybe Int
-getPlayerNumber serverGame (User userId _) = do
+getPlayerNumber :: ServerGame -> AuthUser -> Maybe Int
+getPlayerNumber serverGame (AuthUser userId _) = do
   let playerIds = Prelude.map fst (playing serverGame)
   fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)

@@ -1,16 +1,20 @@
 module Controllers.Game.Game
   ( performRequest,
+    notifyGameConnectionStatus,
   )
 where
 
+import ClassyPrelude (getCurrentTime)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
+import Control.Exception (bracket_)
 import Control.Monad
 import Control.Monad.STM
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
+import Controllers.User.Model.AuthUser
 import Data.Conduit
 import qualified Data.Map as M
 import Data.Pool
@@ -27,13 +31,24 @@ import Wordify.Rules.ScrabbleError
 import Wordify.Rules.Tile
 import Prelude
 
-handlePlayerConnect :: ServerGame -> Maybe User -> IO ()
-handlePlayerConnect serverGame user = undefined
+handlePlayerConnect :: ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerConnect serverGame Nothing = pure ()
+handlePlayerConnect serverGame (Just user) = do
+  now <- getCurrentTime
+  conns <- atomically $ increasePlayerConnections serverGame user now
+  return ()
 
-handlePlayerDisconnect :: ServerGame -> Maybe User -> IO ()
-handlePlayerDisconnect serverGame user = undefined
+handlePlayerDisconnect :: ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerDisconnect serverGame Nothing = pure ()
+handlePlayerDisconnect serverGame (Just user) = do
+  now <- getCurrentTime
+  conns <- atomically $ decreasePlayerConnections serverGame user now
+  return ()
 
-performRequest :: ServerGame -> Pool SqlBackend -> Maybe User -> ClientMessage -> IO ServerResponse
+notifyGameConnectionStatus :: ServerGame -> Maybe AuthUser -> IO () -> IO ()
+notifyGameConnectionStatus serverGame maybeUser = bracket_ (handlePlayerConnect serverGame maybeUser) (handlePlayerDisconnect serverGame maybeUser)
+
+performRequest :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
 performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
 performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
 performRequest serverGame pool player PassMove = handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
@@ -115,7 +130,7 @@ handleExchangeMove sharedServerGame pool (Just playerNo) exchanged =
     moveOutcomeHandler
   where
     moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
-    moveOutcomeHandler (Right (ExchangeTransition _ beforePlayer afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
+    moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
     moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
 handlePassMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> IO ServerResponse
@@ -126,7 +141,7 @@ handlePassMove sharedServerGame pool (Just playerNo) =
     moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
-handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe User -> Text -> IO ServerResponse
+handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
 handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
 handleChatMessage serverGame pool (Just user) messageText =
   do
