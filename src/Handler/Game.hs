@@ -209,7 +209,7 @@ sendPreviousChatMessages pool gameId connection = do
     flip runSqlPersistMPool pool $
       getChatMessages gameId $$ CL.map toJSONResponse $= (CL.mapM_ (liftIO . C.sendTextData connection))
 
-getPlayerNumber :: ServerGame -> Text -> STM (Maybe Int)
-getPlayerNumber serverGame findPlayerID = do
-  players <- readTVar (playing serverGame)
-  return $ fst <$> L.find (\(ind, player) -> findPlayerID == playerId player) (zip [1 .. 4] players)
+getPlayerNumber :: ServerGame -> User -> Maybe Int
+getPlayerNumber serverGame (User userId _) = do
+  let playerIds = map fst (playing serverGame)
+  fst <$> L.find (\(_, playerId) -> userId == playerId) (zip [1 .. 4] playerIds)
