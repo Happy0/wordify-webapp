@@ -4,7 +4,7 @@ module Controllers.Game.Game
   )
 where
 
-import ClassyPrelude (getCurrentTime)
+import ClassyPrelude (getCurrentTime, whenM)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
@@ -19,6 +19,7 @@ import Data.Conduit
 import qualified Data.Map as M
 import Data.Pool
 import Data.Text
+import Data.Time
 import Database.Persist.Sql
 import Model (User)
 import Wordify.Rules.FormedWord
@@ -35,15 +36,37 @@ handlePlayerConnect :: ServerGame -> Maybe AuthUser -> IO ()
 handlePlayerConnect serverGame Nothing = pure ()
 handlePlayerConnect serverGame (Just user) = do
   now <- getCurrentTime
-  conns <- atomically $ increasePlayerConnections serverGame user now
-  return ()
+  atomically $ handleNewPlayerConnection serverGame user now
+  where
+    handleNewPlayerConnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
+    handleNewPlayerConnection serverGame user now = do
+      let connectionCount = increasePlayerConnections serverGame user now
+      whenM (isFirstConnection <$> connectionCount) $ notifyPlayerConnect serverGame user
+
+    isFirstConnection :: Maybe Int -> Bool
+    isFirstConnection (Just connectionCount) = connectionCount == 1
+    isFirstConnection Nothing = False
 
 handlePlayerDisconnect :: ServerGame -> Maybe AuthUser -> IO ()
 handlePlayerDisconnect serverGame Nothing = pure ()
 handlePlayerDisconnect serverGame (Just user) = do
   now <- getCurrentTime
-  conns <- atomically $ decreasePlayerConnections serverGame user now
-  return ()
+  atomically $ handleNewPlayerConnection serverGame user now
+  where
+    handleNewPlayerConnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
+    handleNewPlayerConnection serverGame user now = do
+      let connectionCount = increasePlayerConnections serverGame user now
+      whenM (isLastConnection <$> connectionCount) $ notifyPlayerDisconnect serverGame user
+
+    isLastConnection :: Maybe Int -> Bool
+    isLastConnection (Just connectionCount) = connectionCount == 0
+    isLastConnection Nothing = False
+
+notifyPlayerConnect :: ServerGame -> AuthUser -> STM ()
+notifyPlayerConnect serverGame user = pure ()
+
+notifyPlayerDisconnect :: ServerGame -> AuthUser -> STM ()
+notifyPlayerDisconnect serverGame user = pure ()
 
 notifyGameConnectionStatus :: ServerGame -> Maybe AuthUser -> IO () -> IO ()
 notifyGameConnectionStatus serverGame maybeUser = bracket_ (handlePlayerConnect serverGame maybeUser) (handlePlayerDisconnect serverGame maybeUser)
