@@ -2,6 +2,7 @@ module Controllers.Game.Model.ServerGame
   ( ServerGame,
     ServerGameSnapshot (ServerGameSnapshot, snapshotGameId, gameState),
     getServerPlayer,
+    getPlayerNumber,
     makeNewServerGame,
     makeServerGame,
     makeServerGameSnapshot,
@@ -16,6 +17,7 @@ module Controllers.Game.Model.ServerGame
     numConnections,
     increaseConnectionsByOne,
     decreaseConnectionsByOne,
+    getServerPlayerSnapshot,
   )
 where
 
@@ -35,12 +37,12 @@ import Data.Maybe
 import Data.Text
 import GHC.Conc (TVar (TVar))
 import Model (User (User))
-import Wordify.Rules.Game
+import qualified Wordify.Rules.Game as G
 import Prelude
 
 data ServerGameSnapshot = ServerGameSnapshot
   { snapshotGameId :: Text,
-    gameState :: Game,
+    gameState :: G.Game,
     players :: [SP.ServerPlayer],
     created :: UTCTime,
     lastMove :: Maybe UTCTime,
@@ -49,7 +51,7 @@ data ServerGameSnapshot = ServerGameSnapshot
 
 data ServerGame = ServerGame
   { gameId :: Text,
-    game :: TVar Game,
+    game :: TVar G.Game,
     playing :: [(Text, TVar SP.ServerPlayer)],
     broadcastChannel :: (TChan GameMessage),
     numConnections :: TVar Int,
@@ -71,7 +73,7 @@ makeServerGameSnapshot (ServerGame id game playing _ _ createdAt lastMoveMadeAt 
   finished <- readTVar finishedAt
   return $ ServerGameSnapshot id gameState players createdAt lastMoveMade finished
 
-makeNewServerGame :: Text -> Game -> [SP.ServerPlayer] -> UTCTime -> STM ServerGame
+makeNewServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> STM ServerGame
 makeNewServerGame gameId initialGameState players createdAt = do
   connections <- newTVar 0
   initialPlayerState <- mapM makeServerPlayerState players
@@ -81,7 +83,7 @@ makeNewServerGame gameId initialGameState players createdAt = do
   messageChannel <- newBroadcastTChan
   return (ServerGame gameId game initialPlayerState messageChannel connections createdAt lastMoveMadeAt finishedAt)
 
-makeServerGame :: Text -> Game -> [SP.ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> STM ServerGame
+makeServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> STM ServerGame
 makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedAt = do
   connections <- newTVar 0
   currentPlayerStates <- mapM makeServerPlayerState serverPlayers
@@ -127,6 +129,12 @@ getServerPlayer serverGame user = snd <$> L.find (isUser user) (playing serverGa
     isUser :: User -> (Text, TVar SP.ServerPlayer) -> Bool
     isUser (User userId _) (playerId, _) = userId == playerId
 
+getServerPlayerSnapshot :: ServerGameSnapshot -> User -> Maybe SP.ServerPlayer
+getServerPlayerSnapshot gameSnapshot user = L.find (isUser user) (players gameSnapshot)
+  where
+    isUser :: User -> SP.ServerPlayer -> Bool
+    isUser (User userId _) serverPlayer = SP.playerId serverPlayer == userId
+
 increaseConnectionsByOne :: ServerGame -> STM ()
 increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ
 
@@ -134,3 +142,8 @@ decreaseConnectionsByOne :: ServerGame -> STM ()
 decreaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) decreaseByOne
   where
     decreaseByOne i = i - 1
+
+getPlayerNumber :: ServerGame -> User -> Maybe Int
+getPlayerNumber serverGame (User userId _) = do
+  let playerIds = Prelude.map fst (playing serverGame)
+  fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)

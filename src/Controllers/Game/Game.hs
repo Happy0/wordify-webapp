@@ -33,10 +33,10 @@ handlePlayerConnect serverGame user = undefined
 handlePlayerDisconnect :: ServerGame -> Maybe User -> IO ()
 handlePlayerDisconnect serverGame user = undefined
 
-performRequest :: ServerGame -> Pool SqlBackend -> Maybe Int -> ClientMessage -> IO ServerResponse
-performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool player placed
-performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool player exchanged
-performRequest serverGame pool player PassMove = handlePassMove serverGame pool player
+performRequest :: ServerGame -> Pool SqlBackend -> Maybe User -> ClientMessage -> IO ServerResponse
+performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
+performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
+performRequest serverGame pool player PassMove = handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
 performRequest serverGame pool player (SendChatMessage msg) = handleChatMessage serverGame pool player msg
 performRequest serverGame pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
 
@@ -126,11 +126,13 @@ handlePassMove sharedServerGame pool (Just playerNo) =
     moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
-handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe Int -> Text -> IO ServerResponse
+handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe User -> Text -> IO ServerResponse
 handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-handleChatMessage serverGame pool (Just playerNumber) messageText =
+handleChatMessage serverGame pool (Just user) messageText =
   do
-    (serverPlayer, gameSnapshot) <- atomically $ (,) <$> getServerPlayer serverGame playerNumber <*> makeServerGameSnapshot serverGame
+    gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
+    let serverPlayer = getServerPlayerSnapshot gameSnapshot user
+
     let playerName = serverPlayer >>= SP.name
 
     case playerName of
