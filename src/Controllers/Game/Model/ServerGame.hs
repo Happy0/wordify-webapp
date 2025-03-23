@@ -1,6 +1,7 @@
 module Controllers.Game.Model.ServerGame
   ( ServerGame,
     ServerGameSnapshot (ServerGameSnapshot, snapshotGameId, gameState),
+    getServerPlayer,
     makeNewServerGame,
     makeServerGame,
     makeServerGameSnapshot,
@@ -124,7 +125,7 @@ getServerPlayer :: ServerGame -> User -> Maybe (TVar SP.ServerPlayer)
 getServerPlayer serverGame user = snd <$> L.find (isUser user) (playing serverGame)
   where
     isUser :: User -> (Text, TVar SP.ServerPlayer) -> Bool
-    isUser (User userId _) (playerId, playerTvar) = userId == playerId
+    isUser (User userId _) (playerId, _) = userId == playerId
 
 increaseConnectionsByOne :: ServerGame -> STM ()
 increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ
