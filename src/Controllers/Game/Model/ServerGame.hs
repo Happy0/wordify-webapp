@@ -19,7 +19,6 @@ module Controllers.Game.Model.ServerGame
 where
 
 import ClassyPrelude (UTCTime, whenM)
-import qualified ClassyPrelude.Conduit as L
 import ClassyPrelude.Yesod (Value (Bool))
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
@@ -27,10 +26,10 @@ import Control.Monad (when)
 import Control.Monad.STM
 import Controllers.Common.CacheableSharedResource
 import Controllers.Game.Api
+import Controllers.Game.Model.ServerPlayer (ServerPlayer (ServerPlayer))
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Data.Conduit.Combinators (iterM)
 import qualified Data.List as L
-import qualified Data.List.Safe as SL
 import Data.Maybe
 import Data.Text
 import GHC.Conc (TVar (TVar))
@@ -50,7 +49,7 @@ data ServerGameSnapshot = ServerGameSnapshot
 data ServerGame = ServerGame
   { gameId :: Text,
     game :: TVar Game,
-    playing :: [TVar SP.ServerPlayer],
+    playing :: [(Text, TVar SP.ServerPlayer)],
     broadcastChannel :: (TChan GameMessage),
     numConnections :: TVar Int,
     createdAt :: UTCTime,
@@ -65,7 +64,7 @@ instance CacheableSharedResource ServerGame where
 
 makeServerGameSnapshot :: ServerGame -> STM ServerGameSnapshot
 makeServerGameSnapshot (ServerGame id game playing _ _ createdAt lastMoveMadeAt finishedAt) = do
-  players <- mapM readTVar playing
+  players <- mapM (readTVar . snd) playing
   gameState <- readTVar game
   lastMoveMade <- readTVar lastMoveMadeAt
   finished <- readTVar finishedAt
@@ -74,7 +73,7 @@ makeServerGameSnapshot (ServerGame id game playing _ _ createdAt lastMoveMadeAt 
 makeNewServerGame :: Text -> Game -> [SP.ServerPlayer] -> UTCTime -> STM ServerGame
 makeNewServerGame gameId initialGameState players createdAt = do
   connections <- newTVar 0
-  initialPlayerState <- L.mapM newTVar players
+  initialPlayerState <- mapM makeServerPlayerState players
   lastMoveMadeAt <- newTVar Nothing
   finishedAt <- newTVar Nothing
   game <- newTVar initialGameState
@@ -84,12 +83,16 @@ makeNewServerGame gameId initialGameState players createdAt = do
 makeServerGame :: Text -> Game -> [SP.ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> STM ServerGame
 makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedAt = do
   connections <- newTVar 0
-  currentPlayerState <- mapM newTVar serverPlayers
+  currentPlayerStates <- mapM makeServerPlayerState serverPlayers
   lastMoveMade <- newTVar lastMoveMadeAt
   finished <- newTVar finishedAt
   game <- newTVar gameState
   messageChannel <- newBroadcastTChan
-  return (ServerGame gameId game currentPlayerState messageChannel connections createdAt lastMoveMade finished)
+  return (ServerGame gameId game currentPlayerStates messageChannel connections createdAt lastMoveMade finished)
+
+makeServerPlayerState :: SP.ServerPlayer -> STM (Text, TVar ServerPlayer)
+makeServerPlayerState serverPlayer@(ServerPlayer _ playerId _ _ _) =
+  (,) playerId <$> newTVar serverPlayer
 
 updateLastMoveMade :: ServerGame -> UTCTime -> STM ()
 updateLastMoveMade serverGame moveTime = writeTVar (lastMoveMadeAt serverGame) (Just moveTime)
@@ -99,7 +102,7 @@ updateGameFinishedAt serverGame finishTime = writeTVar (finishedAt serverGame) (
 
 increasePlayerConnections :: ServerGame -> User -> UTCTime -> STM (Maybe Int)
 increasePlayerConnections serverGame user now = do
-  player <- getServerPlayer serverGame user
+  let player = getServerPlayer serverGame user
 
   case player of
     Nothing -> return Nothing
@@ -109,28 +112,19 @@ increasePlayerConnections serverGame user now = do
 
 decreasePlayerConnections :: ServerGame -> User -> UTCTime -> STM (Maybe Int)
 decreasePlayerConnections serverGame user now = do
-  player <- getServerPlayer serverGame user
+  let player = getServerPlayer serverGame user
 
   case player of
-    Nothing -> return Nothing
+    Nothing -> pure Nothing
     Just p -> do
       modifyTVar p (`SP.removeConnection` now)
       Just . SP.numConnections <$> readTVar p
 
-getServerPlayer :: ServerGame -> User -> STM (Maybe (TVar SP.ServerPlayer))
-getServerPlayer serverGame user = findTvar (isUser user) (playing serverGame)
+getServerPlayer :: ServerGame -> User -> Maybe (TVar SP.ServerPlayer)
+getServerPlayer serverGame user = snd <$> L.find (isUser user) (playing serverGame)
   where
-    findTvar :: (a -> Bool) -> [TVar a] -> STM (Maybe (TVar a))
-    findTvar pred [] = pure Nothing
-    findTvar pred (item : items) = do
-      x <- readTVar item
-      if pred x then return (Just item) else findTvar pred items
-
-    isUserM :: User -> TVar SP.ServerPlayer -> STM Bool
-    isUserM user playerTvar = isUser user <$> readTVar playerTvar
-
-    isUser :: User -> SP.ServerPlayer -> Bool
-    isUser (User userId _) serverPlayer = userId == SP.playerId serverPlayer
+    isUser :: User -> (Text, TVar SP.ServerPlayer) -> Bool
+    isUser (User userId _) (playerId, playerTvar) = userId == playerId
 
 increaseConnectionsByOne :: ServerGame -> STM ()
 increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ
