@@ -82,6 +82,11 @@
   width: 100%;
 }
 
+.round-active-light {
+    padding-right: 3px;
+}
+
+
 .round-table tr:nth-child(odd){ background: rgba(183,222,237,1);
 background: -moz-linear-gradient(top, rgba(183,222,237,1) 0%, rgba(113,206,239,1) 50%, rgba(33,180,226,1) 51%, rgba(183,222,237,1) 100%);
 background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(183,222,237,1)), color-stop(50%, rgba(113,206,239,1)), color-stop(51%, rgba(33,180,226,1)), color-stop(100%, rgba(183,222,237,1)));
@@ -154,5 +159,4 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#b7deed', end
 
 .chat-user {
     padding-right: 10px;
-
 }

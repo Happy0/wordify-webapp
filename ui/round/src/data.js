@@ -3,7 +3,8 @@ var merge = require('merge');
 module.exports = function(opts) {
 
     var defaults = {
-        connections: {},
+        //[{"active": true, "lastSeen": "2025-03-24T21:10:32.016620946Z"}]
+        connections: [],
         rack : [{}, {}, {}, {}, {}, {}, {}],
         moveHistory : [],
         // [{"name": "fulano", "score": 10, "​endBonus": 0}]

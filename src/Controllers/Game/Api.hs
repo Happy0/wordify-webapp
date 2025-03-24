@@ -12,6 +12,7 @@ module Controllers.Game.Api
         InvalidCommand
       ),
     MoveSummary (BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary),
+    ConnectionStatus (ConnectionStatus),
     toMoveSummary,
     transitionToMessage,
     transitionToSummary,
@@ -91,6 +92,8 @@ data GameMessage
   | PlayerChat ChatMessage
   | PlayerConnect Int UTCTime
   | PlayerDisconnect Int UTCTime
+
+data ConnectionStatus = ConnectionStatus Int Bool (Maybe UTCTime)
 
 instance ToJSON ChatMessage where
   toJSON (ChatMessage user message) = object ["player" .= user, "message" .= message]
@@ -290,6 +293,9 @@ toMoveSummary formedWords =
               )
 
 toTextScores = fmap (\(word, score) -> (pack word, score))
+
+instance ToJSON ConnectionStatus where
+  toJSON (ConnectionStatus playerNumber active lastSeen) = object ["playerNumber" .= playerNumber, "active" .= active, "lastSeen" .= lastSeen]
 
 instance ToJSON Board where
   toJSON = toJSON . groupSquaresByColumn . allSquares

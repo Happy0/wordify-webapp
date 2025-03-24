@@ -192,9 +192,19 @@ module.exports = function(ctrl) {
     var renderScoreBoard = function() {
         var players = ctrl.data.players;
 
+        var renderOnlineIcon = function(idx) {
+            var player = ctrl.data.connections[idx]
+
+            if (!player || !player.active) {
+                return m('span', {class: 'round-active-light'}, '⚪')
+            } else {
+                return m('span', {class: 'round-active-light'}, '🟢')
+            }
+        }
+
         var renderPlayerRow = function(player, idx) {
             return m('tr', {},
-                     [m('td', {class : ""}, player.name),
+                     [m('td', [renderOnlineIcon(idx), m('span', {class : ""}, player.name) ]),
                          m('td', {}, !ctrl.data.players[idx].endBonus ? player.score :
                           player.score + ' (' + ctrl.data.players[idx].endBonus + ')')]);
         }

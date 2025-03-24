@@ -58,6 +58,14 @@ getGameR gameId = do
     (_, game) <- getCacheableResource (games app) gameId
     lift $ renderGamePage app gameId maybeUser game
 
+getConnectionStatuses :: ServerGame -> STM [ConnectionStatus]
+getConnectionStatuses serverGame = do
+  snapshot <- makeServerGameSnapshot serverGame
+  pure $ L.zipWith toConnectionStatus (snapshotPlayers snapshot) [1 ..]
+  where
+    toConnectionStatus :: ServerPlayer -> Int -> ConnectionStatus
+    toConnectionStatus (ServerPlayer _ _ _ numConnections lastActive) playerNumber = ConnectionStatus playerNumber (numConnections > 0) lastActive
+
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
 renderGamePage app gameId maybeUser (Right serverGame) = do
@@ -70,6 +78,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let playing = G.playerNumber gameSoFar
   let numTilesRemaining = (bagSize (G.bag gameSoFar))
   let gameMoveSummaries = gameToMoveSummaries gameSoFar
+
+  connectionStatuses <- atomically $ getConnectionStatuses serverGame
 
   case gameMoveSummaries of
     Left err -> invalidArgs [err]
@@ -106,6 +116,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               opts.moveHistory = #{toJSON summaries}
               opts.lastMoveReceived = #{toJSON (G.moveNumber gameSoFar)}
               opts.ground.highlightMoveMainWordClass = "highlight-main";
+              opts.connections = #{toJSON connectionStatuses}
 
               opts.send = send;
               var round = Round(opts);

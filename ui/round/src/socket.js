@@ -121,6 +121,12 @@ module.exports = function(opts) {
             var potentialScore = data.potentialScore;
             controller.setPotentialScore(potentialScore);
         },
+        "playerConnect": function(data) {
+            controller.playerConnect(data.playerNumber)
+        },
+        "playerDisconnect": function(data) {
+            controller.playerDisconnect(data.playerNumber)
+        },
         "error" : function(data) {
             controller.showErrorMessage(data);
         }

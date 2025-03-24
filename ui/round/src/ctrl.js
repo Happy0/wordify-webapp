@@ -359,6 +359,22 @@ module.exports = function(opts) {
         askPotentialScore();
     };
 
+    var playerConnect = function(playerNumber) {
+        m.startComputation()
+
+        data.connections[playerNumber - 1] = { active: true }
+
+        m.endComputation()
+    }
+
+    var playerDisconnect = function(playerNumber) {
+        m.startComputation()
+
+        data.connections[playerNumber - 1] = { active: false }
+
+        m.endComputation()
+    }
+
     scrabbleGroundCtrl.setCustomRevertFunction(putTileBackOnRack);
 
     var controllerFunctions = {
@@ -385,6 +401,8 @@ module.exports = function(opts) {
         addExchangeMoveToHistory : addExchangeMoveToHistory,
         addChatMessage : addChatMessage,
         updateRack : updateRack,
+        playerConnect: playerConnect,
+        playerDisconnect: playerDisconnect,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
     };
