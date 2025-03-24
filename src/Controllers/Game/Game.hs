@@ -4,7 +4,7 @@ module Controllers.Game.Game
   )
 where
 
-import ClassyPrelude (getCurrentTime, whenM)
+import ClassyPrelude (getCurrentTime, traverse_, whenM)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
@@ -63,10 +63,14 @@ handlePlayerDisconnect serverGame (Just user) = do
     isLastConnection Nothing = False
 
 notifyPlayerConnect :: ServerGame -> AuthUser -> STM ()
-notifyPlayerConnect serverGame user = pure ()
+notifyPlayerConnect serverGame user = do
+  let playerNumber = getPlayerNumber serverGame user
+  traverse_ (writeTChan (broadcastChannel serverGame) . PlayerConnect) playerNumber
 
 notifyPlayerDisconnect :: ServerGame -> AuthUser -> STM ()
-notifyPlayerDisconnect serverGame user = pure ()
+notifyPlayerDisconnect serverGame user = do
+  let playerNumber = getPlayerNumber serverGame user
+  traverse_ (writeTChan (broadcastChannel serverGame) . PlayerDisconnect) playerNumber
 
 notifyGameConnectionStatus :: ServerGame -> Maybe AuthUser -> IO () -> IO ()
 notifyGameConnectionStatus serverGame maybeUser = bracket_ (handlePlayerConnect serverGame maybeUser) (handlePlayerDisconnect serverGame maybeUser)

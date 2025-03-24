@@ -1,7 +1,7 @@
 module Controllers.Game.Api
   ( ChatMessage (ChatMessage),
     ClientMessage (AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
-    GameMessage (PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat, GameIdle),
+    GameMessage (PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat, PlayerConnect, PlayerDisconnect),
     ServerResponse
       ( PotentialScore,
         BoardMoveSuccess,
@@ -89,7 +89,8 @@ data GameMessage
   | PlayerPassMove Int Int MoveSummary
   | PlayerExchangeMove Int Int [Tile] MoveSummary
   | PlayerChat ChatMessage
-  | GameIdle
+  | PlayerConnect Int
+  | PlayerDisconnect Int
 
 instance ToJSON ChatMessage where
   toJSON (ChatMessage user message) = object ["player" .= user, "message" .= message]
@@ -136,7 +137,8 @@ instance ServerMessage GameMessage where
   commandName (PlayerExchangeMove {}) = "playerExchangeMove"
   commandName (GameEnd {}) = "gameFinished"
   commandName (PlayerChat {}) = "playerChat"
-  commandName (GameIdle {}) = "gameIdle"
+  commandName (PlayerConnect _) = "playerConnect"
+  commandName (PlayerDisconnect _) = "playerDisconnect"
 
 instance ToJSON GameMessage where
   toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
@@ -159,8 +161,9 @@ instance ToJSON GameMessage where
     object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
   toJSON (PlayerPassMove moveNumber nowPlaying summary) =
     object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
+  toJSON (PlayerConnect playerNumber) = object ["playerNumber" .= playerNumber]
+  toJSON (PlayerDisconnect playerNumber) = object ["playerNumber" .= playerNumber]
   toJSON (PlayerChat chatMessage) = toJSON chatMessage
-  toJSON (GameIdle) = object []
 
 instance FromJSON ClientMessage where
   parseJSON (Object request) =
