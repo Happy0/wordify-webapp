@@ -34,51 +34,55 @@ import Wordify.Rules.ScrabbleError
 import Wordify.Rules.Tile
 import Prelude
 
-handlePlayerConnect :: ServerGame -> Maybe AuthUser -> IO ()
-handlePlayerConnect serverGame Nothing = pure ()
-handlePlayerConnect serverGame (Just user) = do
+handlePlayerConnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerConnect pool serverGame Nothing = pure ()
+handlePlayerConnect pool serverGame (Just user) = do
   now <- getCurrentTime
+  persistPlayerLastSeen pool user (gameId serverGame) now
   atomically $ handleNewPlayerConnection serverGame user now
   where
     handleNewPlayerConnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
     handleNewPlayerConnection serverGame user now = do
       newConnectionCount <- increasePlayerConnections serverGame user now
       when (isFirstConnection newConnectionCount) $ do
-        notifyPlayerConnect serverGame user
+        notifyPlayerConnect serverGame user now
 
     isFirstConnection :: Maybe Int -> Bool
     isFirstConnection (Just connectionCount) = connectionCount == 1
     isFirstConnection Nothing = False
 
-handlePlayerDisconnect :: ServerGame -> Maybe AuthUser -> IO ()
-handlePlayerDisconnect serverGame Nothing = pure ()
-handlePlayerDisconnect serverGame (Just user) = do
+handlePlayerDisconnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerDisconnect pool serverGame Nothing = pure ()
+handlePlayerDisconnect pool serverGame (Just user) = do
   now <- getCurrentTime
+  persistPlayerLastSeen pool user (gameId serverGame) now
   atomically $ handleNewPlayerDisconnection serverGame user now
   where
     handleNewPlayerDisconnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
     handleNewPlayerDisconnection serverGame user now = do
       newConnectionCount <- decreasePlayerConnections serverGame user now
       when (isLastConnection newConnectionCount) $ do
-        notifyPlayerDisconnect serverGame user
+        notifyPlayerDisconnect serverGame user now
 
     isLastConnection :: Maybe Int -> Bool
     isLastConnection (Just connectionCount) = connectionCount == 0
     isLastConnection Nothing = False
 
-notifyPlayerConnect :: ServerGame -> AuthUser -> STM ()
-notifyPlayerConnect serverGame user = do
+notifyPlayerConnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
+notifyPlayerConnect serverGame user@(AuthUser userid _) now = do
   let playerNumber = getPlayerNumber serverGame user
+  traverse_ (writeTChan (broadcastChannel serverGame) . flip PlayerConnect now) playerNumber
 
-  traverse_ (writeTChan (broadcastChannel serverGame) . PlayerConnect) playerNumber
-
-notifyPlayerDisconnect :: ServerGame -> AuthUser -> STM ()
-notifyPlayerDisconnect serverGame user = do
+notifyPlayerDisconnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
+notifyPlayerDisconnect serverGame user now = do
   let playerNumber = getPlayerNumber serverGame user
-  traverse_ (writeTChan (broadcastChannel serverGame) . PlayerDisconnect) playerNumber
+  traverse_ (writeTChan (broadcastChannel serverGame) . flip PlayerDisconnect now) playerNumber
 
-notifyGameConnectionStatus :: ServerGame -> Maybe AuthUser -> IO () -> IO ()
-notifyGameConnectionStatus serverGame maybeUser = bracket_ (handlePlayerConnect serverGame maybeUser) (handlePlayerDisconnect serverGame maybeUser)
+persistPlayerLastSeen :: Pool SqlBackend -> AuthUser -> Text -> UTCTime -> IO ()
+persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen pool gameId userId
+
+notifyGameConnectionStatus :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
+notifyGameConnectionStatus pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
 
 performRequest :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
 performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed

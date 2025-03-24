@@ -144,7 +144,7 @@ gameApp app gameId maybeUser = do
 keepClientUpdated :: TVar InactivityTracker -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> IO ()
 keepClientUpdated inactivityTracker connection pool gameId serverGame channel maybeUser =
   withTrackWebsocketActivity inactivityTracker $ do
-    notifyGameConnectionStatus serverGame maybeUser $ do
+    notifyGameConnectionStatus pool serverGame maybeUser $ do
       sendPreviousChatMessages pool gameId connection
 
       -- Send the moves again incase the client missed any inbetween loading the page and

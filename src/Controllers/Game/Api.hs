@@ -89,8 +89,8 @@ data GameMessage
   | PlayerPassMove Int Int MoveSummary
   | PlayerExchangeMove Int Int [Tile] MoveSummary
   | PlayerChat ChatMessage
-  | PlayerConnect Int
-  | PlayerDisconnect Int
+  | PlayerConnect Int UTCTime
+  | PlayerDisconnect Int UTCTime
 
 instance ToJSON ChatMessage where
   toJSON (ChatMessage user message) = object ["player" .= user, "message" .= message]
@@ -137,8 +137,8 @@ instance ServerMessage GameMessage where
   commandName (PlayerExchangeMove {}) = "playerExchangeMove"
   commandName (GameEnd {}) = "gameFinished"
   commandName (PlayerChat {}) = "playerChat"
-  commandName (PlayerConnect _) = "playerConnect"
-  commandName (PlayerDisconnect _) = "playerDisconnect"
+  commandName (PlayerConnect _ _) = "playerConnect"
+  commandName (PlayerDisconnect _ _) = "playerDisconnect"
 
 instance ToJSON GameMessage where
   toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
@@ -161,8 +161,8 @@ instance ToJSON GameMessage where
     object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
   toJSON (PlayerPassMove moveNumber nowPlaying summary) =
     object ["moveNumber" .= moveNumber, "nowPlaying" .= nowPlaying, "summary" .= summary]
-  toJSON (PlayerConnect playerNumber) = object ["playerNumber" .= playerNumber]
-  toJSON (PlayerDisconnect playerNumber) = object ["playerNumber" .= playerNumber]
+  toJSON (PlayerConnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
+  toJSON (PlayerDisconnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
   toJSON (PlayerChat chatMessage) = toJSON chatMessage
 
 instance FromJSON ClientMessage where

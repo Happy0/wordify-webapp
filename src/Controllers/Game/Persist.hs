@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
+module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
 import ClassyPrelude (mapConcurrently)
 import Control.Applicative
@@ -231,6 +231,9 @@ persistPlayers gameId players =
         \(playerNumber, (ServerPlayer _ identifier gameId _ lastActive)) ->
           insert $
             M.Player gameId identifier playerNumber lastActive
+
+updatePlayerLastSeen :: Pool SqlBackend -> Text -> Text -> UTCTime -> IO ()
+updatePlayerLastSeen pool gameId playerId now = return ()
 
 persistGameUpdate :: Pool SqlBackend -> Text -> Game -> GameMessage -> IO ()
 persistGameUpdate pool gameId _ (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
