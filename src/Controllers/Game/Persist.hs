@@ -1,5 +1,6 @@
-module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
+module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
+import ClassyPrelude (mapConcurrently)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -120,7 +121,7 @@ getGame pool localisedGameSetups gameId = do
   case dbEntries of
     Right (Entity _ (M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _), playerModels, moveModels) -> do
       -- This could be more efficient than individual fetches, but it doesn't matter for now
-      serverPlayers <- mapM (playerFromEntity pool) playerModels
+      serverPlayers <- mapConcurrently (playerFromEntity pool) playerModels
 
       runExceptT $ do
         let locale = maybe "en" id maybeLocale
@@ -227,9 +228,12 @@ persistLobbyPlayers gameId players =
 persistPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
    in flip mapM_ playersWithNumbers $ do
-        \(playerNumber, (ServerPlayer playerName identifier gameId active lastActive)) ->
+        \(playerNumber, (ServerPlayer _ identifier gameId _ lastActive)) ->
           insert $
             M.Player gameId identifier playerNumber lastActive
+
+updatePlayerLastSeen :: Pool SqlBackend -> Text -> Text -> UTCTime -> IO ()
+updatePlayerLastSeen pool gameId playerId now = return ()
 
 persistGameUpdate :: Pool SqlBackend -> Text -> Game -> GameMessage -> IO ()
 persistGameUpdate pool gameId _ (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
@@ -361,8 +365,8 @@ playerFromEntity pool (Entity _ (M.Player gameId playerId _ lastActive)) =
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing gameId playerId False lastActive
-      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId False lastActive)
+      Nothing -> return $ makeNewPlayer Nothing gameId playerId 0 lastActive
+      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId 0 lastActive)
 
 playerFromLobbyEntity :: ConnectionPool -> Entity M.LobbyPlayer -> IO ServerPlayer
 playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive)) =
@@ -370,8 +374,8 @@ playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive
     user <- getUser pool playerId
     case user of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing gameId playerId False Nothing
-      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId False lastActive)
+      Nothing -> return $ makeNewPlayer Nothing gameId playerId 0 Nothing
+      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId 0 lastActive)
 
 dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =

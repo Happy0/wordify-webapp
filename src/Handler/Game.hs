@@ -10,6 +10,8 @@ import Controllers.Game.Game
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
+import Controllers.User.Model.AuthUser
+import Controllers.User.Persist
 import Data.Aeson
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -41,23 +43,25 @@ getGameR gameId = do
   app <- getYesod
   liftIO $ trackRequestReceivedActivity (inactivityTracker app)
   let cookies = reqCookies request
-  maybePlayerId <- maybeAuthId
+  userId <- maybeAuthId
+
+  maybeUser <- case userId of
+    Nothing -> pure Nothing
+    Just user -> liftIO $ getUser (appConnPool app) user
 
   {-- If this is a websocket request, the handler is short cutted here
       Once the client has loaded the page and javascript, the javascript for the page
       initiates the websocket request which arrives here -}
-  webSockets $ gameApp app gameId maybePlayerId
+  webSockets $ gameApp app gameId maybeUser
 
   runResourceT $ do
     (_, game) <- getCacheableResource (games app) gameId
-    lift $ renderGamePage app gameId maybePlayerId game
+    lift $ renderGamePage app gameId maybeUser game
 
-renderGamePage :: App -> Text -> Maybe Text -> Either Text ServerGame -> Handler Html
+renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
-renderGamePage app gameId maybePlayerId (Right serverGame) = do
-  maybePlayerNumber <- case maybePlayerId of
-    Nothing -> pure Nothing
-    Just playerId -> atomically $ getPlayerNumber serverGame playerId
+renderGamePage app gameId maybeUser (Right serverGame) = do
+  let maybePlayerNumber = maybeUser >>= getPlayerNumber serverGame
 
   gameSoFar <- liftIO (readTVarIO (game serverGame))
 
@@ -125,8 +129,8 @@ renderGamePage app gameId maybePlayerId (Right serverGame) = do
           <div #scrabbleground>
       |]
 
-gameApp :: App -> Text -> Maybe Text -> WebSocketsT Handler ()
-gameApp app gameId maybePlayerId = do
+gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
+gameApp app gameId maybeUser = do
   connection <- ask
   liftIO $
     withCacheableResource (games app) gameId $ \result ->
@@ -134,36 +138,32 @@ gameApp app gameId maybePlayerId = do
         Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
           let inactivityTrackerState = inactivityTracker app
-
-          maybePlayerNumber <- case maybePlayerId of
-            Nothing -> pure Nothing
-            Just playerId -> atomically $ getPlayerNumber serverGame playerId
-
           channel <- atomically (dupTChan (broadcastChannel serverGame))
-          liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybePlayerNumber)
+          liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybeUser)
 
-keepClientUpdated :: TVar InactivityTracker -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe Int -> IO ()
-keepClientUpdated inactivityTracker connection pool gameId serverGame channel playerNumber =
+keepClientUpdated :: TVar InactivityTracker -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> IO ()
+keepClientUpdated inactivityTracker connection pool gameId serverGame channel maybeUser =
   withTrackWebsocketActivity inactivityTracker $ do
-    sendPreviousChatMessages pool gameId connection
+    notifyGameConnectionStatus pool serverGame maybeUser $ do
+      sendPreviousChatMessages pool gameId connection
 
-    -- Send the moves again incase the client missed any inbetween loading the page and
-    -- connecting with the websocket
-    readTVarIO (game serverGame) >>= sendPreviousMoves connection
+      -- Send the moves again incase the client missed any inbetween loading the page and
+      -- connecting with the websocket
+      readTVarIO (game serverGame) >>= sendPreviousMoves connection
 
-    race_
-      ( forever $
-          (atomically . readTChan) channel >>= C.sendTextData connection . toJSONResponse
-      )
-      ( forever $
-          do
-            msg <- C.receiveData connection
-            case eitherDecode msg of
-              Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
-              Right parsedCommand -> do
-                response <- liftIO $ performRequest serverGame pool playerNumber parsedCommand
-                C.sendTextData connection $ toJSONResponse $ response
-      )
+      race_
+        ( forever $
+            (atomically . readTChan) channel >>= C.sendTextData connection . toJSONResponse
+        )
+        ( forever $
+            do
+              msg <- C.receiveData connection
+              case eitherDecode msg of
+                Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
+                Right parsedCommand -> do
+                  response <- liftIO $ performRequest serverGame pool maybeUser parsedCommand
+                  C.sendTextData connection $ toJSONResponse $ response
+        )
 
 sendPreviousMoves :: C.Connection -> G.Game -> IO ()
 sendPreviousMoves connection game = do
@@ -207,9 +207,4 @@ sendPreviousChatMessages :: Pool SqlBackend -> Text -> C.Connection -> IO ()
 sendPreviousChatMessages pool gameId connection = do
   liftIO $
     flip runSqlPersistMPool pool $
-      getChatMessages gameId $$ CL.map toJSONResponse $= (CL.mapM_ (liftIO . C.sendTextData connection))
-
-getPlayerNumber :: ServerGame -> Text -> STM (Maybe Int)
-getPlayerNumber serverGame findPlayerID = do
-  players <- readTVar (playing serverGame)
-  return $ fst <$> L.find (\(ind, player) -> findPlayerID == playerId player) (zip [1 .. 4] players)
+      getChatMessages gameId $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)

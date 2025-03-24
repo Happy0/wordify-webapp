@@ -20,7 +20,7 @@ import Control.Concurrent.STM.TVar
 import Control.Monad.STM
 import Controllers.Common.CacheableSharedResource
 import qualified Controllers.Game.Model.ServerGame as S
-import Controllers.Game.Model.ServerPlayer
+import qualified Controllers.Game.Model.ServerPlayer as SP
 import Controllers.GameLobby.Api
 import Data.List
 import Data.Maybe
@@ -40,7 +40,7 @@ data ClientLobbyJoinResult = ClientLobbyJoinResult
 
 data GameLobby = GameLobby
   { pendingGame :: Game,
-    lobbyPlayers :: TVar [ServerPlayer],
+    lobbyPlayers :: TVar [SP.ServerPlayer],
     awaiting :: Int,
     channel :: TChan LobbyMessage,
     -- TODO: rename this to 'lobbyGenerator'
@@ -60,19 +60,19 @@ gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)
 duplicateBroadcastChannel :: GameLobby -> STM (TChan LobbyMessage)
 duplicateBroadcastChannel gameLobby = dupTChan . channel $ gameLobby
 
-addPlayer :: GameLobby -> ServerPlayer -> STM Bool
+addPlayer :: GameLobby -> SP.ServerPlayer -> STM Bool
 addPlayer lobby newPlayer = do
   currentPlayers <- readTVar (lobbyPlayers lobby)
 
-  if ((not $ playerAlreadyExists currentPlayers (playerId newPlayer)))
+  if ((not $ playerAlreadyExists currentPlayers (SP.playerId newPlayer)))
     then do
       let newPlayers = currentPlayers ++ [newPlayer]
       writeTVar (lobbyPlayers lobby) newPlayers
       return True
     else return False
   where
-    playerAlreadyExists :: [ServerPlayer] -> T.Text -> Bool
-    playerAlreadyExists serverPlayers id = isJust $ find (\x -> playerId x == id) serverPlayers
+    playerAlreadyExists :: [SP.ServerPlayer] -> T.Text -> Bool
+    playerAlreadyExists serverPlayers id = isJust $ find (\x -> SP.playerId x == id) serverPlayers
 
 lobbyIsFull :: GameLobby -> STM Bool
 lobbyIsFull lobby = do
@@ -82,7 +82,7 @@ lobbyIsFull lobby = do
 inLobby :: GameLobby -> T.Text -> STM Bool
 inLobby lobby playerIdentifier = isJust . find isPlayer <$> readTVar (lobbyPlayers lobby)
   where
-    isPlayer player = (playerId player) == playerIdentifier
+    isPlayer player = (SP.playerId player) == playerIdentifier
 
 increaseConnectionsByOne :: GameLobby -> STM ()
 increaseConnectionsByOne gameLobby = modifyTVar (numConnections gameLobby) succ

@@ -3,31 +3,20 @@ module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage) where
 import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
-import Control.Error.Util
 import Control.Monad
 import Control.Monad.STM
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except
-import Controllers.Common.CacheableSharedResource
-import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
-import Controllers.Game.Persist (deleteLobby, getLobbyPlayer, persistNewGame, persistNewLobbyPlayer)
+import Controllers.Game.Persist
 import Controllers.GameLobby.Api
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser
 import Controllers.User.Persist
 import Data.Either
-import qualified Data.List as L
-import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import Foundation
-import Model.Api
 import System.Random.Shuffle
-import UnliftIO.Resource
-import qualified Wordify.Rules.Game as G
-import qualified Wordify.Rules.Player as P
 import Prelude
 
 {-
@@ -40,7 +29,7 @@ joinClient :: App -> GameLobby -> T.Text -> T.Text -> IO (Either LobbyInputError
 joinClient app gameLobby gameId userId =
   do
     now <- getCurrentTime
-    serverPlayer <- makeLobbyServerPlayer app gameLobby gameId userId
+    serverPlayer <- makeLobbyServerPlayer app gameId userId
     result <- atomically $ updateLobbyState app gameLobby serverPlayer gameId now
 
     case result of
@@ -59,14 +48,15 @@ joinClient app gameLobby gameId userId =
           )
           >> pure result
 
-makeLobbyServerPlayer :: App -> GameLobby -> T.Text -> T.Text -> IO ServerPlayer
-makeLobbyServerPlayer app gameLobby gameId userId =
+makeLobbyServerPlayer :: App -> T.Text -> T.Text -> IO ServerPlayer
+makeLobbyServerPlayer app gameId userId =
   do
     let pool = appConnPool app
     user <- getUser pool userId
     case user of
-      Just (AuthUser ident nickname) -> pure $ makeNewPlayer nickname gameId ident False Nothing
-      Nothing -> pure $ makeNewPlayer Nothing gameId userId False Nothing
+      -- TODO: proper connection tracking
+      Just (AuthUser ident nickname) -> pure $ makeNewPlayer nickname gameId ident 0 Nothing
+      Nothing -> pure $ makeNewPlayer Nothing gameId userId 0 Nothing
 
 updateLobbyState :: App -> GameLobby -> ServerPlayer -> T.Text -> UTCTime -> STM (Either LobbyInputError ClientLobbyJoinResult)
 updateLobbyState app lobby serverPlayer gameId now = do
@@ -106,20 +96,20 @@ handleJoinNewPlayer app gameId newPlayer gameLobby now =
   do
     playerAdded <- addPlayer gameLobby newPlayer
     writeTChan (channel gameLobby) $ PlayerJoined newPlayer
-    maybeServerGame <- handleLobbyFull app gameLobby gameId now
+    maybeServerGame <- createServerGameIfLobbyFull gameLobby gameId now
     channel <- duplicateBroadcastChannel gameLobby
 
     return (ClientLobbyJoinResult channel maybeServerGame (not playerAdded))
 
-handleLobbyFull :: App -> GameLobby -> T.Text -> UTCTime -> STM (Maybe ServerGame)
-handleLobbyFull app lobby gameId now = do
+createServerGameIfLobbyFull :: GameLobby -> T.Text -> UTCTime -> STM (Maybe ServerGame)
+createServerGameIfLobbyFull lobby gameId now = do
   lobbyFull <- lobbyIsFull lobby
   if lobbyFull
-    then Just <$> createGame app gameId lobby now
+    then Just <$> createGame gameId lobby now
     else return Nothing
 
-createGame :: App -> T.Text -> GameLobby -> UTCTime -> STM ServerGame
-createGame app gameId lobby now =
+createGame :: T.Text -> GameLobby -> UTCTime -> STM ServerGame
+createGame gameId lobby now =
   do
     players <- readTVar (lobbyPlayers lobby)
     let initialGameState = pendingGame lobby

@@ -1,21 +1,29 @@
 module Controllers.Game.Game
   ( performRequest,
+    notifyGameConnectionStatus,
   )
 where
 
+import ClassyPrelude (getCurrentTime, putStrLn, traverse_, whenM)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
+import Control.Exception (bracket_)
 import Control.Monad
 import Control.Monad.STM
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
+import Controllers.User.Model.AuthUser
 import Data.Conduit
+import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Pool
 import Data.Text
+import Data.Time
 import Database.Persist.Sql
+import GHC.IO
+import Model (User)
 import Wordify.Rules.FormedWord
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
@@ -26,10 +34,60 @@ import Wordify.Rules.ScrabbleError
 import Wordify.Rules.Tile
 import Prelude
 
-performRequest :: ServerGame -> Pool SqlBackend -> Maybe Int -> ClientMessage -> IO ServerResponse
-performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool player placed
-performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool player exchanged
-performRequest serverGame pool player PassMove = handlePassMove serverGame pool player
+handlePlayerConnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerConnect pool serverGame Nothing = pure ()
+handlePlayerConnect pool serverGame (Just user) = do
+  now <- getCurrentTime
+  persistPlayerLastSeen pool user (gameId serverGame) now
+  atomically $ handleNewPlayerConnection serverGame user now
+  where
+    handleNewPlayerConnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
+    handleNewPlayerConnection serverGame user now = do
+      newConnectionCount <- increasePlayerConnections serverGame user now
+      when (isFirstConnection newConnectionCount) $ do
+        notifyPlayerConnect serverGame user now
+
+    isFirstConnection :: Maybe Int -> Bool
+    isFirstConnection (Just connectionCount) = connectionCount == 1
+    isFirstConnection Nothing = False
+
+handlePlayerDisconnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerDisconnect pool serverGame Nothing = pure ()
+handlePlayerDisconnect pool serverGame (Just user) = do
+  now <- getCurrentTime
+  persistPlayerLastSeen pool user (gameId serverGame) now
+  atomically $ handleNewPlayerDisconnection serverGame user now
+  where
+    handleNewPlayerDisconnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
+    handleNewPlayerDisconnection serverGame user now = do
+      newConnectionCount <- decreasePlayerConnections serverGame user now
+      when (isLastConnection newConnectionCount) $ do
+        notifyPlayerDisconnect serverGame user now
+
+    isLastConnection :: Maybe Int -> Bool
+    isLastConnection (Just connectionCount) = connectionCount == 0
+    isLastConnection Nothing = False
+
+notifyPlayerConnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
+notifyPlayerConnect serverGame user@(AuthUser userid _) now = do
+  let playerNumber = getPlayerNumber serverGame user
+  traverse_ (writeTChan (broadcastChannel serverGame) . flip PlayerConnect now) playerNumber
+
+notifyPlayerDisconnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
+notifyPlayerDisconnect serverGame user now = do
+  let playerNumber = getPlayerNumber serverGame user
+  traverse_ (writeTChan (broadcastChannel serverGame) . flip PlayerDisconnect now) playerNumber
+
+persistPlayerLastSeen :: Pool SqlBackend -> AuthUser -> Text -> UTCTime -> IO ()
+persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen pool gameId userId
+
+notifyGameConnectionStatus :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
+notifyGameConnectionStatus pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
+
+performRequest :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
+performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
+performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
+performRequest serverGame pool player PassMove = handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
 performRequest serverGame pool player (SendChatMessage msg) = handleChatMessage serverGame pool player msg
 performRequest serverGame pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
 
@@ -108,7 +166,7 @@ handleExchangeMove sharedServerGame pool (Just playerNo) exchanged =
     moveOutcomeHandler
   where
     moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
-    moveOutcomeHandler (Right (ExchangeTransition _ beforePlayer afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
+    moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
     moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
 handlePassMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> IO ServerResponse
@@ -119,11 +177,13 @@ handlePassMove sharedServerGame pool (Just playerNo) =
     moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
-handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe Int -> Text -> IO ServerResponse
+handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
 handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-handleChatMessage serverGame pool (Just playerNumber) messageText =
+handleChatMessage serverGame pool (Just user) messageText =
   do
-    (serverPlayer, gameSnapshot) <- atomically $ (,) <$> getServerPlayer serverGame playerNumber <*> makeServerGameSnapshot serverGame
+    gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
+    let serverPlayer = getServerPlayerSnapshot gameSnapshot user
+
     let playerName = serverPlayer >>= SP.name
 
     case playerName of
