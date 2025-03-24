@@ -60,7 +60,7 @@ handlePlayerDisconnect serverGame (Just user) = do
     handleNewPlayerDisconnection serverGame user now = do
       newConnectionCount <- decreasePlayerConnections serverGame user now
       when (isLastConnection newConnectionCount) $ do
-        notifyPlayerConnect serverGame user
+        notifyPlayerDisconnect serverGame user
 
     isLastConnection :: Maybe Int -> Bool
     isLastConnection (Just connectionCount) = connectionCount == 0
