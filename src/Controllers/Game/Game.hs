@@ -4,7 +4,7 @@ module Controllers.Game.Game
   )
 where
 
-import ClassyPrelude (getCurrentTime, traverse_, whenM)
+import ClassyPrelude (getCurrentTime, putStrLn, traverse_, whenM)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
@@ -16,11 +16,13 @@ import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
 import Controllers.User.Model.AuthUser
 import Data.Conduit
+import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Pool
 import Data.Text
 import Data.Time
 import Database.Persist.Sql
+import GHC.IO
 import Model (User)
 import Wordify.Rules.FormedWord
 import Wordify.Rules.Game
@@ -40,8 +42,9 @@ handlePlayerConnect serverGame (Just user) = do
   where
     handleNewPlayerConnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
     handleNewPlayerConnection serverGame user now = do
-      let connectionCount = increasePlayerConnections serverGame user now
-      whenM (isFirstConnection <$> connectionCount) $ notifyPlayerConnect serverGame user
+      newConnectionCount <- increasePlayerConnections serverGame user now
+      when (isFirstConnection newConnectionCount) $ do
+        notifyPlayerConnect serverGame user
 
     isFirstConnection :: Maybe Int -> Bool
     isFirstConnection (Just connectionCount) = connectionCount == 1
@@ -51,12 +54,13 @@ handlePlayerDisconnect :: ServerGame -> Maybe AuthUser -> IO ()
 handlePlayerDisconnect serverGame Nothing = pure ()
 handlePlayerDisconnect serverGame (Just user) = do
   now <- getCurrentTime
-  atomically $ handleNewPlayerConnection serverGame user now
+  atomically $ handleNewPlayerDisconnection serverGame user now
   where
-    handleNewPlayerConnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
-    handleNewPlayerConnection serverGame user now = do
-      let connectionCount = increasePlayerConnections serverGame user now
-      whenM (isLastConnection <$> connectionCount) $ notifyPlayerDisconnect serverGame user
+    handleNewPlayerDisconnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
+    handleNewPlayerDisconnection serverGame user now = do
+      newConnectionCount <- decreasePlayerConnections serverGame user now
+      when (isLastConnection newConnectionCount) $ do
+        notifyPlayerConnect serverGame user
 
     isLastConnection :: Maybe Int -> Bool
     isLastConnection (Just connectionCount) = connectionCount == 0
@@ -65,6 +69,7 @@ handlePlayerDisconnect serverGame (Just user) = do
 notifyPlayerConnect :: ServerGame -> AuthUser -> STM ()
 notifyPlayerConnect serverGame user = do
   let playerNumber = getPlayerNumber serverGame user
+
   traverse_ (writeTChan (broadcastChannel serverGame) . PlayerConnect) playerNumber
 
 notifyPlayerDisconnect :: ServerGame -> AuthUser -> STM ()

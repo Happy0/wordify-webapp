@@ -24,10 +24,10 @@ makeNewPlayer :: Maybe Text -> Text -> Text -> Int -> Maybe UTCTime -> ServerPla
 makeNewPlayer playerName gameId playerId connections lastActive = ServerPlayer playerName playerId gameId connections lastActive
 
 addConnection :: ServerPlayer -> UTCTime -> ServerPlayer
-addConnection player time = player {numConnections = numConnections player - 1, lastActive = Just time}
+addConnection player time = player {numConnections = numConnections player + 1, lastActive = Just time}
 
 removeConnection :: ServerPlayer -> UTCTime -> ServerPlayer
-removeConnection player time = player {numConnections = numConnections player + 1, lastActive = Just time}
+removeConnection player time = player {numConnections = numConnections player - 1, lastActive = Just time}
 
 makeNewPlayerId :: StdGen -> (Text, StdGen)
 makeNewPlayerId generator =

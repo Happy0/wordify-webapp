@@ -1,6 +1,6 @@
 module Controllers.Game.Model.ServerGame
   ( ServerGame,
-    ServerGameSnapshot (ServerGameSnapshot, snapshotGameId, gameState),
+    ServerGameSnapshot (ServerGameSnapshot, snapshotGameId, gameState, snapshotPlayers),
     getServerPlayer,
     getPlayerNumber,
     makeNewServerGame,
@@ -40,7 +40,7 @@ import Prelude
 data ServerGameSnapshot = ServerGameSnapshot
   { snapshotGameId :: Text,
     gameState :: G.Game,
-    players :: [SP.ServerPlayer],
+    snapshotPlayers :: [SP.ServerPlayer],
     created :: UTCTime,
     lastMove :: Maybe UTCTime,
     finished :: Maybe UTCTime
@@ -127,7 +127,7 @@ getServerPlayer serverGame user = snd <$> L.find (isUser user) (playing serverGa
     isUser (AuthUser userId _) (playerId, _) = userId == playerId
 
 getServerPlayerSnapshot :: ServerGameSnapshot -> AuthUser -> Maybe SP.ServerPlayer
-getServerPlayerSnapshot gameSnapshot user = L.find (isUser user) (players gameSnapshot)
+getServerPlayerSnapshot gameSnapshot user = L.find (isUser user) (snapshotPlayers gameSnapshot)
   where
     isUser :: AuthUser -> SP.ServerPlayer -> Bool
     isUser (AuthUser userId _) serverPlayer = SP.playerId serverPlayer == userId
