@@ -359,6 +359,14 @@ module.exports = function(opts) {
         askPotentialScore();
     };
 
+    var setConnections = function(connections) {
+        m.startComputation()
+
+        data.connections = connections;
+
+        m.endComputation()
+    }
+
     var playerConnect = function(playerNumber) {
         m.startComputation()
 
@@ -370,6 +378,7 @@ module.exports = function(opts) {
     var playerDisconnect = function(playerNumber) {
         m.startComputation()
 
+        // TODO: 'last seen' timestamp
         data.connections[playerNumber - 1] = { active: false }
 
         m.endComputation()
@@ -401,6 +410,7 @@ module.exports = function(opts) {
         addExchangeMoveToHistory : addExchangeMoveToHistory,
         addChatMessage : addChatMessage,
         updateRack : updateRack,
+        setConnections: setConnections,
         playerConnect: playerConnect,
         playerDisconnect: playerDisconnect,
         scrabbleGroundCtrl: scrabbleGroundCtrl,

@@ -14,6 +14,7 @@ module.exports = function(opts) {
             controller.setPlayerNumber(data.playerNumber);
             controller.setPlayerToMove(data.playerMove);
             controller.setTilesRemaining(data.tilesRemaining);
+            controller.setConnections(data.connectionStatuses);
 
             var commands = data.moveCommands;
 

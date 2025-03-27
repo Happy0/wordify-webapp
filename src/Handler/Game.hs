@@ -155,14 +155,8 @@ handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool g
   withTrackWebsocketActivity inactivityTracker $ do
     withNotifyJoinAndLeave pool serverGame maybeUser $ do
       let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
-
       mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
-
       sendPreviousChatMessages pool gameId connection
-
-      -- Send the moves again incase the client missed any inbetween loading the page and
-      -- connecting with the websocket
-      readTVarIO (game serverGame) >>= sendPreviousMoves connection
 
       race_
         ( forever $
