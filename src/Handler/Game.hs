@@ -6,6 +6,7 @@ module Handler.Game where
 import Control.Concurrent
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import Controllers.Game.Api
+import Controllers.Game.Api (initialSocketMessage)
 import Controllers.Game.Game
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
@@ -61,10 +62,7 @@ getGameR gameId = do
 getConnectionStatuses :: ServerGame -> STM [ConnectionStatus]
 getConnectionStatuses serverGame = do
   snapshot <- makeServerGameSnapshot serverGame
-  pure $ L.zipWith toConnectionStatus (snapshotPlayers snapshot) [1 ..]
-  where
-    toConnectionStatus :: ServerPlayer -> Int -> ConnectionStatus
-    toConnectionStatus (ServerPlayer _ _ _ numConnections lastActive) playerNumber = ConnectionStatus playerNumber (numConnections > 0) lastActive
+  pure $ connectionStatuses (snapshotPlayers snapshot)
 
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -149,13 +147,17 @@ gameApp app gameId maybeUser = do
         Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
           let inactivityTrackerState = inactivityTracker app
-          channel <- atomically (dupTChan (broadcastChannel serverGame))
-          liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybeUser)
+          (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
+          liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) gameId serverGame channel maybeUser)
 
-keepClientUpdated :: TVar InactivityTracker -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> IO ()
-keepClientUpdated inactivityTracker connection pool gameId serverGame channel maybeUser =
+handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> IO ()
+handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool gameId serverGame channel maybeUser =
   withTrackWebsocketActivity inactivityTracker $ do
-    notifyGameConnectionStatus pool serverGame maybeUser $ do
+    withNotifyJoinAndLeave pool serverGame maybeUser $ do
+      let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
+
+      mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
+
       sendPreviousChatMessages pool gameId connection
 
       -- Send the moves again incase the client missed any inbetween loading the page and

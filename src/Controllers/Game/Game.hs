@@ -1,6 +1,6 @@
 module Controllers.Game.Game
   ( performRequest,
-    notifyGameConnectionStatus,
+    withNotifyJoinAndLeave,
   )
 where
 
@@ -81,8 +81,8 @@ notifyPlayerDisconnect serverGame user now = do
 persistPlayerLastSeen :: Pool SqlBackend -> AuthUser -> Text -> UTCTime -> IO ()
 persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen pool gameId userId
 
-notifyGameConnectionStatus :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
-notifyGameConnectionStatus pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
+withNotifyJoinAndLeave :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
+withNotifyJoinAndLeave pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
 
 performRequest :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
 performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed

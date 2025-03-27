@@ -18,6 +18,7 @@ module Controllers.Game.Model.ServerGame
     increaseConnectionsByOne,
     decreaseConnectionsByOne,
     getServerPlayerSnapshot,
+    getSnapshotPlayerNumber,
   )
 where
 
@@ -26,7 +27,7 @@ import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
 import Controllers.Common.CacheableSharedResource
-import Controllers.Game.Api
+import Controllers.Game.GameMessage
 import Controllers.Game.Model.ServerPlayer (ServerPlayer (ServerPlayer))
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Controllers.User.Model.AuthUser
@@ -37,6 +38,7 @@ import Model (User (User))
 import qualified Wordify.Rules.Game as G
 import Prelude
 
+-- TODO: move this and associated functions to own file
 data ServerGameSnapshot = ServerGameSnapshot
   { snapshotGameId :: Text,
     gameState :: G.Game,
@@ -143,4 +145,9 @@ decreaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) dec
 getPlayerNumber :: ServerGame -> AuthUser -> Maybe Int
 getPlayerNumber serverGame (AuthUser userId _) = do
   let playerIds = Prelude.map fst (playing serverGame)
+  fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)
+
+getSnapshotPlayerNumber :: ServerGameSnapshot -> AuthUser -> Maybe Int
+getSnapshotPlayerNumber serverGame (AuthUser userId _) = do
+  let playerIds = Prelude.map SP.playerId (snapshotPlayers serverGame)
   fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)

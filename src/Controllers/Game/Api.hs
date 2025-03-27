@@ -16,19 +16,29 @@ module Controllers.Game.Api
     toMoveSummary,
     transitionToMessage,
     transitionToSummary,
+    connectionStatuses,
+    initialSocketMessage,
   )
 where
 
 import Control.Applicative
+import Controllers.Game.GameMessage (ChatMessage (ChatMessage), GameMessage (..), MoveSummary (..))
+import Controllers.Game.Model.ServerGame (ServerGameSnapshot (gameState, snapshotPlayers), getSnapshotPlayerNumber)
+import Controllers.Game.Model.ServerPlayer
+import Controllers.User.Model.AuthUser (AuthUser)
 import Data.Aeson
 import Data.Aeson.Types
+import Data.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.List as L
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Maybe as Mb
+import qualified Data.Monoid as M
 import Data.Text
 import Data.Time (UTCTime)
 import qualified Data.Vector as V
+import Database.Esqueleto (Connection)
 import Model.Api
 import Wordify.Rules.Board
 import Wordify.Rules.FormedWord
@@ -36,23 +46,12 @@ import qualified Wordify.Rules.Game as G
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
 import Wordify.Rules.Player
+import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
+import Wordify.Rules.ScrabbleError (ScrabbleError)
 import Wordify.Rules.Square
 import Wordify.Rules.Tile
 import Prelude
-
-data ChatMessage = ChatMessage {user :: Text, message :: Text}
-
-data MoveSummary
-  = BoardMoveSummary
-      { overallScore :: Int,
-        wordsAndScores :: [(Text, Int)],
-        moveDirection :: Direction,
-        placedTiles :: [Pos]
-      }
-  | PassMoveSummary
-  | ExchangeMoveSummary
-  | GameEndSummary (Maybe [(Text, Int)]) [Player]
 
 data ClientMessage
   = AskPotentialScore [(Pos, Tile)]
@@ -67,31 +66,13 @@ data ClientMessage
 -}
 
 data ServerResponse
-  = InitialiseGame [GameMessage] (Maybe [Tile]) [Player] (Maybe Int) Int Int
+  = InitialiseGame [GameMessage] (Maybe [Tile]) [Player] (Maybe Int) Int Int [ConnectionStatus] Int
   | PotentialScore Int
   | BoardMoveSuccess [Tile]
   | ExchangeMoveSuccess [Tile]
   | PassMoveSuccess
   | ChatSuccess
   | InvalidCommand Text
-
--- Messages sent over the server game channel to notify clients of changes
--- such as a player making a move successfully
-data GameMessage
-  = PlayerBoardMove
-      { moveNumber :: Int,
-        placed :: [(Pos, Tile)],
-        summary :: MoveSummary,
-        players :: [Player],
-        nowPlaying :: Int,
-        tilesRemaining :: Int
-      }
-  | GameEnd Int (Maybe [(Pos, Tile)]) MoveSummary
-  | PlayerPassMove Int Int MoveSummary
-  | PlayerExchangeMove Int Int [Tile] MoveSummary
-  | PlayerChat ChatMessage
-  | PlayerConnect Int UTCTime
-  | PlayerDisconnect Int UTCTime
 
 data ConnectionStatus = ConnectionStatus Int Bool (Maybe UTCTime)
 
@@ -183,15 +164,42 @@ instance ToJSON ServerResponse where
   toJSON (ChatSuccess) = object []
   toJSON (InvalidCommand msg) = object ["error" .= msg]
   toJSON (PotentialScore score) = object ["potentialScore" .= score]
-  toJSON (InitialiseGame moves rack players playerNumber toMove tilesRemaining) =
+  toJSON (InitialiseGame moves rack players playerNumber toMove tilesRemaining connectionStatuses appVersion) =
     object
       [ "moveCommands" .= (fmap toJSONMessage moves),
         "rack" .= rack,
         "players" .= players,
         "playerNumber" .= playerNumber,
         "playerMove" .= toMove,
-        "tilesRemaining" .= tilesRemaining
+        "tilesRemaining" .= tilesRemaining,
+        "connectionStatuses" .= connectionStatuses,
+        -- Can be used to determine if we should prompt the user to refresh the page
+        "appVersion" .= appVersion
       ]
+
+initialSocketMessage :: ServerGameSnapshot -> Maybe AuthUser -> Either ScrabbleError ServerResponse
+initialSocketMessage serverGameSnapshot authUser = do
+  gameTransitions <- restoreGame emptyGame $ NE.fromList (toList moves)
+  let maybePlayerNumber = authUser >>= getSnapshotPlayerNumber serverGameSnapshot
+  let moveCommands = NE.map transitionToMessage gameTransitions
+  let rack = P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
+  let players = G.players gameSoFar
+  let playerMove = G.playerNumber gameSoFar
+  let numTilesRemaining = bagSize (G.bag gameSoFar)
+  let connections = connectionStatuses (snapshotPlayers serverGameSnapshot)
+  return $ InitialiseGame (toList moveCommands) rack players maybePlayerNumber playerMove numTilesRemaining connections appVersion
+  where
+    gameSoFar = gameState serverGameSnapshot
+    -- Todo: Don't assume 'Right' and deal with display names
+    Right playersState = makeGameStatePlayers (L.length $ G.players gameSoFar)
+    Right emptyGame = G.makeGame playersState originalBag (G.dictionary gameSoFar)
+    (G.History originalBag moves) = G.history gameSoFar
+
+connectionStatuses :: [ServerPlayer] -> [ConnectionStatus]
+connectionStatuses serverPlayers = L.zipWith toConnectionStatus serverPlayers [1 ..]
+  where
+    toConnectionStatus :: ServerPlayer -> Int -> ConnectionStatus
+    toConnectionStatus (ServerPlayer _ _ _ numConnections lastActive) playerNumber = ConnectionStatus playerNumber (numConnections > 0) lastActive
 
 instance ServerMessage ServerResponse where
   commandName (BoardMoveSuccess _) = "boardMoveSuccess"
@@ -236,6 +244,9 @@ getPosAndTile (Object val) =
     tile <- val .: "tile" >>= parseJSON
     return (pos, tile)
 getPosAndTile _ = fail "expected object payload with pos and tile"
+
+appVersion :: Int
+appVersion = 1
 
 transitionToMessage :: GameTransition -> GameMessage
 transitionToMessage et@(ExchangeTransition newGameState beforeExchange afterExchange) =
@@ -285,12 +296,11 @@ toMoveSummary formedWords =
   let (overallScore, wordsAndScores) = wordsWithScores formedWords
    in let maybeDirection = direction (fst $ M.findMin (playerPlacedMap formedWords)) (fst $ M.findMax (playerPlacedMap formedWords))
        in let direction = maybe Horizontal id maybeDirection -- Default to Horizontal
-           in ( BoardMoveSummary
-                  overallScore
-                  (toTextScores wordsAndScores)
-                  direction
-                  (M.keys (playerPlacedMap formedWords))
-              )
+           in BoardMoveSummary
+                overallScore
+                (toTextScores wordsAndScores)
+                direction
+                (M.keys (playerPlacedMap formedWords))
 
 toTextScores = fmap (\(word, score) -> (pack word, score))
 
@@ -310,9 +320,9 @@ instance ToJSON Square where
 instance ToJSON Player where
   toJSON player =
     object
-      [ "name" .= name player,
-        "score" .= score player,
-        "endBonus" .= endBonus player
+      [ "name" .= P.name player,
+        "score" .= P.score player,
+        "endBonus" .= P.endBonus player
       ]
 
 instance ToJSON Tile where
