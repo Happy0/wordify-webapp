@@ -14,6 +14,7 @@ module.exports = function(opts) {
             controller.setPlayerNumber(data.playerNumber);
             controller.setPlayerToMove(data.playerMove);
             controller.setTilesRemaining(data.tilesRemaining);
+            controller.setConnections(data.connectionStatuses);
 
             var commands = data.moveCommands;
 
@@ -114,8 +115,9 @@ module.exports = function(opts) {
         "playerChat" : function(data) {
             var playerName = data.player;
             var message = data.message;
+            var when = data.when;
 
-            controller.addChatMessage(playerName, message);
+            controller.addChatMessage(playerName, message, when);
         },
         "potentialScore" : function(data) {
             var potentialScore = data.potentialScore;

@@ -248,10 +248,11 @@ module.exports = function(opts) {
         m.endComputation();
     }
 
-    var addChatMessage = function(sender, message) {
+    var addChatMessage = function(sender, message, when) {
         m.startComputation();
         var messages = data.chatMessages;
         messages.push({sender: sender, message: message});
+        data.lastChatMessageReceived = when;
         m.endComputation();
     }
 
@@ -359,6 +360,14 @@ module.exports = function(opts) {
         askPotentialScore();
     };
 
+    var setConnections = function(connections) {
+        m.startComputation()
+
+        data.connections = connections;
+
+        m.endComputation()
+    }
+
     var playerConnect = function(playerNumber) {
         m.startComputation()
 
@@ -370,9 +379,15 @@ module.exports = function(opts) {
     var playerDisconnect = function(playerNumber) {
         m.startComputation()
 
+        // TODO: 'last seen' timestamp
         data.connections[playerNumber - 1] = { active: false }
 
         m.endComputation()
+    }
+
+    var getLastChatMessageReceivedMillisSinceEpoch = function() {
+        // parse to millis
+        return new Date(data.lastChatMessageReceived).getTime();
     }
 
     scrabbleGroundCtrl.setCustomRevertFunction(putTileBackOnRack);
@@ -401,8 +416,10 @@ module.exports = function(opts) {
         addExchangeMoveToHistory : addExchangeMoveToHistory,
         addChatMessage : addChatMessage,
         updateRack : updateRack,
+        setConnections: setConnections,
         playerConnect: playerConnect,
         playerDisconnect: playerDisconnect,
+        getLastChatMessageReceivedMillisSinceEpoch: getLastChatMessageReceivedMillisSinceEpoch,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
     };

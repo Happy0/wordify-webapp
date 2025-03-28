@@ -1,6 +1,6 @@
 module Controllers.Game.Game
   ( performRequest,
-    notifyGameConnectionStatus,
+    withNotifyJoinAndLeave,
   )
 where
 
@@ -81,8 +81,8 @@ notifyPlayerDisconnect serverGame user now = do
 persistPlayerLastSeen :: Pool SqlBackend -> AuthUser -> Text -> UTCTime -> IO ()
 persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen pool gameId userId
 
-notifyGameConnectionStatus :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
-notifyGameConnectionStatus pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
+withNotifyJoinAndLeave :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
+withNotifyJoinAndLeave pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
 
 performRequest :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
 performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
@@ -181,6 +181,9 @@ handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> Text -> 
 handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
 handleChatMessage serverGame pool (Just user) messageText =
   do
+    -- TODO: deal with race conditions around "current time" being used on socket init if two players chat quickly
+    -- 'lastUpdate' on serverGame???
+    now <- getCurrentTime
     gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
     let serverPlayer = getServerPlayerSnapshot gameSnapshot user
 
@@ -190,7 +193,7 @@ handleChatMessage serverGame pool (Just user) messageText =
       Nothing -> return $ InvalidCommand "Internal server error"
       Just playerName -> do
         let channel = broadcastChannel serverGame
-        let message = PlayerChat $ ChatMessage playerName messageText
+        let message = PlayerChat $ ChatMessage playerName messageText now
         P.persistGameUpdate pool (gameId serverGame) (gameState gameSnapshot) message
         atomically $ writeTChan channel message
         return ChatSuccess

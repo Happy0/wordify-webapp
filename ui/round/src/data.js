@@ -13,6 +13,9 @@ module.exports = function(opts) {
         playerToMove : 1,
         playerNumber : null, // our player number
         exchangeMode : false, // Player is selecting tiles to exchange,
+
+        // 2025-03-28T23:21:21.877940745Z | null if none received yet
+        lastChatMessageReceived: null,
         chatMessages : [],
         tilesRemaining : 0,
         potentialScore : 0,

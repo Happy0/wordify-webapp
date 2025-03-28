@@ -4,8 +4,10 @@
 module Handler.Game where
 
 import Control.Concurrent
+import Control.Error (note)
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import Controllers.Game.Api
+import Controllers.Game.Api (initialSocketMessage)
 import Controllers.Game.Game
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
@@ -22,6 +24,9 @@ import qualified Data.Monoid as M
 import Data.Pool
 import Data.Text (Text)
 import qualified Data.Text.Lazy as TL
+import Data.Text.Read (decimal)
+import Data.Time
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Database.Persist.Sql
 import Import
 import InactivityTracker
@@ -61,10 +66,15 @@ getGameR gameId = do
 getConnectionStatuses :: ServerGame -> STM [ConnectionStatus]
 getConnectionStatuses serverGame = do
   snapshot <- makeServerGameSnapshot serverGame
-  pure $ L.zipWith toConnectionStatus (snapshotPlayers snapshot) [1 ..]
-  where
-    toConnectionStatus :: ServerPlayer -> Int -> ConnectionStatus
-    toConnectionStatus (ServerPlayer _ _ _ numConnections lastActive) playerNumber = ConnectionStatus playerNumber (numConnections > 0) lastActive
+  pure $ connectionStatuses (snapshotPlayers snapshot)
+
+chatMessageSinceQueryParamValue :: Handler (Maybe UTCTime)
+chatMessageSinceQueryParamValue = do
+  queryParamValue <- lookupGetParam "chatMessagesSince"
+  let sinceMillisEpochString = note "No chat message since param specific" queryParamValue >>= (fmap fst . decimal)
+  case sinceMillisEpochString of
+    Right sinceInMillisSinceEpoch -> pure $ Just ((posixSecondsToUTCTime . fromIntegral) sinceInMillisSinceEpoch)
+    _ -> pure Nothing
 
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -98,14 +108,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               jQuery.noConflict();
 
               var url = document.URL,
-
               url = url.replace("http:", "ws:").replace("https:", "wss:");
-              var conn = new WebSocket(url);
-
-              var send = function(objectPayload) {
-                  var json = JSON.stringify(objectPayload);
-                  conn.send(json);
-              }
+              var conn;
 
               var opts = {element: document.getElementById("scrabbleground")};
               opts.ground = {}
@@ -118,6 +122,12 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               opts.ground.highlightMoveMainWordClass = "highlight-main";
               opts.connections = #{toJSON connectionStatuses}
 
+              var send = function(objectPayload) {
+                // TODO: handle connection being null / not connected
+                  var json = JSON.stringify(objectPayload);
+                  conn.send(json);
+              }
+
               opts.send = send;
               var round = Round(opts);
 
@@ -126,10 +136,33 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
               round.controller.setPlayerToMove(#{toJSON playing});
 
-              conn.onmessage = function (e) {
+              function connectWebsocket() {
+                var lastChatMessageReceived = round.controller.getLastChatMessageReceivedMillisSinceEpoch() || null;
+
+                var url = document.URL + `?chatMessagesSince=${lastChatMessageReceived}`;
+
+                url = url.replace("http:", "ws:").replace("https:", "wss:");
+                conn = new WebSocket(url);
+
+                conn.onmessage = function (e) {
                   var data = JSON.parse(e.data);
                   round.socketReceive(data);
-              };
+                };
+
+                conn.onclose = function(e) {
+                  console.log('Socket is closed. Reconnecting in 1 second.', e.reason);
+                  setTimeout(function() {
+                    connectWebsocket();
+                  }, 1000);
+                };
+
+                conn.onerror = function(err) {
+                  console.error('Socket error: ', err.message, 'Closing.');
+                  ws.close();
+                };
+              }
+
+              connectWebsocket()
 
               document.addEventListener('DOMContentLoaded', function () {
                 if (Notification.permission !== "granted")
@@ -143,24 +176,23 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
 gameApp app gameId maybeUser = do
   connection <- ask
+  chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
   liftIO $
     withCacheableResource (games app) gameId $ \result ->
       case result of
         Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
         Right serverGame -> do
           let inactivityTrackerState = inactivityTracker app
-          channel <- atomically (dupTChan (broadcastChannel serverGame))
-          liftIO (keepClientUpdated inactivityTrackerState connection (appConnPool app) gameId serverGame channel maybeUser)
+          (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
+          liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) gameId serverGame channel maybeUser chatMessagesSinceParam)
 
-keepClientUpdated :: TVar InactivityTracker -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> IO ()
-keepClientUpdated inactivityTracker connection pool gameId serverGame channel maybeUser =
+handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> Maybe UTCTime -> IO ()
+handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool gameId serverGame channel maybeUser chatMessagesSince =
   withTrackWebsocketActivity inactivityTracker $ do
-    notifyGameConnectionStatus pool serverGame maybeUser $ do
-      sendPreviousChatMessages pool gameId connection
-
-      -- Send the moves again incase the client missed any inbetween loading the page and
-      -- connecting with the websocket
-      readTVarIO (game serverGame) >>= sendPreviousMoves connection
+    withNotifyJoinAndLeave pool serverGame maybeUser $ do
+      let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
+      mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
+      sendPreviousChatMessages pool gameId chatMessagesSince connection
 
       race_
         ( forever $
@@ -214,8 +246,12 @@ gameToMoveSummaries game =
 {-
     Send the chat log history to the client
 -}
-sendPreviousChatMessages :: Pool SqlBackend -> Text -> C.Connection -> IO ()
-sendPreviousChatMessages pool gameId connection = do
+sendPreviousChatMessages :: Pool SqlBackend -> Text -> Maybe UTCTime -> C.Connection -> IO ()
+sendPreviousChatMessages pool gameId Nothing connection = do
   liftIO $
     flip runSqlPersistMPool pool $
       getChatMessages gameId $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
+sendPreviousChatMessages pool gameId (Just since) connection = do
+  liftIO $
+    flip runSqlPersistMPool pool $
+      getChatMessagesSince gameId since $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
