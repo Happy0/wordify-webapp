@@ -96,14 +96,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               jQuery.noConflict();
 
               var url = document.URL,
-
               url = url.replace("http:", "ws:").replace("https:", "wss:");
-              var conn = new WebSocket(url);
-
-              var send = function(objectPayload) {
-                  var json = JSON.stringify(objectPayload);
-                  conn.send(json);
-              }
+              var conn;
 
               var opts = {element: document.getElementById("scrabbleground")};
               opts.ground = {}
@@ -116,6 +110,12 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               opts.ground.highlightMoveMainWordClass = "highlight-main";
               opts.connections = #{toJSON connectionStatuses}
 
+              var send = function(objectPayload) {
+                // TODO: handle connection being null / not connected
+                  var json = JSON.stringify(objectPayload);
+                  conn.send(json);
+              }
+
               opts.send = send;
               var round = Round(opts);
 
@@ -124,10 +124,31 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
               round.controller.setPlayerToMove(#{toJSON playing});
 
-              conn.onmessage = function (e) {
+              function connectWebsocket() {
+                var url = document.URL,
+
+                url = url.replace("http:", "ws:").replace("https:", "wss:");
+                conn = new WebSocket(url);
+
+                conn.onmessage = function (e) {
                   var data = JSON.parse(e.data);
                   round.socketReceive(data);
-              };
+                };
+
+                conn.onclose = function(e) {
+                  console.log('Socket is closed. Reconnecting in 1 second.', e.reason);
+                  setTimeout(function() {
+                    connectWebsocket();
+                  }, 1000);
+                };
+
+                conn.onerror = function(err) {
+                  console.error('Socket error: ', err.message, 'Closing.');
+                  ws.close();
+                };
+              }
+
+              connectWebsocket()
 
               document.addEventListener('DOMContentLoaded', function () {
                 if (Notification.permission !== "granted")
