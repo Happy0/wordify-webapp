@@ -248,10 +248,11 @@ module.exports = function(opts) {
         m.endComputation();
     }
 
-    var addChatMessage = function(sender, message) {
+    var addChatMessage = function(sender, message, when) {
         m.startComputation();
         var messages = data.chatMessages;
         messages.push({sender: sender, message: message});
+        data.lastChatMessageReceived = when;
         m.endComputation();
     }
 
@@ -384,6 +385,11 @@ module.exports = function(opts) {
         m.endComputation()
     }
 
+    var getLastChatMessageReceivedMillisSinceEpoch = function() {
+        // parse to millis
+        return new Date(data.lastChatMessageReceived).getTime();
+    }
+
     scrabbleGroundCtrl.setCustomRevertFunction(putTileBackOnRack);
 
     var controllerFunctions = {
@@ -413,6 +419,7 @@ module.exports = function(opts) {
         setConnections: setConnections,
         playerConnect: playerConnect,
         playerDisconnect: playerDisconnect,
+        getLastChatMessageReceivedMillisSinceEpoch: getLastChatMessageReceivedMillisSinceEpoch,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
     };

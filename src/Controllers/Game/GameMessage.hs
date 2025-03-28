@@ -13,7 +13,7 @@ import Wordify.Rules.Pos
 import Wordify.Rules.Tile (Tile)
 import Prelude (Int)
 
-data ChatMessage = ChatMessage {user :: Text, message :: Text}
+data ChatMessage = ChatMessage {user :: Text, message :: Text, when :: UTCTime}
 
 data MoveSummary
   = BoardMoveSummary

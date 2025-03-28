@@ -316,10 +316,9 @@ updateGameSummary pool gameId gameState = do
     gameBoardTextRepresentation = textRepresentation . board
 
 persistChatMessage :: Pool SqlBackend -> Text -> ChatMessage -> IO ()
-persistChatMessage pool gameId (ChatMessage user message) = do
-  time <- getCurrentTime
+persistChatMessage pool gameId (ChatMessage user message now) = do
   withPool pool $ do
-    insert (M.ChatMessage gameId time user message)
+    insert (M.ChatMessage gameId now user message)
     return ()
 
 tilesToDbRepresentation :: [Tile] -> Text
@@ -333,7 +332,7 @@ tileToDbRepresentation (Blank (Just letter)) = C.toLower letter
 chatMessageFromEntity :: Monad m => Conduit (Entity M.ChatMessage) m GameMessage
 chatMessageFromEntity = CL.map fromEntity
   where
-    fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message)
+    fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message created)
 
 moveFromEntity :: Board -> LetterBag -> M.Move -> Either Text Move
 moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
