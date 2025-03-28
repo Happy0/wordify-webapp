@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (getGame, getChatMessages, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
+module Controllers.Game.Persist (getGame, getChatMessages, getChatMessagesSince, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
 import ClassyPrelude (mapConcurrently)
 import Control.Applicative
@@ -34,6 +34,10 @@ import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
 import Prelude
+
+getChatMessagesSince gameId since =
+  selectSource [M.ChatMessageGame ==. gameId, M.ChatMessageCreatedAt >. since] [Asc M.ChatMessageCreatedAt]
+    $= chatMessageFromEntity
 
 getChatMessages gameId =
   selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]

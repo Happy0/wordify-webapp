@@ -4,6 +4,7 @@
 module Handler.Game where
 
 import Control.Concurrent
+import Control.Error (note)
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import Controllers.Game.Api
 import Controllers.Game.Api (initialSocketMessage)
@@ -23,6 +24,9 @@ import qualified Data.Monoid as M
 import Data.Pool
 import Data.Text (Text)
 import qualified Data.Text.Lazy as TL
+import Data.Text.Read (decimal)
+import Data.Time
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Database.Persist.Sql
 import Import
 import InactivityTracker
@@ -63,6 +67,14 @@ getConnectionStatuses :: ServerGame -> STM [ConnectionStatus]
 getConnectionStatuses serverGame = do
   snapshot <- makeServerGameSnapshot serverGame
   pure $ connectionStatuses (snapshotPlayers snapshot)
+
+chatMessageSinceQueryParamValue :: Handler (Maybe UTCTime)
+chatMessageSinceQueryParamValue = do
+  queryParamValue <- lookupGetParam "chatMessagesSince"
+  let sinceMillisEpochString = note "No chat message since param specific" queryParamValue >>= (fmap fst . decimal)
+  case sinceMillisEpochString of
+    Right sinceInMillisSinceEpoch -> pure $ Just ((posixSecondsToUTCTime . fromIntegral) sinceInMillisSinceEpoch)
+    _ -> pure Nothing
 
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -162,6 +174,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
 gameApp app gameId maybeUser = do
   connection <- ask
+  chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
   liftIO $
     withCacheableResource (games app) gameId $ \result ->
       case result of
@@ -169,15 +182,15 @@ gameApp app gameId maybeUser = do
         Right serverGame -> do
           let inactivityTrackerState = inactivityTracker app
           (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
-          liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) gameId serverGame channel maybeUser)
+          liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) gameId serverGame channel maybeUser chatMessagesSinceParam)
 
-handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> IO ()
-handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool gameId serverGame channel maybeUser =
+handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> Maybe UTCTime -> IO ()
+handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool gameId serverGame channel maybeUser chatMessagesSince =
   withTrackWebsocketActivity inactivityTracker $ do
     withNotifyJoinAndLeave pool serverGame maybeUser $ do
       let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
       mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
-      sendPreviousChatMessages pool gameId connection
+      sendPreviousChatMessages pool gameId chatMessagesSince connection
 
       race_
         ( forever $
@@ -231,8 +244,12 @@ gameToMoveSummaries game =
 {-
     Send the chat log history to the client
 -}
-sendPreviousChatMessages :: Pool SqlBackend -> Text -> C.Connection -> IO ()
-sendPreviousChatMessages pool gameId connection = do
+sendPreviousChatMessages :: Pool SqlBackend -> Text -> Maybe UTCTime -> C.Connection -> IO ()
+sendPreviousChatMessages pool gameId Nothing connection = do
   liftIO $
     flip runSqlPersistMPool pool $
       getChatMessages gameId $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
+sendPreviousChatMessages pool gameId (Just since) connection = do
+  liftIO $
+    flip runSqlPersistMPool pool $
+      getChatMessagesSince gameId since $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
