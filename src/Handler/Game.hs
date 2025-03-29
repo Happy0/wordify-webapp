@@ -208,27 +208,9 @@ handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool g
                   C.sendTextData connection $ toJSONResponse $ response
         )
 
-sendPreviousMoves :: C.Connection -> G.Game -> IO ()
-sendPreviousMoves connection game = do
-  if (length moves == 0)
-    then return ()
-    else do
-      let transitions = restoreGameLazy emptyGame $ NE.fromList (toList moves)
-      forM_ (NE.toList transitions) $ \transition ->
-        case transition of
-          Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack (show err)))
-          Right transition ->
-            C.sendTextData connection $ toJSONResponse (transitionToMessage transition)
-  where
-    -- TODO: Add function to make a new empty game from a game history to
-    -- haskellscrabble
-    Right playersState = makeGameStatePlayers (L.length $ G.players game)
-    Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
-    (G.History originalBag moves) = G.history game
-
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]
 gameToMoveSummaries game =
-  if (length moves /= 0)
+  if not (null moves)
     then do
       let gameTransitions = restoreGameLazy emptyGame $ NE.fromList (toList moves)
       let reconstructedGameSummaries = sequence . map (fmap transitionToSummary) $ NE.toList gameTransitions
@@ -244,7 +226,7 @@ gameToMoveSummaries game =
     (G.History originalBag moves) = G.history game
 
 {-
-    Send the chat log history to the client
+    Send the chat log history to the client from the given date onwards if supplied (otherwise from the beginning)
 -}
 sendPreviousChatMessages :: Pool SqlBackend -> Text -> Maybe UTCTime -> C.Connection -> IO ()
 sendPreviousChatMessages pool gameId Nothing connection = do
