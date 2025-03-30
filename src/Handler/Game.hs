@@ -137,7 +137,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               round.controller.setPlayerToMove(#{toJSON playing});
 
               function connectWebsocket() {
-                var lastChatMessageReceived = round.controller.getLastChatMessageReceivedMillisSinceEpoch() || null;
+                var lastChatMessageReceived = round.controller.getLastChatMessageReceivedMillisSinceEpoch();
 
                 var url = document.URL + `?chatMessagesSince=${lastChatMessageReceived}`;
 

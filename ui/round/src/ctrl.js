@@ -386,8 +386,11 @@ module.exports = function(opts) {
     }
 
     var getLastChatMessageReceivedMillisSinceEpoch = function() {
-        // parse to millis
-        return new Date(data.lastChatMessageReceived).getTime();
+        if (!data.lastChatMessageReceived) {
+            return null
+        } else {
+            return new Date(data.lastChatMessageReceived).getTime();
+        }
     }
 
     scrabbleGroundCtrl.setCustomRevertFunction(putTileBackOnRack);
