@@ -23,7 +23,7 @@ where
 
 import Control.Applicative
 import Controllers.Game.GameMessage (ChatMessage (ChatMessage), GameMessage (..), MoveSummary (..))
-import Controllers.Game.Model.ServerGame (ServerGameSnapshot (gameState, snapshotPlayers), getSnapshotPlayerNumber)
+import Controllers.Game.Model.ServerGame (ServerGame, ServerGameSnapshot (gameState, snapshotPlayers), getSnapshotPlayerNumber)
 import Controllers.Game.Model.ServerPlayer
 import Controllers.User.Model.AuthUser (AuthUser)
 import Data.Aeson
@@ -35,7 +35,9 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Maybe as Mb
 import qualified Data.Monoid as M
+import Data.Sequence (Seq)
 import Data.Text
+import qualified Data.Text as T
 import Data.Time (UTCTime)
 import qualified Data.Vector as V
 import Database.Esqueleto (Connection)
@@ -177,23 +179,31 @@ instance ToJSON ServerResponse where
         "appVersion" .= appVersion
       ]
 
-initialSocketMessage :: ServerGameSnapshot -> Maybe AuthUser -> Either ScrabbleError ServerResponse
+getMoveCommandMessages :: G.Game -> [Move] -> Either Text [GameMessage]
+getMoveCommandMessages _ [] = Right []
+getMoveCommandMessages initialGameState moves =
+  case restoreGame initialGameState $ NE.fromList (toList moves) of
+    Left err -> Left $ T.pack (show err)
+    Right transitions -> Right (NE.toList (NE.map transitionToMessage transitions))
+
+initialSocketMessage :: ServerGameSnapshot -> Maybe AuthUser -> Either Text ServerResponse
 initialSocketMessage serverGameSnapshot authUser = do
-  gameTransitions <- restoreGame emptyGame $ NE.fromList (toList moves)
+  let gameSoFar = gameState serverGameSnapshot
+  let (G.History originalBag moves) = G.history gameSoFar
+  playersState <- makeGameStatePlayers (L.length $ G.players gameSoFar)
+  emptyGame <- case G.makeGame playersState originalBag (G.dictionary gameSoFar) of
+    Left err -> Left (T.pack (show err))
+    Right x -> Right x
+
+  moveCommands <- getMoveCommandMessages emptyGame (toList moves)
+
   let maybePlayerNumber = authUser >>= getSnapshotPlayerNumber serverGameSnapshot
-  let moveCommands = NE.map transitionToMessage gameTransitions
   let rack = P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
   let players = G.players gameSoFar
   let playerMove = G.playerNumber gameSoFar
   let numTilesRemaining = bagSize (G.bag gameSoFar)
   let connections = connectionStatuses (snapshotPlayers serverGameSnapshot)
-  return $ InitialiseGame (toList moveCommands) rack players maybePlayerNumber playerMove numTilesRemaining connections appVersion
-  where
-    gameSoFar = gameState serverGameSnapshot
-    -- Todo: Don't assume 'Right' and deal with display names
-    Right playersState = makeGameStatePlayers (L.length $ G.players gameSoFar)
-    Right emptyGame = G.makeGame playersState originalBag (G.dictionary gameSoFar)
-    (G.History originalBag moves) = G.history gameSoFar
+  return $ InitialiseGame moveCommands rack players maybePlayerNumber playerMove numTilesRemaining connections appVersion
 
 connectionStatuses :: [ServerPlayer] -> [ConnectionStatus]
 connectionStatuses serverPlayers = L.zipWith toConnectionStatus serverPlayers [1 ..]
