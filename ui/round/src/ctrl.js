@@ -385,11 +385,11 @@ module.exports = function(opts) {
         m.endComputation()
     }
 
-    var getLastChatMessageReceivedMillisSinceEpoch = function() {
+    var getLastChatMessageReceivedSecondsSinceEpoch = function() {
         if (!data.lastChatMessageReceived) {
             return null
         } else {
-            return new Date(data.lastChatMessageReceived).getTime();
+            return new Date(data.lastChatMessageReceived).getTime() / 1000;
         }
     }
 
@@ -422,7 +422,7 @@ module.exports = function(opts) {
         setConnections: setConnections,
         playerConnect: playerConnect,
         playerDisconnect: playerDisconnect,
-        getLastChatMessageReceivedMillisSinceEpoch: getLastChatMessageReceivedMillisSinceEpoch,
+        getLastChatMessageReceivedSecondsSinceEpoch: getLastChatMessageReceivedSecondsSinceEpoch,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
     };

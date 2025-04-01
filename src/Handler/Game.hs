@@ -71,9 +71,9 @@ getConnectionStatuses serverGame = do
 chatMessageSinceQueryParamValue :: Handler (Maybe UTCTime)
 chatMessageSinceQueryParamValue = do
   queryParamValue <- lookupGetParam "chatMessagesSince"
-  let sinceMillisEpochString = note "No chat message since param specific" queryParamValue >>= (fmap fst . decimal)
-  case sinceMillisEpochString of
-    Right sinceInMillisSinceEpoch -> pure $ Just ((posixSecondsToUTCTime . fromIntegral) sinceInMillisSinceEpoch)
+  let sinceEpochSeconds = note "No chat message since param specific" queryParamValue >>= (fmap fst . decimal)
+  case sinceEpochSeconds of
+    Right secondsSinceUnixEpoch -> pure $ Just ((posixSecondsToUTCTime . fromIntegral) secondsSinceUnixEpoch)
     _ -> pure Nothing
 
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
@@ -137,7 +137,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               round.controller.setPlayerToMove(#{toJSON playing});
 
               function connectWebsocket() {
-                var lastChatMessageReceived = round.controller.getLastChatMessageReceivedMillisSinceEpoch();
+                var lastChatMessageReceived = round.controller.getLastChatMessageReceivedSecondsSinceEpoch();
 
                 var url = document.URL + `?chatMessagesSince=${lastChatMessageReceived}`;
 
