@@ -34,6 +34,7 @@ import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
 import Controllers.Common.CacheableSharedResource
+import Controllers.Game.Model.ServerGame
 import Controllers.Game.Persist (getGame, getLobby)
 import Controllers.GameLobby.Model.GameLobby
 import Data.Char (isSpace)
@@ -98,8 +99,8 @@ mkYesodDispatch "App" resourcesApp
 -- performs initialization and returns a foundation datatype value. This is also
 -- the place to put your migrate statements to have automatic database
 -- migrations handled by Yesod.
-makeFoundation :: AppSettings -> TVar InactivityTracker -> IO App
-makeFoundation appSettings inactivityTracker = do
+makeFoundation :: AppSettings -> TVar InactivityTracker -> ResourceCache Text ServerGame -> ResourceCache Text GameLobby -> IO App
+makeFoundation appSettings inactivityTracker games gameLobbies = do
   -- Some basic initializations: HTTP connection manager, logger, and static
   -- subsite.
   appHttpManager <- getGlobalManager
@@ -109,7 +110,6 @@ makeFoundation appSettings inactivityTracker = do
       (appStaticDir appSettings)
 
   localisedGameSetups <- loadGameBundles
-  gameLobbies <- newTVarIO M.empty
   stdGen <- getStdGen
   randomGenerator <- newTVarIO stdGen
 
@@ -134,9 +134,6 @@ makeFoundation appSettings inactivityTracker = do
       createSqlitePool
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
-
-  games <- makeResourceCache (getGame pool localisedGameSetups)
-  gameLobbies <- makeResourceCache (getLobby pool localisedGameSetups)
 
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
@@ -240,8 +237,10 @@ warpSettings foundation =
 getApplicationDev :: IO (Settings, Application)
 getApplicationDev = do
   inactivityTracker <- makeInactivityTracker
+  games <- makeResourceCache (getGame pool localisedGameSetups)
+  gameLobbies <- makeResourceCache (getLobby pool localisedGameSetups)
   settings <- getAppSettings
-  foundation <- makeFoundation settings inactivityTracker
+  foundation <- makeFoundation settings inactivityTracker games gameLobbies
   wsettings <- getDevSettings $ warpSettings foundation
   app <- makeApplication foundation
   return (wsettings, app)
@@ -256,29 +255,33 @@ develMain = develMainHelper getApplicationDev
 -- | The @main@ function for an executable running this site.
 appMain :: IO ()
 appMain = do
-  -- Get the settings from all relevant sources
-  settings <-
-    loadYamlSettingsArgs
-      -- fall back to compile-time values, set to [] to require values at runtime
-      [configSettingsYmlValue]
-      -- allow environment variables to override
-      useEnv
+  runResourceT $ do
+    games <- makeResourceCache (getGame pool localisedGameSetups)
+    gameLobbies <- makeResourceCache (getLobby pool localisedGameSetups)
 
-  inactivityTracker <- makeInactivityTracker
+    -- Get the settings from all relevant sources
+    settings <-
+      loadYamlSettingsArgs
+        -- fall back to compile-time values, set to [] to require values at runtime
+        [configSettingsYmlValue]
+        -- allow environment variables to override
+        useEnv
 
-  -- Generate the foundation from the settings
-  foundation <- makeFoundation settings inactivityTracker
+    inactivityTracker <- makeInactivityTracker
 
-  -- Generate a WAI Application from the foundation
-  app <- makeApplication foundation
+    -- Generate the foundation from the settings
+    foundation <- makeFoundation settings inactivityTracker games gameLobbies
 
-  exitAppOnIdle <- getExitAppOnIdleConfig
+    -- Generate a WAI Application from the foundation
+    app <- makeApplication foundation
 
-  let runApp = runSettings (warpSettings foundation) app
+    exitAppOnIdle <- getExitAppOnIdleConfig
 
-  case exitAppOnIdle of
-    True -> raceUntilInactive inactivityTracker runApp
-    False -> runApp
+    let runApp = runSettings (warpSettings foundation) app
+
+    case exitAppOnIdle of
+      True -> raceUntilInactive inactivityTracker runApp
+      False -> runApp
 
 --------------------------------------------------------------
 -- Functions for DevelMain.hs (a way to run the app from GHCi)
