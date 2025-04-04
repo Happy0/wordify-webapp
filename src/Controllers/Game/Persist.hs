@@ -1,6 +1,6 @@
 module Controllers.Game.Persist (getGame, getChatMessages, getChatMessagesSince, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (Either(Right,Left), IO, Maybe (Just, Nothing), Word64, liftIO, mapConcurrently, (.), ($), (==), flip, error, (++), (+), otherwise, show, fst, repeat, snd, maybe, id)
+import ClassyPrelude (putStrLn,Either(Right,Left), IO, Maybe (Just, Nothing), Word64, liftIO, mapConcurrently, (.), ($), (==), flip, error, (++), (+), otherwise, show, fst, repeat, snd, maybe, id)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
