@@ -72,6 +72,9 @@ dependencies:
   - uri-bytestring
   - esqueleto
   - splitmix
+  - stm-containers
+  - foldl
+  - deferred-folds
 
 # The library contains all of our application code. The executable
 # defined below is just a thin wrapper.

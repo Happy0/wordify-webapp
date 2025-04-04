@@ -1,5 +1,8 @@
 module Controllers.Common.CacheableSharedResource (makeResourceCache, makeGlobalResourceCache, withCacheableResource, getCacheableResource, ResourceCache, CacheableSharedResource (decreaseSharersByOne, increaseSharersByOne, numberOfSharers)) where
 
+import qualified Control.Foldl as Foldl
+import qualified DeferredFolds.UnfoldlM as UnfoldlM
+
 import Control.Concurrent
 import Control.Concurrent.STM (TVar, modifyTVar)
 import Control.Concurrent.STM.TVar
@@ -8,15 +11,15 @@ import Control.Monad
 import Control.Monad.STM
 import Data.Either
 import Data.Int
-import Data.Map as M
 import Data.Text
 import Data.Time
 import UnliftIO.Resource
 import Prelude
+import qualified StmContainers.Map as M
 
 data ResourceCache err a = ResourceCache
-  { cache :: TVar (Map Text a),
-    cleanUpMap :: TVar (Map Text UTCTime),
+  { cache :: (M.Map Text a),
+    cleanUpMap :: (M.Map Text UTCTime),
     loadResourceOp :: Text -> IO (Either err a),
     cacheCleanupThreadId :: ThreadId
   }
@@ -40,18 +43,17 @@ makeResourceCache loadResourceOp = do
 
 makeGlobalResourceCache :: CacheableSharedResource a => (Text -> IO (Either err a)) -> IO (ResourceCache err a)
 makeGlobalResourceCache loadResourceOp = do
-  resourceCache <- newTVarIO M.empty
-  cleanUpMap <- newTVarIO M.empty
+  resourceCache <- M.newIO
+  cleanUpMap <- M.newIO
   threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap
   pure $ ResourceCache resourceCache cleanUpMap loadResourceOp threadId
 
-startBroomLoop :: CacheableSharedResource a => TVar (Map Text a) -> TVar (Map Text UTCTime) -> IO ()
+startBroomLoop :: CacheableSharedResource a => M.Map Text a -> M.Map Text UTCTime -> IO ()
 startBroomLoop resourceCache cleanUpMap = forever $ do
   now <- getCurrentTime
-  potentiallyStaleItems <- readTVarIO cleanUpMap
+  potentiallyStaleMapItems <- atomically $ stmMapToList cleanUpMap
 
-  let potentiallyStaleItemsList = M.toList potentiallyStaleItems
-  forM_ potentiallyStaleItemsList $ \(resourceId, cacheExpiryTime) -> do
+  forM_ potentiallyStaleMapItems $ \(resourceId, cacheExpiryTime) -> do
     when (now >= cacheExpiryTime) $ atomically $ removeIfNoSharers resourceCache cleanUpMap resourceId
 
   threadDelay (1 * 60000000)
@@ -60,11 +62,11 @@ startBroomLoop resourceCache cleanUpMap = forever $ do
 scheduleCacheCleanup :: ResourceCache err a -> UTCTime -> Text -> STM ()
 scheduleCacheCleanup (ResourceCache cache cleanUpMap _ _) now resourceId = do
   let oneMinute = 60
-  modifyTVar' cleanUpMap (M.insert resourceId (addUTCTime oneMinute now))
+  M.insert (addUTCTime oneMinute now) resourceId cleanUpMap
 
-removeScheduledCleanup :: TVar (Map Text UTCTime) -> Text -> STM ()
+removeScheduledCleanup :: M.Map Text UTCTime -> Text -> STM ()
 removeScheduledCleanup cleanUpMap resourceId =
-  modifyTVar' cleanUpMap (M.delete resourceId)
+  M.delete resourceId cleanUpMap
 
 handlerSharerJoin :: CacheableSharedResource a => ResourceCache err a -> a -> Text -> IO ()
 handlerSharerJoin cache resource resourceId =
@@ -79,13 +81,12 @@ handleSharerLeave cache resource resourceId = do
     newSharerCount <- decreaseSharersByOne resource
     when (newSharerCount == 0) $ void (scheduleCacheCleanup cache now resourceId)
 
-removeFromCache :: CacheableSharedResource a => TVar (Map Text a) -> Text -> STM ()
-removeFromCache resourceCache resourceId = void $ M.delete resourceId <$> readTVar resourceCache
+removeFromCache :: CacheableSharedResource a => M.Map Text a -> Text -> STM ()
+removeFromCache resourceCache resourceId = M.delete resourceId resourceCache
 
-removeIfNoSharers :: CacheableSharedResource a => TVar (Map Text a) -> TVar (Map Text UTCTime) -> Text -> STM ()
+removeIfNoSharers :: CacheableSharedResource a => M.Map Text a -> M.Map Text UTCTime -> Text -> STM ()
 removeIfNoSharers cache cleanupMap resourceId = do
-  cachedItems <- readTVar cache
-  let resource = M.lookup resourceId cachedItems
+  resource <- M.lookup resourceId cache
   case resource of
     Nothing -> pure ()
     Just cachedItem -> do
@@ -106,11 +107,11 @@ loadCacheableResource (ResourceCache cache _ loadResourceOp _) resourceId = do
     Left loadError -> pure $ Left loadError
     Right cachedResource ->
       atomically $ do
-        cachedItem <- M.lookup resourceId <$> readTVar cache
+        cachedItem <- M.lookup resourceId cache
         case cachedItem of
           Just cachedResource -> pure $ Right cachedResource
           Nothing -> do
-            modifyTVar cache $ M.insert resourceId cachedResource
+            M.insert cachedResource resourceId cache
             pure $ Right cachedResource
 
 withCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> (Either err a -> IO ()) -> IO ()
@@ -135,3 +136,6 @@ getCacheableResource resourceCache resourceId =
       case resource of
         Left _ -> pure ()
         Right sharedResource -> handleSharerLeave resourceCache sharedResource resourceId
+
+stmMapToList :: M.Map k v -> STM [(k, v)]
+stmMapToList = UnfoldlM.foldM (Foldl.generalize Foldl.list) . M.unfoldlM
