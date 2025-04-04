@@ -1,6 +1,6 @@
 module Controllers.Game.Persist (getGame, getChatMessages, getChatMessagesSince, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (liftIO, mapConcurrently)
+import ClassyPrelude (Either(Right,Left), IO, Maybe (Just, Nothing), Word64, liftIO, mapConcurrently, (.), ($), (==), flip, error, (++), (+), otherwise, show, fst, repeat, snd, maybe, id)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -18,7 +18,6 @@ import qualified Data.Conduit.List as CL
 import qualified Data.List as L
 import qualified Data.Map as Mp
 import Data.Pool
-import Data.Text
 import qualified Data.Text as T
 import Data.Time.Clock
 import Database.Persist.Sql
@@ -34,6 +33,8 @@ import Wordify.Rules.Move
 import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
+import System.Random.SplitMix
+import Text.Read (read)
 
 getChatMessagesSince gameId since =
   selectSource [M.ChatMessageGame ==. gameId, M.ChatMessageCreatedAt >. since] [Asc M.ChatMessageCreatedAt]
@@ -43,13 +44,13 @@ getChatMessages gameId =
   selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
     $= chatMessageFromEntity
 
-deleteLobby :: App -> Text -> IO ()
+deleteLobby :: App -> T.Text -> IO ()
 deleteLobby app gameId = do
   withPool (appConnPool app) $ do
     deleteWhere [M.LobbyGameId ==. gameId]
     deleteWhere [M.LobbyPlayerGame ==. gameId]
 
-getLobby :: ConnectionPool -> LocalisedGameSetups -> Text -> IO (Either Text GameLobby)
+getLobby :: ConnectionPool -> LocalisedGameSetups -> T.Text -> IO (Either T.Text GameLobby)
 getLobby pool localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
     maybeLobby <- selectFirst [M.LobbyGameId ==. gameId] []
@@ -73,13 +74,13 @@ getLobby pool localisedGameSetups gameId = do
         GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         lobbyPlayers <- hoistEither $ makeGameStatePlayers numPlayers
         tiles <- hoistEither $ dbTileRepresentationToTiles bag originalLetterBag
-        let bag = makeBagUsingGenerator tiles (read (unpack letterBagSeed) :: StdGen)
-        pendingGame <- hoistEither $ mapLeft (pack . show) (makeGame lobbyPlayers bag dictionary)
+        let bag = makeBagUsingGenerator tiles (stdGenFromText letterBagSeed :: StdGen)
+        pendingGame <- hoistEither $ mapLeft (T.pack . show) (makeGame lobbyPlayers bag dictionary)
         numConnections <- liftIO $ newTVarIO 0
         return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt numConnections
     Left err -> return $ Left err
 
-getLobbyPlayer :: ConnectionPool -> Text -> Text -> IO (Maybe ServerPlayer)
+getLobbyPlayer :: ConnectionPool -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
 getLobbyPlayer pool gameId playerId = do
   playerEntity <- withPool pool $ selectFirst [M.LobbyPlayerGame ==. gameId, M.LobbyPlayerPlayerId ==. playerId] []
 
@@ -88,7 +89,7 @@ getLobbyPlayer pool gameId playerId = do
     Just entity -> Just <$> playerFromLobbyEntity pool entity
 
 addDisplayNames :: [ServerPlayer] -> [P.Player] -> [P.Player]
-addDisplayNames serverPlayers gameStatePlayers = Prelude.zipWith addDisplayName serverPlayers gameStatePlayers
+addDisplayNames serverPlayers gameStatePlayers = L.zipWith addDisplayName serverPlayers gameStatePlayers
   where
     -- TODO: expose function to modify name of player in game state in wordify lib
     addDisplayName serverPlayer gameStatePlayer =
@@ -111,7 +112,7 @@ getCurrentPlayer game (player1 : player2 : player3 : x) 3 = player3
 getCurrentPlayer game (player1 : player2 : player3 : player4 : x) 4 = player4
 getCurrentPlayer game _ _ = currentPlayer game
 
-getGame :: ConnectionPool -> LocalisedGameSetups -> Text -> IO (Either Text ServerGame)
+getGame :: ConnectionPool -> LocalisedGameSetups -> T.Text -> IO (Either T.Text ServerGame)
 getGame pool localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
     maybeGame <- selectFirst [M.GameGameId ==. gameId] []
@@ -133,8 +134,8 @@ getGame pool localisedGameSetups gameId = do
         GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
         tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
-        let letterBag = makeBagUsingGenerator tiles (read (unpack bagSeed) :: StdGen)
-        game <- hoistEither $ mapLeft (pack . show) (makeGame internalPlayers letterBag dictionary)
+        let letterBag = makeBagUsingGenerator tiles (stdGenFromText bagSeed :: StdGen)
+        game <- hoistEither $ mapLeft (T.pack . show) (makeGame internalPlayers letterBag dictionary)
         let playersWithNamesAdded = addDisplayNames serverPlayers (players game)
         let gameWithDisplayNamesSet = setDisplayNames playersWithNamesAdded game
 
@@ -143,17 +144,17 @@ getGame pool localisedGameSetups gameId = do
         liftIO $ atomically (makeServerGame gameId currentGame serverPlayers gameCreatedAt lastMoveMadeAt gameFinishedAt)
     Left err -> return $ Left err
 
-playThroughGame :: Game -> LetterBag -> [M.Move] -> Either Text Game
+playThroughGame :: Game -> LetterBag -> [M.Move] -> Either T.Text Game
 playThroughGame game initialBag moves = foldM playNextMove game moves
   where
-    playNextMove :: Game -> M.Move -> Either Text Game
+    playNextMove :: Game -> M.Move -> Either T.Text Game
     playNextMove game moveModel =
       case moveFromEntity (board game) initialBag moveModel of
         Left err -> Left err
         Right move ->
           let moveResult = makeMove game move
            in case moveResult of
-                Left invalidState -> Left $ pack . show $ invalidState
+                Left invalidState -> Left $ T.pack . show $ invalidState
                 Right moveResult -> Right (newGame moveResult)
 
     scanM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m [a]
@@ -168,7 +169,7 @@ mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft func (Left err) = Left $ func err
 mapLeft _ (Right r) = Right r
 
-persistNewLobby :: Pool SqlBackend -> Text -> Text -> GameLobby -> IO ()
+persistNewLobby :: Pool SqlBackend -> T.Text -> T.Text -> GameLobby -> IO ()
 persistNewLobby pool gameId locale gameLobby = do
   let History letterBag _ = history (pendingGame gameLobby)
   let game = pendingGame gameLobby
@@ -179,39 +180,39 @@ persistNewLobby pool gameId locale gameLobby = do
         M.Lobby
           gameId
           (tilesToDbRepresentation (tiles letterBag))
-          (pack $ show (getGenerator (bag game)))
+          (stdGenToText (getGenerator (bag game)))
           (Just locale)
           (awaiting gameLobby)
           (openedAt gameLobby)
 
     return ()
 
-persistNewLobbyPlayer :: Pool SqlBackend -> Text -> ServerPlayer -> IO ()
+persistNewLobbyPlayer :: Pool SqlBackend -> T.Text -> ServerPlayer -> IO ()
 persistNewLobbyPlayer pool gameId serverPlayer = withPool pool $ persistLobbyPlayers gameId [serverPlayer]
 
 {-
     Persists the original game state (before the game has begun)
 -}
-persistNewGame :: Pool SqlBackend -> Text -> Text -> ServerGame -> IO ()
+persistNewGame :: Pool SqlBackend -> T.Text -> T.Text -> ServerGame -> IO ()
 persistNewGame pool gameId locale serverGame = do
   _ <- persistGameState pool gameId locale serverGame
   return ()
 
 withPool pool = flip runSqlPersistMPool pool
 
-persistGameState :: Pool SqlBackend -> Text -> Text -> ServerGame -> IO (Key M.Game)
+persistGameState :: Pool SqlBackend -> T.Text -> T.Text -> ServerGame -> IO (Key M.Game)
 persistGameState pool gameId locale serverGame = do
   ServerGameSnapshot gameId gameState gamePlayers created lastMove finished <- atomically $ makeServerGameSnapshot serverGame
   let History letterBag _ = history gameState
-  let currentMove = Prelude.length (movesMade gameState) + 1
-  let boardRepresentation = T.pack (Prelude.take 255 (repeat ','))
+  let currentMove = L.length (movesMade gameState) + 1
+  let boardRepresentation = T.pack (L.take 255 (L.repeat ','))
   withPool pool $ do
     gameDbId <-
       insert $
         M.Game
           gameId
           (tilesToDbRepresentation (tiles letterBag))
-          (pack $ show (getGenerator letterBag))
+          (stdGenToText (getGenerator letterBag))
           (Just locale)
           created
           finished
@@ -236,10 +237,10 @@ persistPlayers gameId players =
           insert $
             M.Player gameId identifier playerNumber lastActive
 
-updatePlayerLastSeen :: Pool SqlBackend -> Text -> Text -> UTCTime -> IO ()
+updatePlayerLastSeen :: Pool SqlBackend -> T.Text -> T.Text -> UTCTime -> IO ()
 updatePlayerLastSeen pool gameId playerId now = return ()
 
-persistGameUpdate :: Pool SqlBackend -> Text -> Game -> GameMessage -> IO ()
+persistGameUpdate :: Pool SqlBackend -> T.Text -> Game -> GameMessage -> IO ()
 persistGameUpdate pool gameId _ (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
 persistGameUpdate pool gameId gameState (PlayerBoardMove moveNumber placed _ _ _ _) =
   persistBoardMove pool gameId gameState placed
@@ -254,13 +255,13 @@ persistGameUpdate pool gameId gameState (GameEnd moveNumber placed moveSummary) 
     Just placed -> persistBoardMove pool gameId gameState placed
 persistGameUpdate _ _ _ _ = return ()
 
-persistBoardMove :: Pool SqlBackend -> Text -> Game -> [(Pos, Tile)] -> IO ()
+persistBoardMove :: Pool SqlBackend -> T.Text -> Game -> [(Pos, Tile)] -> IO ()
 persistBoardMove pool gameId gameState placed = do
   let move =
         M.Move
           gameId
           moveNumber
-          (Just $ tilesToDbRepresentation (Prelude.map snd placedSorted))
+          (Just $ tilesToDbRepresentation (L.map snd placedSorted))
           (Just $ xPos min)
           (Just $ yPos min)
           (Just isHorizontal)
@@ -273,19 +274,19 @@ persistBoardMove pool gameId gameState placed = do
     (min, max) = (L.minimum positions, L.maximum positions)
     isHorizontal = yPos min == yPos max
 
-persistPassMove :: Pool SqlBackend -> Text -> Game -> IO ()
+persistPassMove :: Pool SqlBackend -> T.Text -> Game -> IO ()
 persistPassMove pool gameId gameState = do
   persistMoveUpdate pool gameId gameState (M.Move gameId moveNumber Nothing Nothing Nothing Nothing)
   where
     moveNumber = L.length (movesMade gameState)
 
-persistExchangeMove :: Pool SqlBackend -> Text -> Game -> [Tile] -> IO ()
+persistExchangeMove :: Pool SqlBackend -> T.Text -> Game -> [Tile] -> IO ()
 persistExchangeMove pool gameId gameState tiles = do
   persistMoveUpdate pool gameId gameState (M.Move gameId moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing)
   where
     moveNumber = L.length (movesMade gameState)
 
-persistMoveUpdate :: Pool SqlBackend -> Text -> Game -> M.Move -> IO ()
+persistMoveUpdate :: Pool SqlBackend -> T.Text -> Game -> M.Move -> IO ()
 persistMoveUpdate pool gameId gameState move@(M.Move _ moveNumber _ _ _ _) = do
   withPool pool $ do
     _ <- insert move
@@ -293,7 +294,7 @@ persistMoveUpdate pool gameId gameState move@(M.Move _ moveNumber _ _ _ _) = do
 
   updateGameSummary pool gameId gameState
 
-updateGameSummary :: Pool SqlBackend -> Text -> Game -> IO ()
+updateGameSummary :: Pool SqlBackend -> T.Text -> Game -> IO ()
 updateGameSummary pool gameId gameState = do
   now <- getCurrentTime
   withPool pool $ do
@@ -315,16 +316,16 @@ updateGameSummary pool gameId gameState = do
     gameFinished game = gameStatus game == Finished
     gameBoardTextRepresentation = textRepresentation . board
 
-persistChatMessage :: Pool SqlBackend -> Text -> ChatMessage -> IO ()
+persistChatMessage :: Pool SqlBackend -> T.Text -> ChatMessage -> IO ()
 persistChatMessage pool gameId (ChatMessage user message now) = do
   withPool pool $ do
     insert (M.ChatMessage gameId now user message)
     return ()
 
-tilesToDbRepresentation :: [Tile] -> Text
-tilesToDbRepresentation tiles = pack $ Prelude.map tileToDbRepresentation tiles
+tilesToDbRepresentation :: [Tile] -> T.Text
+tilesToDbRepresentation tiles = T.pack $ L.map tileToDbRepresentation tiles
 
-tileToDbRepresentation :: Tile -> Char
+tileToDbRepresentation :: Tile -> C.Char
 tileToDbRepresentation (Letter lettr val) = lettr
 tileToDbRepresentation (Blank Nothing) = '_'
 tileToDbRepresentation (Blank (Just letter)) = C.toLower letter
@@ -334,7 +335,7 @@ chatMessageFromEntity = CL.map fromEntity
   where
     fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message created)
 
-moveFromEntity :: Board -> LetterBag -> M.Move -> Either Text Move
+moveFromEntity :: Board -> LetterBag -> M.Move -> Either T.Text Move
 moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
 moveFromEntity board letterBag (M.Move gameId moveNumber (Just tiles) Nothing Nothing Nothing) =
   case dbTileRepresentationToTiles letterBag tiles of
@@ -380,18 +381,28 @@ playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive
       Nothing -> return $ makeNewPlayer Nothing gameId playerId 0 Nothing
       Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId 0 lastActive)
 
-dbTileRepresentationToTiles :: LetterBag -> Text -> Either Text [Tile]
+dbTileRepresentationToTiles :: LetterBag -> T.Text -> Either T.Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =
-  sequence $ fmap getTile (unpack textRepresentation)
+  sequence $ fmap getTile (T.unpack textRepresentation)
   where
     letterMap = validLetters letterBag
-    getTile :: Char -> Either Text Tile
+    getTile :: C.Char -> Either T.Text Tile
     getTile character
       | (C.isLower character) = Right $ Blank (Just $ C.toUpper character)
       | character == '_' = Right $ Blank Nothing
       | otherwise = case Mp.lookup character letterMap of
-        Just tile -> Right tile
-        _ -> Left $ pack $ (show character) ++ " not found in letterbag"
+         Just tile -> Right tile
+         _ -> Left $ T.pack $ [character] ++ " not found in letterbag"
+
+stdGenToText :: StdGen -> T.Text
+stdGenToText stdGen = 
+  let (a,b) = toSeedStdGen stdGen
+  in T.concat [T.pack (show a), " ", T.pack (show b)]
+
+stdGenFromText :: T.Text -> StdGen 
+stdGenFromText stdGenText = 
+  let [a,b] = T.split (== ' ') stdGenText
+  in fromSeedStdGen (read (T.unpack a), (read (T.unpack b)))
 
 toSeedStdGen :: StdGen -> (Word64, Word64)
 toSeedStdGen = unseedSMGen . unStdGen
