@@ -40,7 +40,6 @@ import Data.Text
 import qualified Data.Text as T
 import Data.Time (UTCTime)
 import qualified Data.Vector as V
-import Database.Esqueleto (Connection)
 import Model.Api
 import Wordify.Rules.Board
 import Wordify.Rules.FormedWord
@@ -152,8 +151,10 @@ instance ToJSON GameMessage where
   toJSON (PlayerChat chatMessage) = toJSON chatMessage
 
 instance FromJSON ClientMessage where
-  parseJSON (Object request) =
-    case HM.lookup "command" request of
+  parseJSON (Object request) = do
+    command <- request .: "command"
+
+    case command of
       Just (String command) ->
         request .: "payload" >>= parseCommand command
       _ -> fail "Expected command to have text value"

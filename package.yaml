@@ -7,32 +7,32 @@ dependencies:
   - yesod-core >=1.6 && <1.7
   - yesod-auth >=1.6 && <1.7
   - yesod-static >=1.6 && <1.7
-  - yesod-form >=1.6 && <1.7
-  - yesod-auth-oauth2 >= 0.6.1.1 && < 0.6.2.0
+  - yesod-form >=1.7.9 && <1.8.0
+  - yesod-auth-oauth2 >= 0.7.4.0 && < 0.8.0.0
   - classy-prelude >=1.5 && <1.6
   - classy-prelude-conduit >=1.5 && <1.6
   - classy-prelude-yesod >=1.5 && <1.6
-  - bytestring >=0.10 && <0.11
-  - text >=0.11 && <2.0
-  - persistent >=2.9 && <2.10
-  - persistent-sqlite >=2.9 && <2.10
-  - persistent-template >=2.5 && <2.9
+  - bytestring >=0.12.1.0 && <0.13.0.0
+  - text >= 2.1.1 && <2.2.0
+  - persistent >=2.14.6.3 && <2.15.0.0
+  - persistent-sqlite >=2.13.3.0 && < 2.14.0.0
+  - persistent-template >=2.12.0.0 && <2.13.0.0
   - template-haskell
-  - shakespeare >=2.0 && <2.1
+  - shakespeare >=2.1.1 && <2.2.0
   - hjsmin >=0.1 && <0.3
   - monad-control >=0.3 && <1.1
-  - wai-extra >=3.0 && <3.1
+  - wai-extra >=3.1.16 && <3.2.0
   - yaml >=0.11 && <0.12
   - http-client-tls >=0.3 && <0.4
   - http-conduit >=2.3 && <2.4
   - directory >=1.1 && <1.4
-  - warp >=3.0 && <3.3
+  - warp >=3.4.7 && <3.5.0
   - data-default
-  - aeson >=1.4 && <1.5
+  - aeson >=2.2.3.0 && <2.3.0.0
   - conduit >=1.0 && <2.0
   - monad-logger >=0.3 && <0.4
-  - fast-logger >=2.2 && <2.5
-  - wai-logger >=2.2 && <2.4
+  - fast-logger >=3.2.5 && <3.3.0
+  - wai-logger >=2.5.0 && <2.6.0
   - file-embed
   - safe
   - unordered-containers
@@ -71,6 +71,7 @@ dependencies:
   - random-shuffle
   - uri-bytestring
   - esqueleto
+  - splitmix
 
 # The library contains all of our application code. The executable
 # defined below is just a thin wrapper.

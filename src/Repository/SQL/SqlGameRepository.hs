@@ -42,7 +42,7 @@ getActiveUserGamesEntities userId =
       E.orderBy [E.desc (game ^. M.GameLastMoveMadeAt)]
       return (player, game)
 
-getAllPlayers :: (Monad m, MonadIO m) => T.Text -> E.SqlPersist m [E.Entity M.Player]
+getAllPlayers :: (Monad m, MonadIO m) => T.Text -> E.SqlPersistT m [E.Entity M.Player]
 getAllPlayers gameId = E.select $
   E.from $ \(player) -> do
     E.where_ (player ^. M.PlayerGameId E.==. E.val gameId)
