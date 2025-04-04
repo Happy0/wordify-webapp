@@ -24,7 +24,7 @@ import qualified Data.Monoid as M
 import Data.Pool
 import Data.Text (Text)
 import qualified Data.Text.Lazy as TL
-import Data.Text.Read (decimal)
+import Data.Text.Read (decimal, rational)
 import Data.Time
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Database.Persist.Sql
@@ -71,9 +71,9 @@ getConnectionStatuses serverGame = do
 chatMessageSinceQueryParamValue :: Handler (Maybe UTCTime)
 chatMessageSinceQueryParamValue = do
   queryParamValue <- lookupGetParam "chatMessagesSince"
-  let sinceEpochSeconds = note "No chat message since param specific" queryParamValue >>= (fmap fst . decimal)
+  let sinceEpochSeconds = note "No chat message since param specific" queryParamValue >>= (fmap fst . rational)
   case sinceEpochSeconds of
-    Right secondsSinceUnixEpoch -> pure $ Just ((posixSecondsToUTCTime . fromIntegral) secondsSinceUnixEpoch)
+    Right secondsSinceUnixEpoch -> pure $ Just ((posixSecondsToUTCTime . fromRational) secondsSinceUnixEpoch)
     _ -> pure Nothing
 
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
@@ -177,6 +177,7 @@ gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
 gameApp app gameId maybeUser = do
   connection <- ask
   chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
+
   liftIO $
     withCacheableResource (games app) gameId $ \result ->
       case result of

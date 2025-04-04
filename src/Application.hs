@@ -34,6 +34,7 @@ import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
 import Controllers.Common.CacheableSharedResource
+import Controllers.Game.Model.ServerGame
 import Controllers.Game.Persist (getGame, getLobby)
 import Controllers.GameLobby.Model.GameLobby
 import Data.Char (isSpace)
@@ -109,7 +110,6 @@ makeFoundation appSettings inactivityTracker = do
       (appStaticDir appSettings)
 
   localisedGameSetups <- loadGameBundles
-  gameLobbies <- newTVarIO M.empty
   stdGen <- getStdGen
   randomGenerator <- newTVarIO stdGen
 
@@ -135,11 +135,11 @@ makeFoundation appSettings inactivityTracker = do
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
 
-  games <- makeResourceCache (getGame pool localisedGameSetups)
-  gameLobbies <- makeResourceCache (getLobby pool localisedGameSetups)
-
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
+
+  games <- makeGlobalResourceCache (getGame pool localisedGameSetups)
+  gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups)
 
   -- Return the foundation
   return $ mkFoundation pool games gameLobbies
