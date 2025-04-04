@@ -5,6 +5,7 @@ import Control.Concurrent.STM (TVar, modifyTVar)
 import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
 import Control.Monad
+import Control.Monad.Cont (liftIO)
 import Control.Monad.STM
 import Data.Either
 import Data.Int
