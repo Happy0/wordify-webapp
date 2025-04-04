@@ -1,6 +1,6 @@
 module Controllers.Game.Persist (getGame, getChatMessages, getChatMessagesSince, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (mapConcurrently)
+import ClassyPrelude (liftIO, mapConcurrently)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -26,6 +26,7 @@ import Foundation
 import qualified Model as M
 import Repository.GameRepository (GameSummary)
 import System.Random
+import System.Random.Internal
 import Wordify.Rules.Board
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
@@ -33,7 +34,6 @@ import Wordify.Rules.Move
 import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
-import Prelude
 
 getChatMessagesSince gameId since =
   selectSource [M.ChatMessageGame ==. gameId, M.ChatMessageCreatedAt >. since] [Asc M.ChatMessageCreatedAt]
@@ -392,3 +392,9 @@ dbTileRepresentationToTiles letterBag textRepresentation =
       | otherwise = case Mp.lookup character letterMap of
         Just tile -> Right tile
         _ -> Left $ pack $ (show character) ++ " not found in letterbag"
+
+toSeedStdGen :: StdGen -> (Word64, Word64)
+toSeedStdGen = unseedSMGen . unStdGen
+
+fromSeedStdGen :: (Word64, Word64) -> StdGen
+fromSeedStdGen = StdGen . seedSMGen'
