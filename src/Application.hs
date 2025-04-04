@@ -99,8 +99,8 @@ mkYesodDispatch "App" resourcesApp
 -- performs initialization and returns a foundation datatype value. This is also
 -- the place to put your migrate statements to have automatic database
 -- migrations handled by Yesod.
-makeFoundation :: AppSettings -> TVar InactivityTracker -> ResourceCache Text ServerGame -> ResourceCache Text GameLobby -> IO App
-makeFoundation appSettings inactivityTracker games gameLobbies = do
+makeFoundation :: AppSettings -> TVar InactivityTracker -> IO App
+makeFoundation appSettings inactivityTracker = do
   -- Some basic initializations: HTTP connection manager, logger, and static
   -- subsite.
   appHttpManager <- getGlobalManager
@@ -137,6 +137,9 @@ makeFoundation appSettings inactivityTracker games gameLobbies = do
 
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
+
+  games <- makeGlobalResourceCache (getGame pool localisedGameSetups)
+  gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups)
 
   -- Return the foundation
   return $ mkFoundation pool games gameLobbies
@@ -237,10 +240,8 @@ warpSettings foundation =
 getApplicationDev :: IO (Settings, Application)
 getApplicationDev = do
   inactivityTracker <- makeInactivityTracker
-  games <- makeResourceCache (getGame pool localisedGameSetups)
-  gameLobbies <- makeResourceCache (getLobby pool localisedGameSetups)
   settings <- getAppSettings
-  foundation <- makeFoundation settings inactivityTracker games gameLobbies
+  foundation <- makeFoundation settings inactivityTracker
   wsettings <- getDevSettings $ warpSettings foundation
   app <- makeApplication foundation
   return (wsettings, app)
@@ -255,33 +256,29 @@ develMain = develMainHelper getApplicationDev
 -- | The @main@ function for an executable running this site.
 appMain :: IO ()
 appMain = do
-  runResourceT $ do
-    games <- makeResourceCache (getGame pool localisedGameSetups)
-    gameLobbies <- makeResourceCache (getLobby pool localisedGameSetups)
+  -- Get the settings from all relevant sources
+  settings <-
+    loadYamlSettingsArgs
+      -- fall back to compile-time values, set to [] to require values at runtime
+      [configSettingsYmlValue]
+      -- allow environment variables to override
+      useEnv
 
-    -- Get the settings from all relevant sources
-    settings <-
-      loadYamlSettingsArgs
-        -- fall back to compile-time values, set to [] to require values at runtime
-        [configSettingsYmlValue]
-        -- allow environment variables to override
-        useEnv
+  inactivityTracker <- makeInactivityTracker
 
-    inactivityTracker <- makeInactivityTracker
+  -- Generate the foundation from the settings
+  foundation <- makeFoundation settings inactivityTracker
 
-    -- Generate the foundation from the settings
-    foundation <- makeFoundation settings inactivityTracker games gameLobbies
+  -- Generate a WAI Application from the foundation
+  app <- makeApplication foundation
 
-    -- Generate a WAI Application from the foundation
-    app <- makeApplication foundation
+  exitAppOnIdle <- getExitAppOnIdleConfig
 
-    exitAppOnIdle <- getExitAppOnIdleConfig
+  let runApp = runSettings (warpSettings foundation) app
 
-    let runApp = runSettings (warpSettings foundation) app
-
-    case exitAppOnIdle of
-      True -> raceUntilInactive inactivityTracker runApp
-      False -> runApp
+  case exitAppOnIdle of
+    True -> raceUntilInactive inactivityTracker runApp
+    False -> runApp
 
 --------------------------------------------------------------
 -- Functions for DevelMain.hs (a way to run the app from GHCi)

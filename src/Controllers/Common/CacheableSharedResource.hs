@@ -1,4 +1,4 @@
-module Controllers.Common.CacheableSharedResource (makeResourceCache, withCacheableResource, getCacheableResource, ResourceCache, CacheableSharedResource (decreaseSharersByOne, increaseSharersByOne, numberOfSharers)) where
+module Controllers.Common.CacheableSharedResource (makeResourceCache, makeGlobalResourceCache, withCacheableResource, getCacheableResource, ResourceCache, CacheableSharedResource (decreaseSharersByOne, increaseSharersByOne, numberOfSharers)) where
 
 import Control.Concurrent
 import Control.Concurrent.STM (TVar, modifyTVar)
@@ -29,19 +29,22 @@ class CacheableSharedResource a where
 
 makeResourceCache :: MonadResource m => CacheableSharedResource a => (Text -> IO (Either err a)) -> m (ReleaseKey, ResourceCache err a)
 makeResourceCache loadResourceOp = do
-  resourceCache <- liftIO $ newTVarIO M.empty
-  cleanUpMap <- liftIO $ newTVarIO M.empty
-  allocate (allocateResource resourceCache cleanUpMap loadResourceOp) deallocateResource
+  allocate (allocateResource loadResourceOp) deallocateResource
   where
-    allocateResource :: CacheableSharedResource a => TVar (Map Text a) -> TVar (Map Text UTCTime) -> (Text -> IO (Either err a)) -> IO (ResourceCache err a)
-    allocateResource c cu lr = do
-      threadID <- liftIO $ forkIO $ startBroomLoop c cu
-      pure $ ResourceCache c cu lr threadID
+    allocateResource :: CacheableSharedResource a => (Text -> IO (Either err a)) -> IO (ResourceCache err a)
+    allocateResource loadResource = makeGlobalResourceCache loadResource
 
     deallocateResource :: CacheableSharedResource a => ResourceCache err a -> IO ()
     deallocateResource cache = do
       let threadId = cacheCleanupThreadId cache
       killThread threadId
+
+makeGlobalResourceCache :: CacheableSharedResource a => (Text -> IO (Either err a)) -> IO (ResourceCache err a)
+makeGlobalResourceCache loadResourceOp = do
+  resourceCache <- newTVarIO M.empty
+  cleanUpMap <- newTVarIO M.empty
+  threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap
+  pure $ ResourceCache resourceCache cleanUpMap loadResourceOp threadId
 
 startBroomLoop :: CacheableSharedResource a => TVar (Map Text a) -> TVar (Map Text UTCTime) -> IO ()
 startBroomLoop resourceCache cleanUpMap = forever $ do
