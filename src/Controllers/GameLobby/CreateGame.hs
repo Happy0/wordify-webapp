@@ -46,8 +46,7 @@ createGameLobby app gameId game numPlayers =
       broadcastChan <- newBroadcastTChan
       newGenerator <- newTVar generator
       serverPlayers <- newTVar []
-      numConnections <- newTVar 0
-      let initialLobby = GameLobby game serverPlayers numPlayers broadcastChan newGenerator timeCreated numConnections
+      let initialLobby = GameLobby game serverPlayers numPlayers broadcastChan newGenerator timeCreated
       return initialLobby
 
 setupGame :: App -> Locale -> Int -> (ExceptT Text IO Game)

@@ -14,9 +14,6 @@ module Controllers.Game.Model.ServerGame
     game,
     playing,
     broadcastChannel,
-    numConnections,
-    increaseConnectionsByOne,
-    decreaseConnectionsByOne,
     getServerPlayerSnapshot,
     getSnapshotPlayerNumber,
   )
@@ -53,19 +50,13 @@ data ServerGame = ServerGame
     game :: TVar G.Game,
     playing :: [(Text, TVar SP.ServerPlayer)],
     broadcastChannel :: (TChan GameMessage),
-    numConnections :: TVar Int,
     createdAt :: UTCTime,
     lastMoveMadeAt :: TVar (Maybe UTCTime),
     finishedAt :: TVar (Maybe UTCTime)
   }
 
-instance CacheableSharedResource ServerGame where
-  decreaseSharersByOne serverGame = decreaseConnectionsByOne serverGame >> readTVar (numConnections serverGame)
-  increaseSharersByOne serverGame = increaseConnectionsByOne serverGame >> readTVar (numConnections serverGame)
-  numberOfSharers serverGame = readTVar (numConnections serverGame)
-
 makeServerGameSnapshot :: ServerGame -> STM ServerGameSnapshot
-makeServerGameSnapshot (ServerGame id game playing _ _ createdAt lastMoveMadeAt finishedAt) = do
+makeServerGameSnapshot (ServerGame id game playing _ createdAt lastMoveMadeAt finishedAt) = do
   players <- mapM (readTVar . snd) playing
   gameState <- readTVar game
   lastMoveMade <- readTVar lastMoveMadeAt
@@ -74,23 +65,21 @@ makeServerGameSnapshot (ServerGame id game playing _ _ createdAt lastMoveMadeAt 
 
 makeNewServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> STM ServerGame
 makeNewServerGame gameId initialGameState players createdAt = do
-  connections <- newTVar 0
   initialPlayerState <- mapM makeServerPlayerState players
   lastMoveMadeAt <- newTVar Nothing
   finishedAt <- newTVar Nothing
   game <- newTVar initialGameState
   messageChannel <- newBroadcastTChan
-  return (ServerGame gameId game initialPlayerState messageChannel connections createdAt lastMoveMadeAt finishedAt)
+  return (ServerGame gameId game initialPlayerState messageChannel createdAt lastMoveMadeAt finishedAt)
 
 makeServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> STM ServerGame
 makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedAt = do
-  connections <- newTVar 0
   currentPlayerStates <- mapM makeServerPlayerState serverPlayers
   lastMoveMade <- newTVar lastMoveMadeAt
   finished <- newTVar finishedAt
   game <- newTVar gameState
   messageChannel <- newBroadcastTChan
-  return (ServerGame gameId game currentPlayerStates messageChannel connections createdAt lastMoveMade finished)
+  return (ServerGame gameId game currentPlayerStates messageChannel createdAt lastMoveMade finished)
 
 makeServerPlayerState :: SP.ServerPlayer -> STM (Text, TVar ServerPlayer)
 makeServerPlayerState serverPlayer@(ServerPlayer _ playerId _ _ _) =
@@ -133,14 +122,6 @@ getServerPlayerSnapshot gameSnapshot user = L.find (isUser user) (snapshotPlayer
   where
     isUser :: AuthUser -> SP.ServerPlayer -> Bool
     isUser (AuthUser userId _) serverPlayer = SP.playerId serverPlayer == userId
-
-increaseConnectionsByOne :: ServerGame -> STM ()
-increaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) succ
-
-decreaseConnectionsByOne :: ServerGame -> STM ()
-decreaseConnectionsByOne serverGame = modifyTVar (numConnections serverGame) decreaseByOne
-  where
-    decreaseByOne i = i - 1
 
 getPlayerNumber :: ServerGame -> AuthUser -> Maybe Int
 getPlayerNumber serverGame (AuthUser userId _) = do

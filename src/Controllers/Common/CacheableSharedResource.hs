@@ -1,4 +1,4 @@
-module Controllers.Common.CacheableSharedResource (makeResourceCache, makeGlobalResourceCache, withCacheableResource, getCacheableResource, ResourceCache, CacheableSharedResource (decreaseSharersByOne, increaseSharersByOne, numberOfSharers)) where
+module Controllers.Common.CacheableSharedResource (makeResourceCache, makeGlobalResourceCache, withCacheableResource, getCacheableResource, ResourceCache) where
 
 import qualified Control.Foldl as Foldl
 import qualified DeferredFolds.UnfoldlM as UnfoldlM
@@ -18,38 +18,44 @@ import UnliftIO.Resource
 import Prelude
 import qualified StmContainers.Map as M
 
+data CacheItem a = CacheItem { cacheItem :: a, connections :: TVar Int }
+
 data ResourceCache err a = ResourceCache
-  { cache :: (M.Map Text a),
+  { cache :: (M.Map Text (CacheItem a)),
     cleanUpMap :: (M.Map Text UTCTime),
     loadResourceOp :: Text -> IO (Either err a),
     cacheCleanupThreadId :: ThreadId
   }
 
-class CacheableSharedResource a where
-  decreaseSharersByOne :: a -> STM Int
-  increaseSharersByOne :: a -> STM Int
-  numberOfSharers :: a -> STM Int
+increaseSharersByOne :: CacheItem a -> STM Int
+increaseSharersByOne (CacheItem item connections) = modifyTVar' connections (+1) >> readTVar connections
 
-makeResourceCache :: MonadResource m => CacheableSharedResource a => (Text -> IO (Either err a)) -> m (ReleaseKey, ResourceCache err a)
+decreaseSharersByOne :: CacheItem a -> STM Int
+decreaseSharersByOne (CacheItem item connections) = modifyTVar' connections (\item -> item - 1) >> readTVar connections
+
+numberOfSharers :: CacheItem a -> STM Int
+numberOfSharers (CacheItem item connections) = readTVar connections
+
+makeResourceCache :: MonadResource m => (Text -> IO (Either err a)) -> m (ReleaseKey, ResourceCache err a)
 makeResourceCache loadResourceOp = do
   allocate (allocateResource loadResourceOp) deallocateResource
   where
-    allocateResource :: CacheableSharedResource a => (Text -> IO (Either err a)) -> IO (ResourceCache err a)
+    allocateResource :: (Text -> IO (Either err a)) -> IO (ResourceCache err a)
     allocateResource loadResource = makeGlobalResourceCache loadResource
 
-    deallocateResource :: CacheableSharedResource a => ResourceCache err a -> IO ()
+    deallocateResource :: ResourceCache err a -> IO ()
     deallocateResource cache = do
       let threadId = cacheCleanupThreadId cache
       killThread threadId
 
-makeGlobalResourceCache :: CacheableSharedResource a => (Text -> IO (Either err a)) -> IO (ResourceCache err a)
+makeGlobalResourceCache :: (Text -> IO (Either err a)) -> IO (ResourceCache err a)
 makeGlobalResourceCache loadResourceOp = do
   resourceCache <- M.newIO
   cleanUpMap <- M.newIO
   threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap
   pure $ ResourceCache resourceCache cleanUpMap loadResourceOp threadId
 
-startBroomLoop :: CacheableSharedResource a => M.Map Text a -> M.Map Text UTCTime -> IO ()
+startBroomLoop :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> IO ()
 startBroomLoop resourceCache cleanUpMap = forever $ do
   now <- getCurrentTime
   potentiallyStaleMapItems <- atomically $ stmMapToList cleanUpMap
@@ -69,22 +75,22 @@ removeScheduledCleanup :: M.Map Text UTCTime -> Text -> STM ()
 removeScheduledCleanup cleanUpMap resourceId =
   M.delete resourceId cleanUpMap
 
-handlerSharerJoin :: CacheableSharedResource a => ResourceCache err a -> a -> Text -> STM ()
-handlerSharerJoin cache resource resourceId = do
-  void $ increaseSharersByOne resource
+handlerSharerJoin :: ResourceCache err a -> CacheItem a -> Text -> STM ()
+handlerSharerJoin cache cacheItem resourceId = do
+  void $ increaseSharersByOne cacheItem
   removeScheduledCleanup (cleanUpMap cache) resourceId
 
-handleSharerLeave :: CacheableSharedResource a => ResourceCache err a -> a -> Text -> IO ()
-handleSharerLeave cache resource resourceId = do
+handleSharerLeave :: ResourceCache err a -> CacheItem a -> Text -> IO ()
+handleSharerLeave cache cacheItem resourceId = do
   now <- getCurrentTime
   atomically $ do
-    newSharerCount <- decreaseSharersByOne resource
+    newSharerCount <- decreaseSharersByOne cacheItem
     when (newSharerCount == 0) $ void (scheduleCacheCleanup cache now resourceId)
 
-removeFromCache :: CacheableSharedResource a => M.Map Text a -> Text -> STM ()
+removeFromCache :: M.Map Text (CacheItem a) -> Text -> STM ()
 removeFromCache resourceCache resourceId = M.delete resourceId resourceCache
 
-removeIfNoSharers :: CacheableSharedResource a => M.Map Text a -> M.Map Text UTCTime -> Text -> STM ()
+removeIfNoSharers :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> Text -> STM ()
 removeIfNoSharers cache cleanupMap resourceId = do
   resource <- M.lookup resourceId cache
   case resource of
@@ -93,7 +99,7 @@ removeIfNoSharers cache cleanupMap resourceId = do
       sharers <- numberOfSharers cachedItem
       when (sharers == 0) $ removeFromCache cache resourceId >> removeScheduledCleanup cleanupMap resourceId
 
-loadCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> IO (Either err a)
+loadCacheableResource :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
 loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _) resourceId = do
   existingItem <- atomically $ do
     item <- M.lookup resourceId cache
@@ -109,36 +115,40 @@ loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _) res
       resource <- loadResourceOp resourceId
       case resource of
         Left loadError -> pure $ Left loadError
-        Right cachedResource ->
+        Right newResource ->
           atomically $ do
             cachedItem <- M.lookup resourceId cache
             result <- case cachedItem of
               Just cachedResource -> pure cachedResource
               Nothing -> do
-                M.insert cachedResource resourceId cache
-                pure cachedResource
+                numConnections <- newTVar 0
+                let item = CacheItem newResource numConnections
+                M.insert item resourceId cache
+                pure item
             
             handlerSharerJoin resourceCache result resourceId
             pure (Right result)
 
-withCacheableResource :: CacheableSharedResource a => ResourceCache err a -> Text -> (Either err a -> IO ()) -> IO ()
+stmMapToList :: M.Map k v -> STM [(k, v)]
+stmMapToList = UnfoldlM.foldM (Foldl.generalize Foldl.list) . M.unfoldlM
+
+withCacheableResource :: ResourceCache err a -> Text -> (Either err a -> IO ()) -> IO ()
 withCacheableResource cache resourceId op = 
   runResourceT $ do
     (_, cachedResource) <- getCacheableResource cache resourceId
     liftIO $ op cachedResource
 
-getCacheableResource :: MonadResource m => CacheableSharedResource a => ResourceCache err a -> Text -> m (ReleaseKey, Either err a)
-getCacheableResource resourceCache resourceId =
-  allocate (allocateResource resourceCache resourceId) (deAllocateResource resourceCache)
+getCacheableResource :: MonadResource m =>ResourceCache err a -> Text -> m (ReleaseKey, Either err a)
+getCacheableResource resourceCache resourceId = do
+  (releaseKey, cacheEntry) <- allocate (allocateResource resourceCache resourceId) (deAllocateResource resourceCache)
+  return (releaseKey, cacheItem <$> cacheEntry)
+
   where
-    allocateResource :: CacheableSharedResource a => ResourceCache err a -> Text -> IO (Either err a)
+    allocateResource :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
     allocateResource resourceCache resourceId = loadCacheableResource resourceCache resourceId
 
-    deAllocateResource :: CacheableSharedResource a => ResourceCache err a -> Either err a -> IO ()
+    deAllocateResource :: ResourceCache err a -> Either err (CacheItem a) -> IO ()
     deAllocateResource resourceCache resource = do
       case resource of
         Left _ -> pure ()
         Right sharedResource -> handleSharerLeave resourceCache sharedResource resourceId
-
-stmMapToList :: M.Map k v -> STM [(k, v)]
-stmMapToList = UnfoldlM.foldM (Foldl.generalize Foldl.list) . M.unfoldlM

@@ -45,14 +45,8 @@ data GameLobby = GameLobby
     channel :: TChan LobbyMessage,
     -- TODO: rename this to 'lobbyGenerator'
     playerIdGenerator :: TVar StdGen,
-    openedAt :: UTCTime,
-    numConnections :: TVar Int
+    openedAt :: UTCTime
   }
-
-instance CacheableSharedResource GameLobby where
-  decreaseSharersByOne gameLobby = decreaseConnectionsByOne gameLobby >> readTVar (numConnections gameLobby)
-  increaseSharersByOne gameLobby = increaseConnectionsByOne gameLobby >> readTVar (numConnections gameLobby)
-  numberOfSharers gameLobby = readTVar (numConnections gameLobby)
 
 gameStarted :: ClientLobbyJoinResult -> Bool
 gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)
@@ -83,11 +77,3 @@ inLobby :: GameLobby -> T.Text -> STM Bool
 inLobby lobby playerIdentifier = isJust . find isPlayer <$> readTVar (lobbyPlayers lobby)
   where
     isPlayer player = (SP.playerId player) == playerIdentifier
-
-increaseConnectionsByOne :: GameLobby -> STM ()
-increaseConnectionsByOne gameLobby = modifyTVar (numConnections gameLobby) succ
-
-decreaseConnectionsByOne :: GameLobby -> STM ()
-decreaseConnectionsByOne gameLobby = modifyTVar (numConnections gameLobby) decreaseByOne
-  where
-    decreaseByOne i = i - 1

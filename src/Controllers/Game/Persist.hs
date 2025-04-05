@@ -76,8 +76,7 @@ getLobby pool localisedGameSetups gameId = do
         tiles <- hoistEither $ dbTileRepresentationToTiles bag originalLetterBag
         let bag = makeBagUsingGenerator tiles (stdGenFromText letterBagSeed :: StdGen)
         pendingGame <- hoistEither $ mapLeft (T.pack . show) (makeGame lobbyPlayers bag dictionary)
-        numConnections <- liftIO $ newTVarIO 0
-        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt numConnections
+        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt
     Left err -> return $ Left err
 
 getLobbyPlayer :: ConnectionPool -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
