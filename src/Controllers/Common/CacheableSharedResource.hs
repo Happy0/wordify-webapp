@@ -24,6 +24,7 @@ data ResourceCache err a = ResourceCache
   { cache :: (M.Map Text (CacheItem a)),
     cleanUpMap :: (M.Map Text UTCTime),
     loadResourceOp :: Text -> IO (Either err a),
+    onRemoval :: Maybe (a -> IO ()),
     cacheCleanupThreadId :: ThreadId
   }
 
@@ -36,38 +37,42 @@ decreaseSharersByOne (CacheItem item connections) = modifyTVar' connections (\it
 numberOfSharers :: CacheItem a -> STM Int
 numberOfSharers (CacheItem item connections) = readTVar connections
 
-makeResourceCache :: MonadResource m => (Text -> IO (Either err a)) -> m (ReleaseKey, ResourceCache err a)
-makeResourceCache loadResourceOp = do
-  allocate (allocateResource loadResourceOp) deallocateResource
+makeResourceCache :: MonadResource m => (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> m (ReleaseKey, ResourceCache err a)
+makeResourceCache loadResourceOp onRemoval = do
+  allocate (allocateResource loadResourceOp onRemoval) deallocateResource
   where
-    allocateResource :: (Text -> IO (Either err a)) -> IO (ResourceCache err a)
-    allocateResource loadResource = makeGlobalResourceCache loadResource
+    allocateResource :: (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> IO (ResourceCache err a)
+    allocateResource loadResource onRemoval = makeGlobalResourceCache loadResource onRemoval
 
     deallocateResource :: ResourceCache err a -> IO ()
     deallocateResource cache = do
       let threadId = cacheCleanupThreadId cache
       killThread threadId
 
-makeGlobalResourceCache :: (Text -> IO (Either err a)) -> IO (ResourceCache err a)
-makeGlobalResourceCache loadResourceOp = do
+makeGlobalResourceCache :: (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> IO (ResourceCache err a)
+makeGlobalResourceCache loadResourceOp onRemoval = do
   resourceCache <- M.newIO
   cleanUpMap <- M.newIO
-  threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap
-  pure $ ResourceCache resourceCache cleanUpMap loadResourceOp threadId
+  threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap onRemoval
+  pure $ ResourceCache resourceCache cleanUpMap loadResourceOp onRemoval threadId
 
-startBroomLoop :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> IO ()
-startBroomLoop resourceCache cleanUpMap = forever $ do
+startBroomLoop :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> Maybe (a -> IO ()) -> IO ()
+startBroomLoop resourceCache cleanUpMap onRemove = forever $ do
   now <- getCurrentTime
   potentiallyStaleMapItems <- atomically $ stmMapToList cleanUpMap
 
   forM_ potentiallyStaleMapItems $ \(resourceId, cacheExpiryTime) -> do
-    when (now >= cacheExpiryTime) $ atomically $ removeIfNoSharers resourceCache cleanUpMap resourceId
+    when (now >= cacheExpiryTime) $ do
+      removed <- atomically $ removeIfNoSharers resourceCache cleanUpMap resourceId
+      case (removed, onRemove) of
+        (Just removedItem, Just onRemovalFunction) -> onRemovalFunction removedItem
+        _ -> return ()
 
   threadDelay (1 * 60000000)
-  startBroomLoop resourceCache cleanUpMap
+  startBroomLoop resourceCache cleanUpMap onRemove
 
 scheduleCacheCleanup :: ResourceCache err a -> UTCTime -> Text -> STM ()
-scheduleCacheCleanup (ResourceCache cache cleanUpMap _ _) now resourceId = do
+scheduleCacheCleanup (ResourceCache cache cleanUpMap _ _ _) now resourceId = do
   let oneMinute = 60
   M.insert (addUTCTime oneMinute now) resourceId cleanUpMap
 
@@ -90,17 +95,23 @@ handleSharerLeave cache cacheItem resourceId = do
 removeFromCache :: M.Map Text (CacheItem a) -> Text -> STM ()
 removeFromCache resourceCache resourceId = M.delete resourceId resourceCache
 
-removeIfNoSharers :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> Text -> STM ()
+removeIfNoSharers :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> Text -> STM (Maybe a)
 removeIfNoSharers cache cleanupMap resourceId = do
   resource <- M.lookup resourceId cache
   case resource of
-    Nothing -> pure ()
-    Just cachedItem -> do
-      sharers <- numberOfSharers cachedItem
-      when (sharers == 0) $ removeFromCache cache resourceId >> removeScheduledCleanup cleanupMap resourceId
+    Nothing -> pure Nothing
+    Just cached -> do
+      sharers <- numberOfSharers cached
+
+      if (sharers == 0) then do
+        removeFromCache cache resourceId
+        removeScheduledCleanup cleanupMap resourceId
+        return (Just (cacheItem cached))
+      else
+        return Nothing
 
 loadCacheableResource :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
-loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _) resourceId = do
+loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _ _) resourceId = do
   existingItem <- atomically $ do
     item <- M.lookup resourceId cache
     case item of

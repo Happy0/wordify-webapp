@@ -138,8 +138,8 @@ makeFoundation appSettings inactivityTracker = do
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
-  games <- makeGlobalResourceCache (getGame pool localisedGameSetups)
-  gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups)
+  games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
+  gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing
 
   -- Return the foundation
   return $ mkFoundation pool games gameLobbies
