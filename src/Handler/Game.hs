@@ -124,7 +124,6 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
               var send = function(objectPayload) {
                   if (!conn || conn.readyState !== WebSocket.OPEN) {
-                    alert("Connection is not open. Reconnecting...")
                     return false;
                   }
 

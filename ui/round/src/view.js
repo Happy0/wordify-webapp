@@ -25,11 +25,26 @@ module.exports = function(ctrl) {
                         m('button', buttonAttrs, text));
     };
 
+    var onClickSubmitMove = function () {
+        var result = ctrl.makeBoardMove()
+        if (!result) alert("Connection is not open. Reconnecting...")
+    }
+
+    var onClickPass = function () {
+        var result = ctrl.makePassMove()
+        if (!result) alert("Connection is not open. Reconnecting...")
+    }
+
+    var onClickExchange = function () {
+        var result = ctrl.toggleExchangeMode()
+        if (!result) alert("Connection is not open. Reconnecting...")
+    }
+
     var renderActionButtons = function () {
         return m('div', {class: 'action-buttons'}, [
-                     renderButton("Submit", ctrl.makeBoardMove),
-                     renderButton("Exchange", ctrl.toggleExchangeMode),
-                     renderButton("Pass", ctrl.makePassMove)]);
+                     renderButton("Submit", onClickSubmitMove),
+                     renderButton("Exchange", onClickExchange),
+                     renderButton("Pass", onClickPass)]);
    };
 
     var renderTileRack = function() {
@@ -119,6 +134,8 @@ module.exports = function(ctrl) {
 
                         if (sendResult) {
                             $(element).val("");
+                        } else {
+                            alert("Connection is not open. Reconnecting...")
                         }
                     }
                 })

@@ -65,7 +65,7 @@ module.exports = function(opts) {
             payload : tilesPlaced
         };
 
-        socketOpts.send(data);
+        return socketOpts.send(data);
     };
 
     var makePassMove = function() {
@@ -75,7 +75,7 @@ module.exports = function(opts) {
         }
 
         recallTilesToRack();
-        socketOpts.send(data);
+        return socketOpts.send(data);
     };
 
     var toggleExchangeMode = function() {
@@ -99,12 +99,14 @@ module.exports = function(opts) {
                     payload : wantsToExchange
                 };
 
-                socketOpts.send(payload);
+                return socketOpts.send(payload);
             }
         }
 
         recallTilesToRack();
         data.exchangeMode = !data.exchangeMode;
+
+        return true;
     };
 
     var sendChatMessage = function(message) {
