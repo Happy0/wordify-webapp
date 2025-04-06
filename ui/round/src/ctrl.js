@@ -115,7 +115,7 @@ module.exports = function(opts) {
             }
         }
 
-        socketOpts.send(data);
+        return socketOpts.send(data);
     }
 
 

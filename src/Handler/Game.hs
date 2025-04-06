@@ -123,9 +123,15 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               opts.connections = #{toJSON connectionStatuses}
 
               var send = function(objectPayload) {
-                // TODO: handle connection being null / not connected
+                  if (!conn || conn.readyState !== WebSocket.OPEN) {
+                    alert("Connection is not open. Reconnecting...")
+                    return false;
+                  }
+
                   var json = JSON.stringify(objectPayload);
                   conn.send(json);
+
+                  return true;
               }
 
               opts.send = send;
@@ -158,7 +164,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
                 conn.onerror = function(err) {
                   console.error('Socket error: ', err.message, 'Closing.');
-                  ws.close();
+                  conn.close();
                 };
               }
 

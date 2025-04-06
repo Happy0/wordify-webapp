@@ -115,8 +115,11 @@ module.exports = function(ctrl) {
                 $(element).keydown(function(e) {
                     if (e.which == 13 && $(element).val())
                     {
-                        ctrl.sendChatMessage($(element).val())
-                        $(element).val("");
+                        var sendResult = ctrl.sendChatMessage($(element).val())
+
+                        if (sendResult) {
+                            $(element).val("");
+                        }
                     }
                 })
 
