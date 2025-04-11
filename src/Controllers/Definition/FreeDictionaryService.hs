@@ -8,13 +8,18 @@ module Controllers.Definition.FreeDictionaryService (getDefinitions) where
     
     data FreeDictionaryService = FreeDictionaryService {urlPrefix :: T.Text}
 
-    data FreeDictionaryDefinition = FreeDictionaryDefinition {definition :: T.Text, synonyms :: [T.Text]}
+    data FreeDictionaryDefinition = FreeDictionaryDefinition {definition :: T.Text, example :: T.Text, synonyms :: [T.Text]}
     data FreeDictionaryMeaning = FreeDictionaryMeaning {partOfSpeech :: T.Text, definitions :: [FreeDictionaryDefinition]}
     data FreeDictionaryResponseItem = FreeDictionaryResponseItem {word :: T.Text, meanings :: [FreeDictionaryMeaning]}
     data FreeDictionaryResponse = FreeDictionaryResponse [FreeDictionaryResponseItem]
 
     instance FromJSON FreeDictionaryDefinition where
-        parseJSON (Object response) = undefined
+        parseJSON = withObject "Definition" $ \obj -> do
+            definition <- obj .: "definition"
+            example <- obj .: "example"
+            synonyms <- obj .: "synonyms"
+            pure $ FreeDictionaryDefinition definition example synonyms
+             
 
     instance FromJSON FreeDictionaryMeaning where
         parseJSON = withObject "Meaning" $ \obj -> do
@@ -34,4 +39,7 @@ module Controllers.Definition.FreeDictionaryService (getDefinitions) where
             pure $ FreeDictionaryResponse items
 
     instance DefinitionService FreeDictionaryService where
-        getDefinitions service word = undefined
+        getDefinitions = getDefinitionsImpl
+
+    getDefinitionsImpl :: FreeDictionaryService -> T.Text -> IO (Either T.Text [Definition])
+    getDefinitionsImpl service word = undefined
