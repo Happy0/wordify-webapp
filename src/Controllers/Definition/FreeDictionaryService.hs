@@ -59,6 +59,7 @@ module Controllers.Definition.FreeDictionaryService (getDefinitions) where
 
     freeDictionaryGetRequest :: FreeDictionaryService -> T.Text -> IO (Either T.Text FreeDictionaryResponse)
     freeDictionaryGetRequest freeDictionaryService word = 
+        -- TODO: catch errors / deal with error HTTP error status codes to return as Either Left
         runReq defaultHttpConfig $ do
             r <- req GET (https "api.dictionaryapi.dev" /: "api" /: "v2" /: "entries" /: "en" /: word) NoReqBody jsonResponse mempty
             let body = (responseBody r :: Value)
