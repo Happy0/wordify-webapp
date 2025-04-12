@@ -4,21 +4,21 @@ module Controllers.Definition.FreeDictionaryService (getDefinitions) where
     import Data.Aeson
     import Data.Aeson.Types
     import Controllers.Definition.DefinitionService
-    import ClassyPrelude (IO, Either(Left, Right), undefined, Maybe, (<$>), pure, mapM, fmap, ($), toList, mempty, String, concatMap, (.), map, concat)
+    import ClassyPrelude (IO, Either(Left, Right), undefined, Maybe, (<$>), pure, mapM, fmap, ($), toList, mempty, String, concatMap, (.), map, concat, Show)
     import Network.HTTP.Req
     import Control.Arrow (left)
 
-    data FreeDictionaryService = FreeDictionaryService {urlPrefix :: T.Text}
+    data FreeDictionaryService = FreeDictionaryService
 
-    data FreeDictionaryDefinition = FreeDictionaryDefinition {definition :: T.Text, example :: T.Text, synonyms :: [T.Text]}
-    data FreeDictionaryMeaning = FreeDictionaryMeaning {partOfSpeech :: T.Text, definitions :: [FreeDictionaryDefinition]}
-    data FreeDictionaryResponseItem = FreeDictionaryResponseItem {word :: T.Text, meanings :: [FreeDictionaryMeaning]}
-    data FreeDictionaryResponse = FreeDictionaryResponse [FreeDictionaryResponseItem]
+    data FreeDictionaryDefinition = FreeDictionaryDefinition {definition :: T.Text, example :: Maybe T.Text, synonyms :: [T.Text]} deriving Show
+    data FreeDictionaryMeaning = FreeDictionaryMeaning {partOfSpeech :: T.Text, definitions :: [FreeDictionaryDefinition]} deriving Show
+    data FreeDictionaryResponseItem = FreeDictionaryResponseItem {word :: T.Text, meanings :: [FreeDictionaryMeaning]} deriving Show
+    data FreeDictionaryResponse = FreeDictionaryResponse [FreeDictionaryResponseItem] deriving Show
 
     instance FromJSON FreeDictionaryDefinition where
         parseJSON = withObject "Definition" $ \obj -> do
             definition <- obj .: "definition"
-            example <- obj .: "example"
+            example <- obj .:? "example"
             synonyms <- obj .: "synonyms"
             pure $ FreeDictionaryDefinition definition example synonyms
              
@@ -60,7 +60,7 @@ module Controllers.Definition.FreeDictionaryService (getDefinitions) where
     freeDictionaryGetRequest :: FreeDictionaryService -> T.Text -> IO (Either T.Text FreeDictionaryResponse)
     freeDictionaryGetRequest freeDictionaryService word = 
         runReq defaultHttpConfig $ do
-            r <- req GET (https "api.dictionaryapi.dev/api/v2/entries/en/" /: word) NoReqBody jsonResponse mempty
+            r <- req GET (https "api.dictionaryapi.dev" /: "api" /: "v2" /: "entries" /: "en" /: word) NoReqBody jsonResponse mempty
             let body = (responseBody r :: Value)
             let decodedResponseBody = fromJSON body :: Result FreeDictionaryResponse
             case decodedResponseBody of 
