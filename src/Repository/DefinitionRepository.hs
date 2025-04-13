@@ -2,6 +2,7 @@ module Repository.DefinitionRepository (
     DefinitionRepository(getDefinitions, saveGameDefinitions, getGameDefinitions),
     DefinitionRepositoryImpl(getWordDefinitions, saveGameWordDefinitions, getGameWordDefinitions)) where
 
+    import Conduit (ConduitT)
     import ClassyPrelude (IO, UTCTime, Maybe)
     import qualified Data.Text as T
 
@@ -11,12 +12,12 @@ module Repository.DefinitionRepository (
     class DefinitionRepository a where
         getDefinitions :: a -> T.Text -> IO [WordDefinitionItem]
         saveGameDefinitions :: a -> T.Text -> T.Text -> [WordDefinitionItem] -> IO ()
-        getGameDefinitions :: a -> T.Text -> IO [GameWordItem]
+        getGameDefinitions :: a -> T.Text -> ConduitT () GameWordItem IO ()
 
     data DefinitionRepositoryImpl = DefinitionRepositoryImpl {
         getWordDefinitions :: T.Text -> IO [WordDefinitionItem],
         saveGameWordDefinitions :: T.Text -> T.Text -> [WordDefinitionItem] -> IO (),
-        getGameWordDefinitions :: T.Text -> IO [GameWordItem]
+        getGameWordDefinitions :: T.Text -> ConduitT () GameWordItem IO ()
     }
 
     toDefinitionServiceImpl :: DefinitionRepository a => a -> DefinitionRepositoryImpl
