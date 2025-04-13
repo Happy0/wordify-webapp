@@ -89,6 +89,8 @@ import System.Random
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 import qualified Prelude as P
+import Controllers.Definition.DefinitionService(DefinitionServiceImpl, toDefinitionServiceImpl)
+import Controllers.Definition.FreeDictionaryService(FreeDictionaryService(FreeDictionaryService))
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -114,6 +116,8 @@ makeFoundation appSettings inactivityTracker = do
   randomGenerator <- newTVarIO stdGen
 
   authDetails <- getAuthDetails
+
+  let definitionService = toDefinitionServiceImpl FreeDictionaryService
 
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:

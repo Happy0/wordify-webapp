@@ -85,13 +85,13 @@ persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen p
 withNotifyJoinAndLeave :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
 withNotifyJoinAndLeave pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
 
-performRequest :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
-performRequest serverGame pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
-performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
-performRequest serverGame pool player PassMove = handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
-performRequest serverGame pool player (SendChatMessage msg) = handleChatMessage serverGame pool player msg
-performRequest serverGame pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
-performRequest serverGame _ player (AskDefinition word) = undefined --handleAskDefinition serverGame (player >>= getPlayerNumber serverGame) word
+performRequest :: ServerGame -> DefinitionServiceImpl -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
+performRequest serverGame _ pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
+performRequest serverGame _ pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
+performRequest serverGame _ pool player PassMove = handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
+performRequest serverGame _ pool player (SendChatMessage msg) = handleChatMessage serverGame pool player msg
+performRequest serverGame _ pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
+performRequest serverGame definitionService _ player (AskDefinition word) = handleAskDefinition definitionService serverGame (player >>= getPlayerNumber serverGame) word
 
 handleDefinitionResult :: ServerGame -> (Either Text [Definition]) -> IO ()
 handleDefinitionResult serverGame result = do

@@ -1,4 +1,4 @@
-module Controllers.Definition.FreeDictionaryService (getDefinitions) where
+module Controllers.Definition.FreeDictionaryService (getDefinitions, FreeDictionaryService(FreeDictionaryService)) where
 
     import qualified Data.Text as T
     import Data.Aeson

@@ -37,6 +37,7 @@ import Yesod.Auth.OpenId (IdentifierType (Claimed), authOpenId)
 import Yesod.Core.Types (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
 import Yesod.Default.Util (addStaticContentExternal)
+import Controllers.Definition.DefinitionService(DefinitionServiceImpl)
 
 data LocalisedGameSetup = GameSetup
   { localisedDictionary :: Dictionary,
@@ -71,7 +72,8 @@ data App = App
     games :: ResourceCache Text ServerGame,
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
-    inactivityTracker :: TVar InactivityTracker
+    inactivityTracker :: TVar InactivityTracker,
+    definitionService :: DefinitionServiceImpl
   }
 
 data MenuItem = MenuItem
