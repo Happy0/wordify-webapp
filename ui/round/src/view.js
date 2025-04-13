@@ -123,6 +123,10 @@ module.exports = function(ctrl) {
             return m('li', {class: 'chat-message'}, [m('span', {class: 'chat-user'}, m('b',"<" + sender  + ">")), message]);
         }
 
+        var renderDefinition = function(definition) {
+            return m('li', {class: 'chat-message'}, [m('span', {class: 'chat-user'}, m('b',"[" + definition.word  + "]:")), definition.definition.definition]);
+        }
+
         var renderInputBox = function() {
             var listenForEnter = function(element, initialised, context) {
                 if (initialised) return;
@@ -130,7 +134,12 @@ module.exports = function(ctrl) {
                 $(element).keydown(function(e) {
                     if (e.which == 13 && $(element).val())
                     {
-                        var sendResult = ctrl.sendChatMessage($(element).val())
+                        var messageContents = $(element).val()
+                        var sendResult = ctrl.sendChatMessage(messageContents)
+
+                        if (messageContents.startsWith("!define ")) {
+                            ctrl.requestDefinition(messageContents.split("!define ")[1])
+                        }
 
                         if (sendResult) {
                             $(element).val("");
@@ -152,7 +161,11 @@ module.exports = function(ctrl) {
         return m('div', {class: 'chat-box'},
                  [
                      m('ul', {class: 'chat-messages', config: messagesConfig}, ctrl.data.chatMessages.map(function(message) {
-                    return renderMessage(message.sender, message.message)
+                    if (message.word) {
+                        return renderDefinition(message)
+                    } else {
+                        return renderMessage(message.sender, message.message)
+                    }
             })),
              renderInputBox()
             ]

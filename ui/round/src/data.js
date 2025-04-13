@@ -16,6 +16,8 @@ module.exports = function(opts) {
 
         // 2025-03-28T23:21:21.877940745Z | null if none received yet
         lastChatMessageReceived: null,
+
+        // [{sender: sender, message: message} || {word: "word", definition: {"definition": "..", "partOfSpeech": "...", "example": "..." | undefined}}
         chatMessages : [],
         tilesRemaining : 0,
         potentialScore : 0,
