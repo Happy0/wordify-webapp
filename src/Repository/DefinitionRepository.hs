@@ -1,6 +1,8 @@
 module Repository.DefinitionRepository (
     DefinitionRepository(getDefinitions, saveGameDefinitions, getGameDefinitions),
-    DefinitionRepositoryImpl(getWordDefinitions, saveGameWordDefinitions, getGameWordDefinitions)) where
+    DefinitionRepositoryImpl(getWordDefinitions, saveGameWordDefinitions, getGameWordDefinitions),
+    GameWordItem(GameWordItem),
+    WordDefinitionItem(WordDefinitionItem)) where
 
     import Conduit (ConduitT)
     import ClassyPrelude (IO, UTCTime, Maybe)
