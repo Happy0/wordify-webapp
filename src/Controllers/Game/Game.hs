@@ -95,10 +95,11 @@ performRequest serverGame definitionService _ player (AskDefinition word) = hand
 
 handleDefinitionResult :: ServerGame -> Text -> (Either Text [Definition]) -> IO ()
 handleDefinitionResult serverGame word result = do
+  now <- getCurrentTime
   let channel = broadcastChannel serverGame
   case result of 
-    Left err ->  atomically (writeTChan channel (WordDefinitions word []))
-    Right definitions -> atomically (writeTChan channel (WordDefinitions word definitions))
+    Left err ->  atomically (writeTChan channel (WordDefinitions word now []))
+    Right definitions -> atomically (writeTChan channel (WordDefinitions word now definitions))
 
 handleAskDefinition :: DefinitionServiceImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
 handleAskDefinition definitionService serverGame Nothing word = 

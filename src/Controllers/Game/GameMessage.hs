@@ -44,4 +44,4 @@ data GameMessage
   | PlayerChat ChatMessage
   | PlayerConnect Int UTCTime
   | PlayerDisconnect Int UTCTime
-  | WordDefinitions Text [Definition]
+  | WordDefinitions Text UTCTime [Definition]
