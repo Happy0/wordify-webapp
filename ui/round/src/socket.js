@@ -130,7 +130,7 @@ module.exports = function(opts) {
             controller.playerDisconnect(data.playerNumber)
         },
         "wordDefinitions": function(data) {
-            controller.displayDefinitions(data)
+            controller.addDefinitions(data)
         },
         "error" : function(data) {
             controller.showErrorMessage(data);

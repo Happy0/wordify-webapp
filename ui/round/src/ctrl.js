@@ -395,8 +395,23 @@ module.exports = function(opts) {
         }
     }
 
-    var displayDefinitions = function (definitions) {
+    var addDefinitions = function (definitions) {
+        m.startComputation();
+        var messages = data.chatMessages;
+        var firstDefinition = definitions.definitions[0]
+        messages.push({word: definitions.word, definition: firstDefinition});
+        m.endComputation();
+    }
+    
+    var requestDefinition = function (word) {
+        var data = {
+            command : "askDefinition",
+            payload : {
+                word: word
+            }
+        };
 
+        return socketOpts.send(data);
     }
 
     scrabbleGroundCtrl.setCustomRevertFunction(putTileBackOnRack);
@@ -428,7 +443,8 @@ module.exports = function(opts) {
         setConnections: setConnections,
         playerConnect: playerConnect,
         playerDisconnect: playerDisconnect,
-        displayDefinitions: displayDefinitions,
+        addDefinitions: addDefinitions,
+        requestDefinition: requestDefinition,
         getLastChatMessageReceivedSecondsSinceEpoch: getLastChatMessageReceivedSecondsSinceEpoch,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
