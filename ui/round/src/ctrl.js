@@ -395,6 +395,10 @@ module.exports = function(opts) {
         }
     }
 
+    var displayDefinitions = function (definitions) {
+
+    }
+
     scrabbleGroundCtrl.setCustomRevertFunction(putTileBackOnRack);
 
     var controllerFunctions = {
@@ -424,6 +428,7 @@ module.exports = function(opts) {
         setConnections: setConnections,
         playerConnect: playerConnect,
         playerDisconnect: playerDisconnect,
+        displayDefinitions: displayDefinitions,
         getLastChatMessageReceivedSecondsSinceEpoch: getLastChatMessageReceivedSecondsSinceEpoch,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket

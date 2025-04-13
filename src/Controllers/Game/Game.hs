@@ -93,17 +93,17 @@ performRequest serverGame _ pool player (SendChatMessage msg) = handleChatMessag
 performRequest serverGame _ pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
 performRequest serverGame definitionService _ player (AskDefinition word) = handleAskDefinition definitionService serverGame (player >>= getPlayerNumber serverGame) word
 
-handleDefinitionResult :: ServerGame -> (Either Text [Definition]) -> IO ()
-handleDefinitionResult serverGame result = do
+handleDefinitionResult :: ServerGame -> Text -> (Either Text [Definition]) -> IO ()
+handleDefinitionResult serverGame word result = do
   let channel = broadcastChannel serverGame
   case result of 
     Left err -> Prelude.putStrLn (unpack err) --todo
     -- TODO: handle non player socket sending request or request for a word that hasn't been played
-    Right definitions -> atomically (writeTChan channel (WordDefinitions definitions))
+    Right definitions -> atomically (writeTChan channel (WordDefinitions word definitions))
 
 handleAskDefinition :: DefinitionServiceImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
 handleAskDefinition definitionService serverGame playerNumber word =
-  handleDefinitionAsync word (handleDefinitionResult serverGame) >> pure AskDefinitionSuccess
+  handleDefinitionAsync word (handleDefinitionResult serverGame word) >> pure AskDefinitionSuccess
   where
     handleDefinitionAsync word = withDefinitionsAsync definitionService word 5
 

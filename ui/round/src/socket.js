@@ -129,6 +129,9 @@ module.exports = function(opts) {
         "playerDisconnect": function(data) {
             controller.playerDisconnect(data.playerNumber)
         },
+        "wordDefinitions": function(data) {
+            controller.displayDefinitions(data)
+        },
         "error" : function(data) {
             controller.showErrorMessage(data);
         }
