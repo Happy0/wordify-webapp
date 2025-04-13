@@ -98,6 +98,7 @@ handleDefinitionResult serverGame result = do
   let channel = broadcastChannel serverGame
   case result of 
     Left err -> Prelude.putStrLn (unpack err) --todo
+    -- TODO: handle non player socket sending request or request for a word that hasn't been played
     Right definitions -> atomically (writeTChan channel (WordDefinitions definitions))
 
 handleAskDefinition :: DefinitionServiceImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
