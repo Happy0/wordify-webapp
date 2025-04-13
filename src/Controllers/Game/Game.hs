@@ -14,6 +14,7 @@ import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
+import Controllers.Definition.DefinitionService (DefinitionServiceImpl, Definition, withDefinitionsAsync)
 import Controllers.User.Model.AuthUser
 import Data.Conduit
 import qualified Data.List as L
@@ -90,6 +91,23 @@ performRequest serverGame pool player (ExchangeMove exchanged) = handleExchangeM
 performRequest serverGame pool player PassMove = handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
 performRequest serverGame pool player (SendChatMessage msg) = handleChatMessage serverGame pool player msg
 performRequest serverGame pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
+performRequest serverGame _ player (AskDefinition word) = undefined --handleAskDefinition serverGame (player >>= getPlayerNumber serverGame) word
+
+handleDefinitionResult :: ServerGame -> (Either Text [Definition]) -> IO ()
+handleDefinitionResult serverGame result = do
+  let channel = broadcastChannel serverGame
+  case result of 
+    Left err -> Prelude.putStrLn (unpack err) --todo
+    Right definitions -> atomically (writeTChan channel (WordDefinitions definitions))
+
+handleAskDefinition :: DefinitionServiceImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
+handleAskDefinition definitionService serverGame playerNumber word =
+  handleDefinitionAsync word (handleDefinitionResult serverGame) >> pure AskDefinitionSuccess
+  where
+    handleDefinitionAsync word = withDefinitionsAsync definitionService word 5
+
+    wordPlayedInGame :: ServerGame -> Bool
+    wordPlayedInGame serverGame = undefined
 
 handlePotentialScore :: ServerGame -> [(Pos, Tile)] -> IO ServerResponse
 handlePotentialScore serverGame placedTiles =

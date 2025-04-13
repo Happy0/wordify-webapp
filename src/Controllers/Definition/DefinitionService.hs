@@ -1,4 +1,4 @@
-module Controllers.Definition.DefinitionService (DefinitionService(getDefinitions), Definition(Definition), DefinitionServiceImpl(DefinitionServiceImpl), definitions, toDefinitionServiceImpl) where
+module Controllers.Definition.DefinitionService (DefinitionService(getDefinitions), Definition(Definition), DefinitionServiceImpl(DefinitionServiceImpl), definitions, toDefinitionServiceImpl, withDefinitionsAsync) where
     import qualified Data.Text as T
     import ClassyPrelude (IO, Either, Show, Maybe, void, Int, pure, (>>), (>>=), Either(Left, Right), ($), (*), join, (<$>), either, id, (.))
     import Control.Concurrent.Async (race)

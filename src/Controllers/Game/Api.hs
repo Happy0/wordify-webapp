@@ -1,13 +1,14 @@
 module Controllers.Game.Api
   ( ChatMessage (ChatMessage),
-    ClientMessage (AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove),
-    GameMessage (PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat, PlayerConnect, PlayerDisconnect),
+    ClientMessage (AskPotentialScore, SendChatMessage, BoardMove, ExchangeMove, PassMove, AskDefinition),
+    GameMessage (PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat, PlayerConnect, PlayerDisconnect, WordDefinitions),
     ServerResponse
       ( PotentialScore,
         BoardMoveSuccess,
         ExchangeMoveSuccess,
         PassMoveSuccess,
         ChatSuccess,
+        AskDefinitionSuccess,
         InitialiseGame,
         InvalidCommand
       ),
@@ -56,6 +57,7 @@ import Prelude
 
 data ClientMessage
   = AskPotentialScore [(Pos, Tile)]
+  | AskDefinition Text
   | SendChatMessage Text
   | BoardMove [(Pos, Tile)]
   | ExchangeMove [Tile]
@@ -73,6 +75,7 @@ data ServerResponse
   | ExchangeMoveSuccess [Tile]
   | PassMoveSuccess
   | ChatSuccess
+  | AskDefinitionSuccess
   | InvalidCommand Text
 
 data ConnectionStatus = ConnectionStatus Int Bool (Maybe UTCTime)
@@ -124,6 +127,7 @@ instance ServerMessage GameMessage where
   commandName (PlayerChat {}) = "playerChat"
   commandName (PlayerConnect _ _) = "playerConnect"
   commandName (PlayerDisconnect _ _) = "playerDisconnect"
+  commandName (WordDefinitions _) = "wordDefinitions"
 
 instance ToJSON GameMessage where
   toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
@@ -149,6 +153,7 @@ instance ToJSON GameMessage where
   toJSON (PlayerConnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
   toJSON (PlayerDisconnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
   toJSON (PlayerChat chatMessage) = toJSON chatMessage
+  toJSON (WordDefinitions definitions) = undefined
 
 instance FromJSON ClientMessage where
   parseJSON (Object request) = do
@@ -165,6 +170,7 @@ instance ToJSON ServerResponse where
   toJSON PassMoveSuccess = object []
   toJSON (ExchangeMoveSuccess tiles) = object ["rack" .= toJSON tiles]
   toJSON (ChatSuccess) = object []
+  toJSON (AskDefinitionSuccess) = object []
   toJSON (InvalidCommand msg) = object ["error" .= msg]
   toJSON (PotentialScore score) = object ["potentialScore" .= score]
   toJSON (InitialiseGame moves rack players playerNumber toMove tilesRemaining connectionStatuses appVersion) =
@@ -217,6 +223,7 @@ instance ServerMessage ServerResponse where
   commandName (ExchangeMoveSuccess _) = "exchangeMoveSuccess"
   commandName PassMoveSuccess = "passMoveSuccess"
   commandName ChatSuccess = "chatSuccess"
+  commandName AskDefinitionSuccess = "askDefinitionSuccess"
   commandName (PotentialScore _) = "potentialScore"
   commandName (InvalidCommand _) = "error"
   commandName (InitialiseGame {}) = "initialise"
@@ -227,6 +234,7 @@ writePosAndTile (pos, tile) = object ["pos" .= toJSON pos, "tile" .= toJSON tile
 parseCommand :: Text -> Value -> Parser ClientMessage
 parseCommand "say" value = parseChatMessage value
 parseCommand "potentialScore" value = parsePotentialScore value
+parseCommand "askDefintion" value = parseAskDefinition value
 parseCommand "boardMove" value = parseBoardMove value
 parseCommand "exchangeMove" value = parseExchangeMove value
 parseCommand "passMove" _ = return PassMove
@@ -239,6 +247,9 @@ parseChatMessage _ = fail "Unrecognised chat message"
 parsePotentialScore :: Value -> Parser ClientMessage
 parsePotentialScore (Array a) = AskPotentialScore <$> (sequence . V.toList $ fmap getPosAndTile a)
 parsePotentialScore _ = fail "Unexpected payload for 'potentialScore'"
+
+parseAskDefinition :: Value -> Parser ClientMessage
+parseAskDefinition (Object val) = AskDefinition <$> val .: "word"
 
 parseBoardMove :: Value -> Parser ClientMessage
 parseBoardMove (Array a) = BoardMove <$> (sequence . V.toList $ fmap getPosAndTile a)

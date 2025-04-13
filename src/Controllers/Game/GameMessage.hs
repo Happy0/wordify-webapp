@@ -1,6 +1,6 @@
 module Controllers.Game.GameMessage
   ( MoveSummary (BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary, GameEndSummary),
-    GameMessage (PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat, PlayerConnect, PlayerDisconnect),
+    GameMessage (PlayerBoardMove, GameEnd, PlayerPassMove, PlayerExchangeMove, PlayerChat, PlayerConnect, PlayerDisconnect, WordDefinitions),
     ChatMessage (ChatMessage),
   )
 where
@@ -12,6 +12,7 @@ import Wordify.Rules.Player (Player)
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile (Tile)
 import Prelude (Int)
+import Controllers.Definition.DefinitionService (Definition)
 
 data ChatMessage = ChatMessage {user :: Text, message :: Text, when :: UTCTime}
 
@@ -43,3 +44,4 @@ data GameMessage
   | PlayerChat ChatMessage
   | PlayerConnect Int UTCTime
   | PlayerDisconnect Int UTCTime
+  | WordDefinitions [Definition]
