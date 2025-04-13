@@ -398,8 +398,13 @@ module.exports = function(opts) {
     var addDefinitions = function (definitions) {
         m.startComputation();
         var messages = data.chatMessages;
-        var firstDefinition = definitions.definitions[0]
-        messages.push({word: definitions.word, definition: firstDefinition});
+        if (definitions.definitions.length > 0) {
+            var firstDefinition = definitions.definitions[0]
+            messages.push({word: definitions.word, definition: firstDefinition});
+        } else {
+            messages.push({word: definitions.word, definition: {definition: "No definitions found."}});
+        }
+        
         m.endComputation();
     }
     

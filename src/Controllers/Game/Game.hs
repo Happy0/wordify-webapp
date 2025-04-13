@@ -97,12 +97,13 @@ handleDefinitionResult :: ServerGame -> Text -> (Either Text [Definition]) -> IO
 handleDefinitionResult serverGame word result = do
   let channel = broadcastChannel serverGame
   case result of 
-    Left err -> Prelude.putStrLn (unpack err) --todo
-    -- TODO: handle non player socket sending request or request for a word that hasn't been played
+    Left err ->  atomically (writeTChan channel (WordDefinitions word []))
     Right definitions -> atomically (writeTChan channel (WordDefinitions word definitions))
 
 handleAskDefinition :: DefinitionServiceImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
-handleAskDefinition definitionService serverGame playerNumber word =
+handleAskDefinition definitionService serverGame Nothing word = 
+  return $ InvalidCommand "Observers cannot request definitions."
+handleAskDefinition definitionService serverGame (Just _) word =
   handleDefinitionAsync word (handleDefinitionResult serverGame word) >> pure AskDefinitionSuccess
   where
     handleDefinitionAsync word = withDefinitionsAsync definitionService word 5
