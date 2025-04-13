@@ -11,15 +11,15 @@ module Repository.SQL.SqlDefinitionRepository where
     data DefinitionRepositorySQLBackend = DefinitionRepositorySQLBackend (Pool SqlBackend)
 
     instance DefinitionRepository DefinitionRepositorySQLBackend where
-        getDefinitions (DefinitionRepositorySQLBackend pool)  word = undefined
-        saveGameDefinitions (DefinitionRepositorySQLBackend pool) gameId word definitions = undefined
-        getGameDefinitions (DefinitionRepositorySQLBackend pool) gameId = undefined
+        getDefinitions (DefinitionRepositorySQLBackend pool)  word = getDefinitionsImpl pool word
+        saveGameDefinitions (DefinitionRepositorySQLBackend pool) gameId word definitions = saveGameDefinitionsImpl pool gameId word
+        getGameDefinitions (DefinitionRepositorySQLBackend pool) gameId = getGameDefinitionsImpl pool gameId
 
-    getDefinitionsImpl :: Pool SqlBackend -> IO [WordDefinitionItem]
+    getDefinitionsImpl :: Pool SqlBackend -> T.Text -> IO [WordDefinitionItem]
     getDefinitionsImpl pool = undefined
 
-    saveGameDefinitions :: Pool SqlBackend -> T.Text -> T.Text -> IO ()
-    saveGameDefinitions pool gameId word = undefined
+    saveGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> T.Text -> IO ()
+    saveGameDefinitionsImpl pool gameId word = undefined
 
-    getGameDefinitions :: Pool SqlBackend -> T.Text -> ConduitT () GameWordItem IO ()
-    getGameDefinitions pool gameId = undefined
+    getGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> ConduitT () GameWordItem IO ()
+    getGameDefinitionsImpl pool gameId = undefined
