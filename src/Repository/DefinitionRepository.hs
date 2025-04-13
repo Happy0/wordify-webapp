@@ -1,0 +1,23 @@
+module Repository.DefinitionRepository (
+    DefinitionRepository(getDefinitions, saveGameDefinitions, getGameDefinitions),
+    DefinitionRepositoryImpl(getWordDefinitions, saveGameWordDefinitions, getGameWordDefinitions)) where
+
+    import ClassyPrelude (IO, UTCTime, Maybe)
+    import qualified Data.Text as T
+
+    data WordDefinitionItem = WordDefinitionItem { partOfSpeech :: T.Text, definition :: T.Text, example :: Maybe T.Text }
+    data GameWordItem = GameWordItem { word :: T.Text, when :: UTCTime, definitions :: [WordDefinitionItem] }
+
+    class DefinitionRepository a where
+        getDefinitions :: a -> T.Text -> IO [WordDefinitionItem]
+        saveGameDefinitions :: a -> T.Text -> T.Text -> [WordDefinitionItem] -> IO ()
+        getGameDefinitions :: a -> T.Text -> IO [GameWordItem]
+
+    data DefinitionRepositoryImpl = DefinitionRepositoryImpl {
+        getWordDefinitions :: T.Text -> IO [WordDefinitionItem],
+        saveGameWordDefinitions :: T.Text -> T.Text -> [WordDefinitionItem] -> IO (),
+        getGameWordDefinitions :: T.Text -> IO [GameWordItem]
+    }
+
+    toDefinitionServiceImpl :: DefinitionRepository a => a -> DefinitionRepositoryImpl
+    toDefinitionServiceImpl repository = DefinitionRepositoryImpl (getDefinitions repository) (saveGameDefinitions repository) (getGameDefinitions repository)
