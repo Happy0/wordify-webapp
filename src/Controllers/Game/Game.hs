@@ -15,7 +15,7 @@ import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl, Definition(Definition), withDefinitionsAsync)
-import Repository.DefinitionRepository(DefinitionRepositoryImpl, saveGameDefinitions, WordDefinitionItem(WordDefinitionItem))
+import Repository.DefinitionRepository(DefinitionRepositoryImpl(DefinitionRepositoryImpl), saveGameDefinitions, WordDefinitionItem(WordDefinitionItem))
 import Controllers.User.Model.AuthUser
 import Data.Conduit
 import qualified Data.List as L
@@ -86,33 +86,39 @@ persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen p
 withNotifyJoinAndLeave :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
 withNotifyJoinAndLeave pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
 
-performRequest :: ServerGame -> DefinitionServiceImpl -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
-performRequest serverGame _ pool player (BoardMove placed) = handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
-performRequest serverGame _ pool player (ExchangeMove exchanged) = handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
-performRequest serverGame _ pool player PassMove = handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
-performRequest serverGame _ pool player (SendChatMessage msg) = handleChatMessage serverGame pool player msg
-performRequest serverGame _ pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
-performRequest serverGame definitionService _ player (AskDefinition word) = handleAskDefinition definitionService serverGame (player >>= getPlayerNumber serverGame) word
+performRequest :: ServerGame -> DefinitionServiceImpl -> DefinitionRepositoryImpl -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
+performRequest serverGame _ _ pool player (BoardMove placed) =
+   handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
+performRequest serverGame _ _ pool player (ExchangeMove exchanged) =
+   handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
+performRequest serverGame _ _ pool player PassMove =
+   handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
+performRequest serverGame _ _ pool player (SendChatMessage msg) =
+   handleChatMessage serverGame pool player msg
+performRequest serverGame _ _ pool player (AskPotentialScore placed) =
+   handlePotentialScore serverGame placed
+performRequest serverGame definitionService definitionRepository _ player (AskDefinition word) =
+   handleAskDefinition definitionService definitionRepository serverGame (player >>= getPlayerNumber serverGame) word
 
 handleDefinitionResult :: DefinitionRepositoryImpl -> ServerGame -> Text -> (Either Text [Definition]) -> IO ()
-handleDefinitionResult definitionRepository serverGame word result = do
+handleDefinitionResult (DefinitionRepositoryImpl _ saveGameDefinitions _) serverGame word result = do
   now <- getCurrentTime
   let channel = broadcastChannel serverGame
   case result of 
     Left err ->  atomically (writeTChan channel (WordDefinitions word now []))
     Right definitions -> do
-      saveGameDefinitions now (gameId serverGame) (Prelude.map wordDefinitionItem definitions)
+      saveGameDefinitions now (gameId serverGame) word (Prelude.map wordDefinitionItem definitions)
       atomically (writeTChan channel (WordDefinitions word now definitions))
     where
       wordDefinitionItem :: Definition -> WordDefinitionItem
       wordDefinitionItem (Definition partOfSpeech definition example) =
         WordDefinitionItem partOfSpeech definition example
 
-handleAskDefinition :: DefinitionServiceImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
-handleAskDefinition definitionService serverGame Nothing word = 
+handleAskDefinition :: DefinitionServiceImpl -> DefinitionRepositoryImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
+handleAskDefinition definitionService definitionRepository serverGame Nothing word = 
   return $ InvalidCommand "Observers cannot request definitions."
-handleAskDefinition definitionService serverGame (Just _) word =
-  handleDefinitionAsync word (handleDefinitionResult serverGame word) >> pure AskDefinitionSuccess
+handleAskDefinition definitionService definitionRepository serverGame (Just _) word =
+  handleDefinitionAsync word (handleDefinitionResult definitionRepository serverGame word) >> pure AskDefinitionSuccess
   where
     handleDefinitionAsync word = withDefinitionsAsync definitionService word 5
 

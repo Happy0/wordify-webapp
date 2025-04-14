@@ -70,12 +70,10 @@ Definition
     partOfSpeech Text
     definition Text
     example Text Maybe
-    IndexWord word
-    UniqueDefinition word partOfSpeech definition
+    UniqueWordPartOfSpeechDefinition word partOfSpeech definition
     
 GameDefinition
     word Text
     createdAt UTCTime
     definition Definition
     gameId Game
-    IndexGame gameId

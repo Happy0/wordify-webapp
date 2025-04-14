@@ -1,6 +1,7 @@
 module Repository.DefinitionRepository (
+    toDefinitionRepositoryImpl,
     DefinitionRepository(getDefinitions, saveGameDefinitions, getGameDefinitions),
-    DefinitionRepositoryImpl(getWordDefinitions, saveGameWordDefinitions, getGameWordDefinitions),
+    DefinitionRepositoryImpl(DefinitionRepositoryImpl, getWordDefinitions, saveGameWordDefinitions, getGameWordDefinitions),
     GameWordItem(GameWordItem),
     WordDefinitionItem(WordDefinitionItem)) where
 
@@ -22,5 +23,5 @@ module Repository.DefinitionRepository (
         getGameWordDefinitions :: T.Text -> ConduitT () GameWordItem IO ()
     }
 
-    toDefinitionServiceImpl :: DefinitionRepository a => a -> DefinitionRepositoryImpl
-    toDefinitionServiceImpl repository = DefinitionRepositoryImpl (getDefinitions repository) (saveGameDefinitions repository) (getGameDefinitions repository)
+    toDefinitionRepositoryImpl :: DefinitionRepository a => a -> DefinitionRepositoryImpl
+    toDefinitionRepositoryImpl repository = DefinitionRepositoryImpl (getDefinitions repository) (saveGameDefinitions repository) (getGameDefinitions repository)

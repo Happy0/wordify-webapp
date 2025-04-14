@@ -1,12 +1,12 @@
 
-module Repository.SQL.SqlDefinitionRepository where 
+module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(DefinitionRepositorySQLBackend), getDefinitionsImpl) where 
 
     import Conduit (ConduitT)
     import Data.Pool
     import qualified Model as M
     import qualified Data.Text as T
     import qualified Data.Text.Encoding as TE
-    import ClassyPrelude (IO, undefined, flip, UTCTime, (.), mapConcurrently, ($), zip, map, Maybe(Just, Nothing), pure, liftIO)
+    import ClassyPrelude (IO, undefined, flip, UTCTime, (.), mapConcurrently, ($), zip, map, Maybe(Just, Nothing), pure, liftIO, mapM)
     import Database.Persist.Sql
     import Repository.DefinitionRepository (WordDefinitionItem(WordDefinitionItem), GameWordItem, DefinitionRepository(getDefinitions, saveGameDefinitions,getGameDefinitions), WordDefinitionItem)
     import qualified Data.ByteString.Base16 as B16
@@ -27,7 +27,7 @@ module Repository.SQL.SqlDefinitionRepository where
     saveGameDefinitionsImpl :: Pool SqlBackend -> UTCTime -> T.Text -> T.Text -> [WordDefinitionItem]-> IO ()
     saveGameDefinitionsImpl pool when gameId word definitions = do
         -- TODO: do this in SQL with persist bulk upsert / raw SQL if necessary
-        definitions <- mapConcurrently (upsertDefinition pool when word) definitions
+        definitions <- mapM (upsertDefinition pool when word) definitions
         withPool pool $ do
             maybeGame <- get (M.GameKey gameId)
 
@@ -35,7 +35,7 @@ module Repository.SQL.SqlDefinitionRepository where
                 Nothing -> pure ()
                 Just gameEntity -> do
                     let gameDefinitions = map (makeGameDefinition when gameEntity word) definitions
-                    putMany gameDefinitions
+                    insertMany_ gameDefinitions
         
     makeGameDefinition :: UTCTime -> M.Game -> T.Text -> M.Definition -> M.GameDefinition
     makeGameDefinition createdAt game word definition = 
@@ -44,7 +44,7 @@ module Repository.SQL.SqlDefinitionRepository where
     upsertDefinition :: Pool SqlBackend -> UTCTime -> T.Text -> WordDefinitionItem -> IO M.Definition
     upsertDefinition pool when word definition@(WordDefinitionItem partOfSpeech wordDefinition _) = withPool pool $ do
         let dbModel = gameDefinitionDatabaseModel word definition
-        (Entity _ entity) <- upsertBy (M.UniqueDefinition word partOfSpeech wordDefinition) dbModel []
+        (Entity _ entity) <- upsertBy (M.UniqueWordPartOfSpeechDefinition word partOfSpeech wordDefinition) dbModel []
         pure entity
 
     gameDefinitionDatabaseModel :: T.Text -> WordDefinitionItem -> M.Definition
