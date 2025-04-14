@@ -39,18 +39,14 @@ module Repository.SQL.SqlDefinitionRepository where
         M.GameDefinition word createdAt definition game
 
     upsertDefinition :: Pool SqlBackend -> UTCTime -> T.Text -> WordDefinitionItem -> IO M.Definition
-    upsertDefinition pool when word definition = withPool pool $ do
+    upsertDefinition pool when word definition@(WordDefinitionItem partOfSpeech wordDefinition _) = withPool pool $ do
         let dbModel = gameDefinitionDatabaseModel word definition
-        let (M.Definition _ _ _ _ dbModelHash) = dbModel
-        (Entity _ entity) <- upsertBy (M.UniqueWordDefHash dbModelHash) dbModel []
+        (Entity _ entity) <- upsertBy (M.UniqueDefinition word partOfSpeech wordDefinition) dbModel []
         pure entity
 
     gameDefinitionDatabaseModel :: T.Text -> WordDefinitionItem -> M.Definition
     gameDefinitionDatabaseModel word (WordDefinitionItem partOfSpeech definition example) = 
-        M.Definition word partOfSpeech definition example (hashDefinition word definition partOfSpeech)
-        where
-            hashDefinition :: T.Text -> T.Text -> T.Text -> T.Text
-            hashDefinition word definition partOfSpeech = undefined
+        M.Definition word partOfSpeech definition example
 
     getGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> ConduitT () GameWordItem IO ()
     getGameDefinitionsImpl pool gameId = undefined

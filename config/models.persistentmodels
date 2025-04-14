@@ -70,10 +70,8 @@ Definition
     partOfSpeech Text
     definition Text
     example Text Maybe
-    definitionHash Text
     IndexWord word
-    IndexDefinitionHash definitionHash
-    UniqueWordDefHash definitionHash
+    UniqueDefinition word partOfSpeech definition
     
 GameDefinition
     word Text
