@@ -21,6 +21,9 @@ module Repository.SQL.SqlDefinitionRepository where
     getDefinitionsImpl :: Pool SqlBackend -> T.Text -> IO [WordDefinitionItem]
     getDefinitionsImpl pool = undefined
 
+    getGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> ConduitT () GameWordItem IO ()
+    getGameDefinitionsImpl pool gameId = undefined
+
     saveGameDefinitionsImpl :: Pool SqlBackend -> UTCTime -> T.Text -> T.Text -> [WordDefinitionItem]-> IO ()
     saveGameDefinitionsImpl pool when gameId word definitions = do
         -- TODO: do this in SQL with persist bulk upsert / raw SQL if necessary
@@ -47,8 +50,5 @@ module Repository.SQL.SqlDefinitionRepository where
     gameDefinitionDatabaseModel :: T.Text -> WordDefinitionItem -> M.Definition
     gameDefinitionDatabaseModel word (WordDefinitionItem partOfSpeech definition example) = 
         M.Definition word partOfSpeech definition example
-
-    getGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> ConduitT () GameWordItem IO ()
-    getGameDefinitionsImpl pool gameId = undefined
 
     withPool pool = flip runSqlPersistMPool pool

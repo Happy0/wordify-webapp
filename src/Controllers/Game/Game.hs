@@ -14,7 +14,8 @@ import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
-import Controllers.Definition.DefinitionService (DefinitionServiceImpl, Definition, withDefinitionsAsync)
+import Controllers.Definition.DefinitionService (DefinitionServiceImpl, Definition(Definition), withDefinitionsAsync)
+import Repository.DefinitionRepository(DefinitionRepositoryImpl, saveGameDefinitions, WordDefinitionItem(WordDefinitionItem))
 import Controllers.User.Model.AuthUser
 import Data.Conduit
 import qualified Data.List as L
@@ -93,13 +94,19 @@ performRequest serverGame _ pool player (SendChatMessage msg) = handleChatMessag
 performRequest serverGame _ pool player (AskPotentialScore placed) = handlePotentialScore serverGame placed
 performRequest serverGame definitionService _ player (AskDefinition word) = handleAskDefinition definitionService serverGame (player >>= getPlayerNumber serverGame) word
 
-handleDefinitionResult :: ServerGame -> Text -> (Either Text [Definition]) -> IO ()
-handleDefinitionResult serverGame word result = do
+handleDefinitionResult :: DefinitionRepositoryImpl -> ServerGame -> Text -> (Either Text [Definition]) -> IO ()
+handleDefinitionResult definitionRepository serverGame word result = do
   now <- getCurrentTime
   let channel = broadcastChannel serverGame
   case result of 
     Left err ->  atomically (writeTChan channel (WordDefinitions word now []))
-    Right definitions -> atomically (writeTChan channel (WordDefinitions word now definitions))
+    Right definitions -> do
+      saveGameDefinitions now (gameId serverGame) (Prelude.map wordDefinitionItem definitions)
+      atomically (writeTChan channel (WordDefinitions word now definitions))
+    where
+      wordDefinitionItem :: Definition -> WordDefinitionItem
+      wordDefinitionItem (Definition partOfSpeech definition example) =
+        WordDefinitionItem partOfSpeech definition example
 
 handleAskDefinition :: DefinitionServiceImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
 handleAskDefinition definitionService serverGame Nothing word = 
