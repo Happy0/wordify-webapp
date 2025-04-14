@@ -13,12 +13,12 @@ module Repository.DefinitionRepository (
 
     class DefinitionRepository a where
         getDefinitions :: a -> T.Text -> IO [WordDefinitionItem]
-        saveGameDefinitions :: a -> T.Text -> T.Text -> [WordDefinitionItem] -> IO ()
+        saveGameDefinitions :: a -> UTCTime -> T.Text -> T.Text -> [WordDefinitionItem] -> IO ()
         getGameDefinitions :: a -> T.Text -> ConduitT () GameWordItem IO ()
 
     data DefinitionRepositoryImpl = DefinitionRepositoryImpl {
         getWordDefinitions :: T.Text -> IO [WordDefinitionItem],
-        saveGameWordDefinitions :: T.Text -> T.Text -> [WordDefinitionItem] -> IO (),
+        saveGameWordDefinitions :: UTCTime -> T.Text -> T.Text -> [WordDefinitionItem] -> IO (),
         getGameWordDefinitions :: T.Text -> ConduitT () GameWordItem IO ()
     }
 

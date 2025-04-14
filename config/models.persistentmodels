@@ -70,9 +70,14 @@ Definition
     partOfSpeech Text
     definition Text
     example Text Maybe
-
+    definitionHash Text
+    IndexWord word
+    IndexDefinitionHash definitionHash
+    UniqueWordDefHash definitionHash
+    
 GameDefinition
     word Text
     createdAt UTCTime
     definition Definition
     gameId Game
+    IndexGame gameId
