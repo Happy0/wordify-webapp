@@ -1,7 +1,10 @@
 module Repository.DefinitionRepository (
     toDefinitionRepositoryImpl,
     DefinitionRepository(getDefinitions, saveGameDefinitions, getGameDefinitions),
-    DefinitionRepositoryImpl(DefinitionRepositoryImpl, getWordDefinitions, saveGameWordDefinitions, getGameWordDefinitions),
+    DefinitionRepositoryImpl,
+    getWordDefinitionsImpl,
+    saveGameDefinitionsImpl,
+    getGameDefinitionsImpl,
     GameWordItem(GameWordItem),
     WordDefinitionItem(WordDefinitionItem)) where
 
@@ -25,3 +28,12 @@ module Repository.DefinitionRepository (
 
     toDefinitionRepositoryImpl :: DefinitionRepository a => a -> DefinitionRepositoryImpl
     toDefinitionRepositoryImpl repository = DefinitionRepositoryImpl (getDefinitions repository) (saveGameDefinitions repository) (getGameDefinitions repository)
+
+    getWordDefinitionsImpl :: DefinitionRepositoryImpl -> T.Text -> IO [WordDefinitionItem]
+    getWordDefinitionsImpl (DefinitionRepositoryImpl getWordDefinitions _ _) word = getWordDefinitions word
+
+    saveGameDefinitionsImpl :: DefinitionRepositoryImpl -> UTCTime -> T.Text -> T.Text -> [WordDefinitionItem] -> IO ()
+    saveGameDefinitionsImpl (DefinitionRepositoryImpl _ saveGameWordDefinitions _) when gameId word definitions = saveGameWordDefinitions when gameId word definitions
+
+    getGameDefinitionsImpl :: DefinitionRepositoryImpl -> T.Text -> ConduitT () GameWordItem IO ()
+    getGameDefinitionsImpl (DefinitionRepositoryImpl _ _ getGameWordDefinitions) gameId = getGameWordDefinitions gameId

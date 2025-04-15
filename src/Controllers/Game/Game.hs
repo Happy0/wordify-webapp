@@ -15,7 +15,7 @@ import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl, Definition(Definition), withDefinitionsAsync)
-import Repository.DefinitionRepository(DefinitionRepositoryImpl(DefinitionRepositoryImpl), saveGameDefinitions, WordDefinitionItem(WordDefinitionItem))
+import Repository.DefinitionRepository(DefinitionRepositoryImpl, saveGameDefinitionsImpl, WordDefinitionItem(WordDefinitionItem))
 import Controllers.User.Model.AuthUser
 import Data.Conduit
 import qualified Data.List as L
@@ -101,13 +101,13 @@ performRequest serverGame definitionService definitionRepository _ player (AskDe
    handleAskDefinition definitionService definitionRepository serverGame (player >>= getPlayerNumber serverGame) word
 
 handleDefinitionResult :: DefinitionRepositoryImpl -> ServerGame -> Text -> (Either Text [Definition]) -> IO ()
-handleDefinitionResult (DefinitionRepositoryImpl _ saveGameDefinitions _) serverGame word result = do
+handleDefinitionResult definitionRepositoryImpl serverGame word result = do
   now <- getCurrentTime
   let channel = broadcastChannel serverGame
   case result of 
     Left err ->  atomically (writeTChan channel (WordDefinitions word now []))
     Right definitions -> do
-      saveGameDefinitions now (gameId serverGame) word (Prelude.map wordDefinitionItem definitions)
+      saveGameDefinitionsImpl definitionRepositoryImpl now (gameId serverGame) word (Prelude.map wordDefinitionItem definitions)
       atomically (writeTChan channel (WordDefinitions word now definitions))
     where
       wordDefinitionItem :: Definition -> WordDefinitionItem

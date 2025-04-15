@@ -75,5 +75,5 @@ Definition
 GameDefinition
     word Text
     createdAt UTCTime
-    definition Definition
-    gameId Game
+    definition DefinitionId
+    gameId GameId
