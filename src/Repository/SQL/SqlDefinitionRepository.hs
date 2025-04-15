@@ -26,18 +26,16 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
 
     getGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> ConduitT () GameWordItem IO ()
     getGameDefinitionsImpl pool gameId = do
-        definitionEntries <- liftIO $ withPool pool $ do
-            maybeGame <- E.get (M.GameKey gameId)
-            case maybeGame of
-                Nothing -> pure []
-                Just gameEntity -> do
-                    definitions <- E.select $ E.from $ \definition -> do
-                        E.where_ (definition E.^. M.GameDefinitionGameId E.==. E.val (M.GameKey gameId))
-                        return definition
-                    return $ map E.entityVal definitions
-        sourceList (makeGameWordDefinitions definitionEntries)
+        defs <- liftIO $ withPool pool $ do
+            E.select $ do
+                E.from $ \(gameDef `E.InnerJoin` def) -> do
+                    E.on (gameDef E.^. M.GameDefinitionDefinition E.==. def E.^. M.DefinitionId)
+                    E.where_ (gameDef E.^. M.GameDefinitionGameId E.==. E.val (M.GameKey gameId))
+                    return (gameDef, def)
+        -- todo: stream from database using appropriate query
+        sourceList (makeGameWordDefinitions defs)
                     
-    makeGameWordDefinitions :: [M.GameDefinition] -> [GameWordItem]
+    makeGameWordDefinitions :: [(E.Entity M.GameDefinition, E.Entity M.Definition)] -> [GameWordItem]
     makeGameWordDefinitions definitions = undefined
 
     saveGameDefinitionsImpl :: Pool SqlBackend -> UTCTime -> T.Text -> T.Text -> [WordDefinitionItem]-> IO ()
