@@ -29,7 +29,7 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
         defs <- liftIO $ withPool pool $ do
             E.select $ do
                 E.from $ \(gameDef `E.InnerJoin` def) -> do
-                    E.on (gameDef E.^. M.GameDefinitionDefinition E.==. def E.^. M.DefinitionId)
+                    E.on (gameDef E.^. M.GameDefinitionDefinitionId E.==. def E.^. M.DefinitionId)
                     E.where_ (gameDef E.^. M.GameDefinitionGameId E.==. E.val (M.GameKey gameId))
                     return (gameDef, def)
         -- todo: stream from database using appropriate query
