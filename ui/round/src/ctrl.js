@@ -253,7 +253,7 @@ module.exports = function(opts) {
     var addChatMessage = function(sender, message, when) {
         m.startComputation();
         var messages = data.chatMessages;
-        messages.push({sender: sender, message: message});
+        messages.push({sender: sender, message: message, when: when});
         data.lastChatMessageReceived = when;
         m.endComputation();
     }
@@ -395,15 +395,33 @@ module.exports = function(opts) {
         }
     }
 
+    var sortMessages = function() {
+        data.chatMessages.sort(function(a, b) {
+            if (a.when < b.when) {
+                return -1;
+            }
+            else if (a.when > b.when) {
+                return 1;
+            }
+            else {
+                return Object.hasOwn(a, "sender") ? -1 : 1;
+            }
+        });
+    }
+
     var addDefinitions = function (definitions) {
         m.startComputation();
         var messages = data.chatMessages;
         if (definitions.definitions.length > 0) {
             var firstDefinition = definitions.definitions[0]
-            messages.push({word: definitions.word, definition: firstDefinition});
+            messages.push({word: definitions.word, definition: firstDefinition, when: definitions.when});
         } else {
             messages.push({word: definitions.word, definition: {definition: "No definitions found."}});
         }
+
+        sortMessages();
+
+        data.lastChatMessageReceived = definitions.when;
         
         m.endComputation();
     }

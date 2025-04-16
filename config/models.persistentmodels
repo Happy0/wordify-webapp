@@ -64,3 +64,17 @@ LobbyPlayer
     playerId Text
     playerNumber Int
     lastActive UTCTime Maybe
+
+Definition
+    word Text
+    partOfSpeech Text
+    definition Text
+    example Text Maybe
+    UniqueWordPartOfSpeechDefinition word partOfSpeech definition
+    
+GameDefinition
+    word Text
+    definitionNumber Int
+    createdAt UTCTime
+    definitionId DefinitionId
+    gameId GameId

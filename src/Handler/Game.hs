@@ -41,7 +41,8 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.Core
 import Yesod.WebSockets
-import Controllers.Definition.DefinitionService(DefinitionServiceImpl(DefinitionServiceImpl))
+import qualified Controllers.Definition.DefinitionService as D
+import Repository.DefinitionRepository(DefinitionRepositoryImpl, WordDefinitionItem(WordDefinitionItem), GameWordItem(GameWordItem), getGameDefinitionsImpl)
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -191,15 +192,16 @@ gameApp app gameId maybeUser = do
         Right serverGame -> do
           let inactivityTrackerState = inactivityTracker app
           (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
-          liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) (definitionService app) gameId serverGame channel maybeUser chatMessagesSinceParam)
+          liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) (definitionService app) (definitionRepository app) gameId serverGame channel maybeUser chatMessagesSinceParam)
 
-handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> DefinitionServiceImpl -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> Maybe UTCTime -> IO ()
-handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool definitionService gameId serverGame channel maybeUser chatMessagesSince =
+handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> D.DefinitionServiceImpl -> DefinitionRepositoryImpl -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> Maybe UTCTime -> IO ()
+handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool definitionService definitionRepository gameId serverGame channel maybeUser chatMessagesSince =
   withTrackWebsocketActivity inactivityTracker $ do
     withNotifyJoinAndLeave pool serverGame maybeUser $ do
       let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
       mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
       sendPreviousChatMessages pool gameId chatMessagesSince connection
+      sendPreviousDefinitions definitionRepository gameId chatMessagesSince connection
 
       race_
         ( forever $
@@ -211,7 +213,7 @@ handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool d
               case eitherDecode msg of
                 Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
                 Right parsedCommand -> do
-                  response <- liftIO $ performRequest serverGame definitionService pool maybeUser parsedCommand
+                  response <- liftIO $ performRequest serverGame definitionService definitionRepository pool maybeUser parsedCommand
                   C.sendTextData connection $ toJSONResponse $ response
         )
 
@@ -244,3 +246,20 @@ sendPreviousChatMessages pool gameId (Just since) connection = do
   liftIO $
     flip runSqlPersistMPool pool $
       getChatMessagesSince gameId since $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
+
+sendPreviousDefinitions :: DefinitionRepositoryImpl -> Text -> Maybe UTCTime -> C.Connection -> IO ()
+sendPreviousDefinitions definitionRepository gameId since connection = 
+  runConduit $ getGameDefinitionsImpl definitionRepository gameId .| CL.filter (isAfter since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+  where
+    mapDefinitions :: GameWordItem -> GameMessage
+    mapDefinitions (GameWordItem word createdAt definitions) =
+      let wordDefinitions = map makeDefinition definitions
+      in WordDefinitions word createdAt wordDefinitions
+
+    isAfter :: Maybe UTCTime -> GameWordItem -> Bool
+    isAfter Nothing (GameWordItem _ createdAt _) = True
+    isAfter (Just since) (GameWordItem _ createdAt _) = createdAt > since
+
+    makeDefinition :: WordDefinitionItem -> D.Definition
+    makeDefinition (WordDefinitionItem partOfSpeech definition example)  =
+      D.Definition partOfSpeech definition example
