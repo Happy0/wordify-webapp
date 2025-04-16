@@ -8,11 +8,12 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
     import qualified Model as M
     import qualified Data.Text as T
     import qualified Data.Text.Encoding as TE
-    import ClassyPrelude (IO, undefined, flip, UTCTime, (.), mapConcurrently, ($), zip, map, Maybe(Just, Nothing), pure, liftIO, mapM, return)
+    import ClassyPrelude (IO, undefined, flip, UTCTime, (.), mapConcurrently, ($), zip, map, Maybe(Just, Nothing), pure, liftIO, mapM, return, (++), fst, uncurry, Ord)
     import Database.Persist.Sql
-    import Repository.DefinitionRepository (WordDefinitionItem(WordDefinitionItem), GameWordItem, DefinitionRepository(getDefinitions, saveGameDefinitions,getGameDefinitions), WordDefinitionItem)
+    import Repository.DefinitionRepository (WordDefinitionItem(WordDefinitionItem), GameWordItem, GameWordItem(GameWordItem), DefinitionRepository(getDefinitions, saveGameDefinitions,getGameDefinitions), WordDefinitionItem)
     import qualified Data.ByteString.Base16 as B16
     import Data.Conduit.List (sourceList)
+    import qualified Data.Map.Strict as Map
 
     data DefinitionRepositorySQLBackend = DefinitionRepositorySQLBackend (Pool SqlBackend)
 
@@ -32,11 +33,36 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
                     E.on (gameDef E.^. M.GameDefinitionDefinitionId E.==. def E.^. M.DefinitionId)
                     E.where_ (gameDef E.^. M.GameDefinitionGameId E.==. E.val (M.GameKey gameId))
                     return (gameDef, def)
-        -- todo: stream from database using appropriate query
+        -- TODO: stream from database using appropriate query rather than loading all into memory and grouping
         sourceList (makeGameWordDefinitions defs)
                     
     makeGameWordDefinitions :: [(E.Entity M.GameDefinition, E.Entity M.Definition)] -> [GameWordItem]
-    makeGameWordDefinitions definitions = undefined
+    makeGameWordDefinitions definitions = 
+        let entities = map extractValues definitions
+        in let groupedByWordAndTimestamp = groupByKey (extractWordAndTimeStamp . fst) entities
+        in makeGameWorkItems groupedByWordAndTimestamp
+        where
+            makeGameWorkItems :: Map.Map (T.Text, UTCTime) [(M.GameDefinition, M.Definition)] -> [GameWordItem]
+            makeGameWorkItems grouped = map (uncurry makeGameWordItem) (Map.toList grouped)
+
+            makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, M.Definition)] -> GameWordItem
+            makeGameWordItem (word, createdAt) definitions = 
+                let wordDefinitions = map makeDefinition definitions
+                in GameWordItem word createdAt wordDefinitions
+            
+            makeDefinition :: (M.GameDefinition, M.Definition) -> WordDefinitionItem
+            makeDefinition (gameDef, def) = 
+                let (M.Definition _ partOfSpeech definition example) = def
+                in WordDefinitionItem partOfSpeech definition example
+
+            extractValues :: (E.Entity M.GameDefinition, E.Entity M.Definition) -> (M.GameDefinition, M.Definition)
+            extractValues (Entity _ gameDef, Entity _ def) = (gameDef, def)
+
+            extractWordAndTimeStamp :: M.GameDefinition -> (T.Text, UTCTime)
+            extractWordAndTimeStamp (M.GameDefinition word createdAt _ _) = (word, createdAt)
+
+            groupByKey :: Ord k => (a -> k) -> [a] -> Map.Map k [a]
+            groupByKey toKey xs = Map.fromListWith (++) [(toKey x, [x]) | x <- xs]
 
     saveGameDefinitionsImpl :: Pool SqlBackend -> UTCTime -> T.Text -> T.Text -> [WordDefinitionItem]-> IO ()
     saveGameDefinitionsImpl pool when gameId word definitions = do
