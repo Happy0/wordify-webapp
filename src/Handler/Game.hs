@@ -201,7 +201,7 @@ handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool d
       let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
       mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
       sendPreviousChatMessages pool gameId chatMessagesSince connection
-      sendPreviousDefinitions definitionRepository gameId connection
+      sendPreviousDefinitions definitionRepository gameId chatMessagesSince connection
 
       race_
         ( forever $
@@ -247,14 +247,18 @@ sendPreviousChatMessages pool gameId (Just since) connection = do
     flip runSqlPersistMPool pool $
       getChatMessagesSince gameId since $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
 
-sendPreviousDefinitions :: DefinitionRepositoryImpl -> Text -> C.Connection -> IO ()
-sendPreviousDefinitions definitionRepository gameId connection = 
-  runConduit $ getGameDefinitionsImpl definitionRepository gameId .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+sendPreviousDefinitions :: DefinitionRepositoryImpl -> Text -> Maybe UTCTime -> C.Connection -> IO ()
+sendPreviousDefinitions definitionRepository gameId since connection = 
+  runConduit $ getGameDefinitionsImpl definitionRepository gameId .| CL.filter (isAfter since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
   where
     mapDefinitions :: GameWordItem -> GameMessage
     mapDefinitions (GameWordItem word createdAt definitions) =
       let wordDefinitions = map makeDefinition definitions
       in WordDefinitions word createdAt wordDefinitions
+
+    isAfter :: Maybe UTCTime -> GameWordItem -> Bool
+    isAfter Nothing (GameWordItem _ createdAt _) = True
+    isAfter (Just since) (GameWordItem _ createdAt _) = createdAt > since
 
     makeDefinition :: WordDefinitionItem -> D.Definition
     makeDefinition (WordDefinitionItem partOfSpeech definition example)  =

@@ -420,6 +420,8 @@ module.exports = function(opts) {
         }
 
         sortMessages();
+
+        data.lastChatMessageReceived = definitions.when;
         
         m.endComputation();
     }
