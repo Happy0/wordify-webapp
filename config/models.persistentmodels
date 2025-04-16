@@ -74,6 +74,7 @@ Definition
     
 GameDefinition
     word Text
+    definitionNumber Int
     createdAt UTCTime
     definitionId DefinitionId
     gameId GameId

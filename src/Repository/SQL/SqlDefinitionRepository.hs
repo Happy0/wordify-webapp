@@ -8,7 +8,7 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
     import qualified Model as M
     import qualified Data.Text as T
     import qualified Data.Text.Encoding as TE
-    import ClassyPrelude (IO, undefined, flip, UTCTime, (.), mapConcurrently, ($), zip, map, Maybe(Just, Nothing), pure, liftIO, mapM, return, (++), fst, uncurry, Ord)
+    import ClassyPrelude (Int, IO, undefined, flip, UTCTime, (.), mapConcurrently, ($), zip, compare, map, Maybe(Just, Nothing), pure, liftIO, mapM, return, (++), fst, uncurry, Ord, zipWith, Ordering, sortBy)
     import Database.Persist.Sql
     import Repository.DefinitionRepository (WordDefinitionItem(WordDefinitionItem), GameWordItem, GameWordItem(GameWordItem), DefinitionRepository(getDefinitions, saveGameDefinitions,getGameDefinitions), WordDefinitionItem)
     import qualified Data.ByteString.Base16 as B16
@@ -47,8 +47,18 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
 
             makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, M.Definition)] -> GameWordItem
             makeGameWordItem (word, createdAt) definitions = 
-                let wordDefinitions = map makeDefinition definitions
+                let wordDefinitions = map makeDefinition (sortDefinitions definitions)
                 in GameWordItem word createdAt wordDefinitions
+                where
+                    sortDefinitions :: [(M.GameDefinition, M.Definition)] -> [(M.GameDefinition, M.Definition)]
+                    sortDefinitions x = sortBy comparator x
+
+                    comparator :: (M.GameDefinition, M.Definition) -> (M.GameDefinition, M.Definition) -> Ordering
+                    comparator (gameDef1, def1) (gameDef2, def2) = compare (definitionNumber gameDef1) (definitionNumber gameDef2)
+
+                    definitionNumber :: M.GameDefinition -> Int
+                    definitionNumber (M.GameDefinition _ defNumber _ _ _) = defNumber
+                        
             
             makeDefinition :: (M.GameDefinition, M.Definition) -> WordDefinitionItem
             makeDefinition (gameDef, def) = 
@@ -59,7 +69,7 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
             extractValues (Entity _ gameDef, Entity _ def) = (gameDef, def)
 
             extractWordAndTimeStamp :: M.GameDefinition -> (T.Text, UTCTime)
-            extractWordAndTimeStamp (M.GameDefinition word createdAt _ _) = (word, createdAt)
+            extractWordAndTimeStamp (M.GameDefinition word _ createdAt _ _) = (word, createdAt)
 
             groupByKey :: Ord k => (a -> k) -> [a] -> Map.Map k [a]
             groupByKey toKey xs = Map.fromListWith (++) [(toKey x, [x]) | x <- xs]
@@ -69,12 +79,12 @@ module Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(Def
         -- TODO: do this in SQL with persist bulk upsert / raw SQL if necessary
         definitions <- mapM (upsertDefinition pool when word) definitions
         withPool pool $ do
-            let gameDefinitions = map (makeGameDefinition when gameId word) definitions
+            let gameDefinitions = zipWith (makeGameDefinition when gameId word) [1..] definitions
             insertMany_ gameDefinitions
         
-    makeGameDefinition :: UTCTime -> T.Text -> T.Text -> Key M.Definition -> M.GameDefinition
-    makeGameDefinition createdAt gameId word definitionId = 
-        M.GameDefinition word createdAt definitionId (M.GameKey gameId)
+    makeGameDefinition :: UTCTime -> T.Text -> T.Text -> Int -> Key M.Definition -> M.GameDefinition
+    makeGameDefinition createdAt gameId word definitionNumber definitionId = 
+        M.GameDefinition word definitionNumber createdAt definitionId (M.GameKey gameId)
 
     upsertDefinition :: Pool SqlBackend -> UTCTime -> T.Text -> WordDefinitionItem -> IO (Key M.Definition)
     upsertDefinition pool when word definition@(WordDefinitionItem partOfSpeech wordDefinition _) = withPool pool $ do
