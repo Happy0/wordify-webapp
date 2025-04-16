@@ -41,8 +41,8 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.Core
 import Yesod.WebSockets
-import Controllers.Definition.DefinitionService(DefinitionServiceImpl(DefinitionServiceImpl))
-import Repository.DefinitionRepository(DefinitionRepositoryImpl)
+import qualified Controllers.Definition.DefinitionService as D
+import Repository.DefinitionRepository(DefinitionRepositoryImpl, WordDefinitionItem(WordDefinitionItem), GameWordItem(GameWordItem), getGameDefinitionsImpl)
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -194,13 +194,14 @@ gameApp app gameId maybeUser = do
           (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
           liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) (definitionService app) (definitionRepository app) gameId serverGame channel maybeUser chatMessagesSinceParam)
 
-handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> DefinitionServiceImpl -> DefinitionRepositoryImpl -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> Maybe UTCTime -> IO ()
+handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> D.DefinitionServiceImpl -> DefinitionRepositoryImpl -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> Maybe UTCTime -> IO ()
 handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool definitionService definitionRepository gameId serverGame channel maybeUser chatMessagesSince =
   withTrackWebsocketActivity inactivityTracker $ do
     withNotifyJoinAndLeave pool serverGame maybeUser $ do
       let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
       mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
       sendPreviousChatMessages pool gameId chatMessagesSince connection
+      sendPreviousDefinitions definitionRepository gameId connection
 
       race_
         ( forever $
@@ -245,3 +246,16 @@ sendPreviousChatMessages pool gameId (Just since) connection = do
   liftIO $
     flip runSqlPersistMPool pool $
       getChatMessagesSince gameId since $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
+
+sendPreviousDefinitions :: DefinitionRepositoryImpl -> Text -> C.Connection -> IO ()
+sendPreviousDefinitions definitionRepository gameId connection = 
+  runConduit $ getGameDefinitionsImpl definitionRepository gameId .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+  where
+    mapDefinitions :: GameWordItem -> GameMessage
+    mapDefinitions (GameWordItem word createdAt definitions) =
+      let wordDefinitions = map makeDefinition definitions
+      in WordDefinitions word createdAt wordDefinitions
+
+    makeDefinition :: WordDefinitionItem -> D.Definition
+    makeDefinition (WordDefinitionItem partOfSpeech definition example)  =
+      D.Definition partOfSpeech definition example

@@ -77,4 +77,3 @@ GameDefinition
     createdAt UTCTime
     definitionId DefinitionId
     gameId GameId
-    IndexGame gameId
