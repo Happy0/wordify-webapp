@@ -23,7 +23,6 @@ import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
-import Controllers.Common.CacheableSharedResource
 import Controllers.Game.GameMessage
 import Controllers.Game.Model.ServerPlayer (ServerPlayer (ServerPlayer))
 import qualified Controllers.Game.Model.ServerPlayer as SP
@@ -31,7 +30,6 @@ import Controllers.User.Model.AuthUser
 import qualified Data.List as L
 import Data.Maybe
 import Data.Text
-import Model (User (User))
 import qualified Wordify.Rules.Game as G
 import Prelude
 
