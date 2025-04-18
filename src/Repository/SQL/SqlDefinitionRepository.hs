@@ -1,6 +1,6 @@
 module Repository.SQL.SqlDefinitionRepository (DefinitionRepositorySQLBackend (DefinitionRepositorySQLBackend), getDefinitionsImpl) where
 
-import ClassyPrelude (IO, Int, Maybe (Just, Nothing), Ord, Ordering, UTCTime, compare, flip, fromMaybe, fst, liftIO, map, mapM, pure, return, sortBy, uncurry, undefined, zipWith, ($), (++), (.))
+import ClassyPrelude (IO, Int, Maybe (Just, Nothing), Ord, Ordering, UTCTime, compare, flip, fromMaybe, fst, liftIO, map, mapM, pure, return, sortBy, uncurry, undefined, zipWith, ($), (++), (.), (<$>))
 import Conduit (ConduitT)
 import Data.Conduit.List (sourceList)
 import qualified Data.Map.Strict as Map
@@ -44,7 +44,7 @@ makeGameWordDefinitions definitions =
     makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, Maybe M.Definition)] -> GameWordItem
     makeGameWordItem (word, createdAt) defs =
       let wordsWithDefinitions = fromMaybe [] (mapM definitionOrEmpty defs)
-       in let wordDefinitions = map makeDefinition wordsWithDefinitions
+       in let wordDefinitions = map makeDefinition (sortDefinitions wordsWithDefinitions)
            in GameWordItem word createdAt wordDefinitions
       where
         definitionOrEmpty :: (M.GameDefinition, Maybe M.Definition) -> Maybe (M.GameDefinition, M.Definition)
@@ -52,7 +52,7 @@ makeGameWordDefinitions definitions =
         definitionOrEmpty (_, Nothing) = Nothing
 
         sortDefinitions :: [(M.GameDefinition, M.Definition)] -> [(M.GameDefinition, M.Definition)]
-        sortDefinitions x = sortBy comparator x
+        sortDefinitions = sortBy comparator
 
         comparator :: (M.GameDefinition, M.Definition) -> (M.GameDefinition, M.Definition) -> Ordering
         comparator (gameDef1, def1) (gameDef2, def2) = compare (definitionNumber gameDef1) (definitionNumber gameDef2)

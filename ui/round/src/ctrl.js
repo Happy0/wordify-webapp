@@ -416,7 +416,7 @@ module.exports = function(opts) {
             var firstDefinition = definitions.definitions[0]
             messages.push({word: definitions.word, definition: firstDefinition, when: definitions.when});
         } else {
-            messages.push({word: definitions.word, definition: {definition: "No definitions found."}});
+            messages.push({word: definitions.word, definition: {definition: "No definitions found."}, when: definitions.when});
         }
 
         sortMessages();
