@@ -76,5 +76,5 @@ GameDefinition
     word Text
     definitionNumber Int
     createdAt UTCTime
-    definitionId DefinitionId
+    definitionId DefinitionId Maybe
     gameId GameId

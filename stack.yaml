@@ -18,6 +18,7 @@
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
 resolver: lts-23.17
+system-ghc: true
 
 docker:
   enable: false
