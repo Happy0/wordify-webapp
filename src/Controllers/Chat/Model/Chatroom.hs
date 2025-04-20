@@ -26,12 +26,12 @@ data Chatroom = Chatroom
     sequenceWriteChannel :: TChan SendMessage,
     chatBroadcastChannel :: TChan ChatMessage,
     persistChatMessage :: ChatMessage -> IO (),
-    getChatMessages :: Text -> UTCTime -> C.ConduitT () ChatMessage IO (),
+    getChatMessages :: Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO (),
     thawed :: TVar Bool,
     threadId :: TVar (Maybe ThreadId)
   }
 
-makeChatroom :: Text -> (ChatMessage -> IO ()) -> (Text -> C.ConduitT () ChatMessage IO ()) -> IO Chatroom
+makeChatroom :: Text -> (ChatMessage -> IO ()) -> (Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()) -> IO Chatroom
 makeChatroom chatroomId persistChatMessage getChatMessagesLive = do
   (writeChannel, broadcastChan) <- atomically $ (,) <$> newTChan <*> newTChan
   thawed <- newTVarIO False
@@ -43,8 +43,8 @@ sendMessage chatroom message = do
   thawChatroom chatroom
   atomically (writeTChan (sequenceWriteChannel chatroom) message)
 
-subscribeMessagesLive :: Chatroom -> (Maybe UTCTime) -> C.ConduitT () ChatMessage IO ()
-subscribeMessagesLive chatroom@(Chatroom chatroomId _ subChannel _ getChatMessages _ _) since = do
+subscribeMessagesLive :: Chatroom -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()
+subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) since = do
   broadcastChannel <- liftIO $ (atomically . dupTChan) subChannel
   let existingChatMessages = getChatMessages chatroomId since
   let liveMessagesConduit = chanSource broadcastChannel
@@ -68,7 +68,7 @@ startWorkerThread (Chatroom _ sequenceWriteChannel broadcastChan persistChatMess
   msg <- atomically (readTChan sequenceWriteChannel)
   now <- getCurrentTime
   let chatMessage = ChatMessage (userDisplayName msg) (message msg) now
-  -- TODO: stop this look from exiting due to IO error
+  -- TODO: stop this loop from exiting due to IO errors
   persistChatMessage chatMessage
   atomically (writeTChan broadcastChan chatMessage)
 
