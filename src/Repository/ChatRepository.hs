@@ -1,3 +1,13 @@
+module Repository.ChatRepository
+  ( toChatRepositoryImpl,
+    ChatRepository (saveChatMessage, getChatMessages),
+    ChatRepositoryImpl,
+    saveChatMessageImpl,
+    getChatMessagesImpl,
+    ChatMessage (ChatMessage),
+  )
+where
+
 import ClassyPrelude (IO, Maybe)
 import Conduit (ConduitT)
 import qualified Data.Text as T
