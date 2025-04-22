@@ -25,13 +25,13 @@ data Chatroom = Chatroom
   { chatroomId :: Text,
     sequenceWriteChannel :: TChan SendMessage,
     chatBroadcastChannel :: TChan ChatMessage,
-    persistChatMessage :: ChatMessage -> IO (),
+    persistChatMessage :: Text -> ChatMessage -> IO (),
     getChatMessages :: Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO (),
     thawed :: TVar Bool,
     threadId :: TVar (Maybe ThreadId)
   }
 
-makeChatroom :: (ChatMessage -> IO ()) -> (Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
+makeChatroom :: (Text -> ChatMessage -> IO ()) -> (Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
 makeChatroom persistChatMessage getChatMessagesLive chatroomId = do
   (writeChannel, broadcastChan) <- atomically $ (,) <$> newTChan <*> newTChan
   thawed <- newTVarIO False
@@ -64,12 +64,12 @@ thawChatroom chatroom = do
   when chatroomNeedsThawed (startWorkerThread chatroom)
 
 startWorkerThread :: Chatroom -> IO ()
-startWorkerThread (Chatroom _ sequenceWriteChannel broadcastChan persistChatMessage _ _ _) = forever $ do
+startWorkerThread (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ _ _) = forever $ do
   msg <- atomically (readTChan sequenceWriteChannel)
   now <- getCurrentTime
   let chatMessage = ChatMessage (userDisplayName msg) (message msg) now
   -- TODO: stop this loop from exiting due to IO errors
-  persistChatMessage chatMessage
+  persistChatMessage roomId chatMessage
   atomically (writeTChan broadcastChan chatMessage)
 
 claimedAsGoingToThaw :: Chatroom -> IO Bool
