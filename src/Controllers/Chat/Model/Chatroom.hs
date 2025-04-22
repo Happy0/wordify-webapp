@@ -8,7 +8,7 @@ module Controllers.Chat.Model.Chatroom
   )
 where
 
-import ClassyPrelude (Bool (..), IO, Maybe (Nothing), MonadIO, Text, UTCTime, const, for_, forever, liftIO, pure, undefined, when, ($), (.), (<$>), (<*>), (>>))
+import ClassyPrelude (Bool (..), IO, Maybe (Nothing), Text, UTCTime, const, for_, forever, liftIO, pure, when, ($), (.), (<$>), (<*>), (>>))
 import ClassyPrelude.Conduit (Monoid (mconcat))
 import Control.Concurrent (ThreadId)
 import Control.Concurrent.STM (STM, TChan, TVar, atomically, dupTChan, modifyTVar, newTChan, newTVarIO, readTChan, readTVar, writeTChan, writeTVar)
@@ -31,8 +31,8 @@ data Chatroom = Chatroom
     threadId :: TVar (Maybe ThreadId)
   }
 
-makeChatroom :: Text -> (ChatMessage -> IO ()) -> (Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()) -> IO Chatroom
-makeChatroom chatroomId persistChatMessage getChatMessagesLive = do
+makeChatroom :: (ChatMessage -> IO ()) -> (Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
+makeChatroom persistChatMessage getChatMessagesLive chatroomId = do
   (writeChannel, broadcastChan) <- atomically $ (,) <$> newTChan <*> newTChan
   thawed <- newTVarIO False
   threadId <- newTVarIO Nothing
