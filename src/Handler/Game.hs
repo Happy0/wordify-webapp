@@ -200,14 +200,14 @@ handleBroadcastMessages connection serverGame chatroom chatMessagesSince = do
 
   race_ (runConduit chatMessagesSubscription) (runConduit gameMessagesSubscription)
 
-handleInboundSocketMessages :: App -> C.Connection -> ServerGame -> Maybe AuthUser -> IO ()
-handleInboundSocketMessages app connection serverGame maybeUser = forever
+handleInboundSocketMessages :: App -> C.Connection -> CR.Chatroom -> ServerGame -> Maybe AuthUser -> IO ()
+handleInboundSocketMessages app connection chatroom serverGame maybeUser = forever
   $ do
     msg <- C.receiveData connection
     case eitherDecode msg of
       Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
       Right parsedCommand -> do
-        response <- liftIO $ performRequest serverGame (definitionService app) (definitionRepository app) (appConnPool app) maybeUser parsedCommand
+        response <- liftIO $ performRequest serverGame chatroom (definitionService app) (definitionRepository app) (appConnPool app) maybeUser parsedCommand
         C.sendTextData connection $ toJSONResponse $ response
 
 sendInitialGameState :: C.Connection -> ServerGameSnapshot -> Maybe AuthUser -> IO ()
@@ -230,7 +230,7 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince = runResourceT
         withNotifyJoinAndLeave (appConnPool app) serverGame maybeUser $ do
           sendInitialGameState connection gameSnapshot maybeUser
           let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince
-          let handleInbound = handleInboundSocketMessages app connection serverGame maybeUser
+          let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
           race_ handleOutbound handleInbound
 
 gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()

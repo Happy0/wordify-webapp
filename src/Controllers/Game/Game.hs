@@ -10,6 +10,8 @@ import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
 import Control.Monad
 import Control.Monad.STM
+import Controllers.Chat.Model.Chatroom
+import qualified Controllers.Chat.Model.Chatroom as CR (ChatMessage (ChatMessage), Chatroom, SendMessage (SendMessage), sendMessage)
 import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, withDefinitionsAsync)
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
@@ -86,18 +88,18 @@ persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen p
 withNotifyJoinAndLeave :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
 withNotifyJoinAndLeave pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
 
-performRequest :: ServerGame -> DefinitionServiceImpl -> DefinitionRepositoryImpl -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
-performRequest serverGame _ _ pool player (BoardMove placed) =
+performRequest :: ServerGame -> Chatroom -> DefinitionServiceImpl -> DefinitionRepositoryImpl -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
+performRequest serverGame _ _ _ pool player (BoardMove placed) =
   handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
-performRequest serverGame _ _ pool player (ExchangeMove exchanged) =
+performRequest serverGame _ _ _ pool player (ExchangeMove exchanged) =
   handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
-performRequest serverGame _ _ pool player PassMove =
+performRequest serverGame _ _ _ pool player PassMove =
   handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
-performRequest serverGame _ _ pool player (SendChatMessage msg) =
-  handleChatMessage serverGame pool player msg
-performRequest serverGame _ _ pool player (AskPotentialScore placed) =
+performRequest serverGame chatroom _ _ pool player (SendChatMessage msg) =
+  handleChatMessage serverGame chatroom pool player msg
+performRequest serverGame _ _ _ pool player (AskPotentialScore placed) =
   handlePotentialScore serverGame placed
-performRequest serverGame definitionService definitionRepository _ player (AskDefinition word) =
+performRequest serverGame _ definitionService definitionRepository _ player (AskDefinition word) =
   handleAskDefinition definitionService definitionRepository serverGame (player >>= getPlayerNumber serverGame) word
 
 handleDefinitionResult :: DefinitionRepositoryImpl -> ServerGame -> Text -> Either Text [Definition] -> IO ()
@@ -213,23 +215,15 @@ handlePassMove sharedServerGame pool (Just playerNo) =
     moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
-handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
-handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-handleChatMessage serverGame pool (Just user) messageText =
+handleChatMessage :: ServerGame -> Chatroom -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
+handleChatMessage _ _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
+handleChatMessage serverGame chatroom pool (Just user) messageText =
   do
-    -- TODO: deal with race conditions around "current time" being used on socket init if two players chat quickly
-    -- 'lastUpdate' on serverGame???
     now <- getCurrentTime
     gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
     let serverPlayer = getServerPlayerSnapshot gameSnapshot user
-
     let playerName = serverPlayer >>= SP.name
 
     case playerName of
       Nothing -> return $ InvalidCommand "Internal server error"
-      Just playerName -> do
-        let channel = broadcastChannel serverGame
-        let message = PlayerChat $ ChatMessage playerName messageText now
-        P.persistGameUpdate pool (gameId serverGame) (gameState gameSnapshot) message
-        atomically $ writeTChan channel message
-        return ChatSuccess
+      Just playerName -> sendMessage chatroom (CR.SendMessage playerName messageText) >> return ChatSuccess

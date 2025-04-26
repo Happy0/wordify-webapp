@@ -5,6 +5,7 @@ module Controllers.Chat.Model.Chatroom
     makeChatroom,
     freezeChatroom,
     sendMessage,
+    SendMessage (SendMessage),
   )
 where
 
