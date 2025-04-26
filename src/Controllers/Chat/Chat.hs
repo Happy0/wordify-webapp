@@ -1,4 +1,4 @@
-module Controllers.Chat (getChat) where
+module Controllers.Chat.Chat (getChat) where
 
 import ClassyPrelude
 import Controllers.Chat.Model.Chatroom (ChatMessage (ChatMessage), Chatroom, makeChatroom)
@@ -7,8 +7,9 @@ import qualified Data.Conduit.List as CL (map)
 import qualified Data.Text as T
 import Repository.ChatRepository (ChatMessageEntity (ChatMessageEntity), ChatRepositoryImpl, getChatMessagesImpl, saveChatMessageImpl)
 
-getChat :: ChatRepositoryImpl -> T.Text -> IO Chatroom
-getChat chatRepository = makeChatroom (saveChatMessage chatRepository) (getChatMessages chatRepository)
+getChat :: ChatRepositoryImpl -> T.Text -> IO (Either Text Chatroom)
+getChat _ "" = pure (Left "Chatroom ID cannot be empty")
+getChat chatRepository chatroomId = Right <$> makeChatroom (saveChatMessage chatRepository) (getChatMessages chatRepository) chatroomId
 
 saveChatMessage :: ChatRepositoryImpl -> Text -> ChatMessage -> IO ()
 saveChatMessage chatRepository chatroomId msg = saveChatMessageImpl chatRepository (toChatMessageEntity chatroomId msg)

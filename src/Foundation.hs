@@ -14,7 +14,9 @@ module Foundation where
 
 import Auth0 (auth0Provider)
 import Control.Monad.Logger (LogSource)
+import Controllers.Chat.Model.Chatroom
 import Controllers.Common.CacheableSharedResource
+import Controllers.Definition.DefinitionService (DefinitionServiceImpl)
 import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser)
@@ -25,6 +27,7 @@ import Database.Persist.Sql (ConnectionPool, runSqlPool)
 import Import.NoFoundation
 import InactivityTracker
 import OAuthDetails (OAuthDetails, buildOAuthDetails)
+import Repository.DefinitionRepository
 import System.Environment
 import System.Random
 import Text.Hamlet (hamletFile)
@@ -37,8 +40,6 @@ import Yesod.Auth.OpenId (IdentifierType (Claimed), authOpenId)
 import Yesod.Core.Types (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
 import Yesod.Default.Util (addStaticContentExternal)
-import Controllers.Definition.DefinitionService(DefinitionServiceImpl)
-import Repository.DefinitionRepository
 
 data LocalisedGameSetup = GameSetup
   { localisedDictionary :: Dictionary,
@@ -71,6 +72,7 @@ data App = App
     -- TODO: https://hackage.haskell.org/package/stm-containers
     gameLobbies :: ResourceCache Text GameLobby,
     games :: ResourceCache Text ServerGame,
+    chatrooms :: ResourceCache Text Chatroom,
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
     inactivityTracker :: TVar InactivityTracker,
@@ -205,7 +207,7 @@ instance Yesod App where
   --   b) Validates that incoming write requests include that token in either a header or POST parameter.
   -- To add it, chain it together with the defaultMiddleware: yesodMiddleware = defaultYesodMiddleware . defaultCsrfMiddleware
   -- For details, see the CSRF documentation in the Yesod.Core.Handler module of the yesod-core package.
-  yesodMiddleware :: ToTypedContent res => Handler res -> Handler res
+  yesodMiddleware :: (ToTypedContent res) => Handler res -> Handler res
   yesodMiddleware = defaultYesodMiddleware
 
   defaultLayout :: Widget -> Handler Html
@@ -233,9 +235,9 @@ instance Yesod App where
   authRoute _ = Just $ AuthR LoginR
 
   isAuthorized ::
-    -- | The route the user is visiting.
+    -- \| The route the user is visiting.
     Route App ->
-    -- | Whether or not this is a "write" request.
+    -- \| Whether or not this is a "write" request.
     Bool ->
     Handler AuthResult
   -- Routes not requiring authentication.
@@ -250,11 +252,11 @@ instance Yesod App where
   -- expiration dates to be set far in the future without worry of
   -- users receiving stale content.
   addStaticContent ::
-    -- | The file extension
+    -- \| The file extension
     Text ->
-    -- | The MIME content type
+    -- \| The MIME content type
     Text ->
-    -- | The contents of the file
+    -- \| The contents of the file
     LByteString ->
     Handler (Maybe (Either Text (Route App, [(Text, Text)])))
   addStaticContent ext mime content = do
@@ -276,10 +278,12 @@ instance Yesod App where
   -- in development, and warnings and errors in production.
   shouldLogIO :: App -> LogSource -> LogLevel -> IO Bool
   shouldLogIO app _source level =
-    return $
-      appShouldLogAll (appSettings app)
-        || level == LevelWarn
-        || level == LevelError
+    return
+      $ appShouldLogAll (appSettings app)
+      || level
+      == LevelWarn
+      || level
+      == LevelError
 
   makeLogger :: App -> IO Logger
   makeLogger = return . appLogger
