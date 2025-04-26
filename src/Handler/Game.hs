@@ -256,21 +256,6 @@ gameToMoveSummaries game =
     Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
     (G.History originalBag moves) = G.history game
 
-{-
-    Send the chat log history to the client from the given date onwards if supplied (otherwise from the beginning)
--}
-sendPreviousChatMessages :: Pool SqlBackend -> Text -> Maybe UTCTime -> C.Connection -> IO ()
-sendPreviousChatMessages pool gameId Nothing connection = do
-  liftIO
-    $ flip runSqlPersistMPool pool
-    $ getChatMessages gameId
-    $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
-sendPreviousChatMessages pool gameId (Just since) connection = do
-  liftIO
-    $ flip runSqlPersistMPool pool
-    $ getChatMessagesSince gameId since
-    $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
-
 sendPreviousDefinitions :: DefinitionRepositoryImpl -> Text -> Maybe UTCTime -> C.Connection -> IO ()
 sendPreviousDefinitions definitionRepository gameId since connection =
   runConduit $ getGameDefinitionsImpl definitionRepository gameId .| CL.filter (isAfter since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)

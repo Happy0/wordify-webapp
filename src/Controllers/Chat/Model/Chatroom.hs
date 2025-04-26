@@ -9,9 +9,9 @@ module Controllers.Chat.Model.Chatroom
   )
 where
 
-import ClassyPrelude (Bool (..), IO, Maybe (Nothing), Text, UTCTime, const, for_, forever, liftIO, pure, when, ($), (.), (<$>), (<*>), (>>))
+import ClassyPrelude (Bool (..), IO, Maybe (Just, Nothing), Text, UTCTime, const, for_, forever, liftIO, pure, when, ($), (.), (<$>), (<*>), (>>))
 import ClassyPrelude.Conduit (Monoid (mconcat))
-import Control.Concurrent (ThreadId)
+import Control.Concurrent (ThreadId, forkIO)
 import Control.Concurrent.STM (STM, TChan, TVar, atomically, dupTChan, modifyTVar, newTChan, newTVarIO, readTChan, readTVar, writeTChan, writeTVar)
 import qualified Data.Conduit as C (ConduitT, yield)
 import Data.Time.Clock (getCurrentTime)
@@ -55,10 +55,12 @@ subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) s
 thawChatroom :: Chatroom -> IO ()
 thawChatroom chatroom = do
   chatroomNeedsThawed <- claimedAsGoingToThaw chatroom
-  when chatroomNeedsThawed (startWorkerThread chatroom)
+  when chatroomNeedsThawed $ do
+    thread <- forkIO (workerLoop chatroom)
+    atomically (writeTVar (threadId chatroom) (Just thread))
 
-startWorkerThread :: Chatroom -> IO ()
-startWorkerThread (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ _ _) = forever $ do
+workerLoop :: Chatroom -> IO loop
+workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ _ _) = forever $ do
   msg <- atomically (readTChan sequenceWriteChannel)
   now <- getCurrentTime
   let chatMessage = ChatMessage (userDisplayName msg) (message msg) now
