@@ -15,6 +15,7 @@ import Control.Concurrent.STM (STM, TChan, TVar, atomically, dupTChan, modifyTVa
 import qualified Data.Conduit as C (ConduitT, yield)
 import Data.Time.Clock (getCurrentTime)
 import GHC.Conc (killThread)
+import Util.ConduitChan (chanSource)
 
 -- TODO: include user IDs and do migration so that database 'chat' rows have user IDs
 data SendMessage = SendMessage {userDisplayName :: Text, message :: Text}
@@ -49,14 +50,6 @@ subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) s
   let existingChatMessages = getChatMessages chatroomId since
   let liveMessagesConduit = chanSource broadcastChannel
   mconcat [existingChatMessages, liveMessagesConduit]
-
-chanSource :: TChan a -> C.ConduitT () a IO ()
-chanSource chan = do
-  let loop = do
-        msg <- liftIO (atomically (readTChan chan))
-        C.yield msg
-        loop
-  loop
 
 thawChatroom :: Chatroom -> IO ()
 thawChatroom chatroom = do

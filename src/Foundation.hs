@@ -72,7 +72,7 @@ data App = App
     -- TODO: https://hackage.haskell.org/package/stm-containers
     gameLobbies :: ResourceCache Text GameLobby,
     games :: ResourceCache Text ServerGame,
-    chatrooms :: ResourceCache Text Chatroom,
+    chatRooms :: ResourceCache Text Chatroom,
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
     inactivityTracker :: TVar InactivityTracker,
