@@ -1,7 +1,7 @@
 module Controllers.Chat.Chat (getChat) where
 
 import ClassyPrelude
-import Controllers.Chat.Model.Chatroom (ChatMessage (ChatMessage), Chatroom, makeChatroom)
+import Controllers.Chat.Chatroom (ChatMessage (ChatMessage), Chatroom, makeChatroom)
 import qualified Data.Conduit as C (ConduitT, (.|))
 import qualified Data.Conduit.List as CL (map)
 import qualified Data.Text as T

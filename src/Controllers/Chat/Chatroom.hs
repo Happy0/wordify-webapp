@@ -1,4 +1,4 @@
-module Controllers.Chat.Model.Chatroom
+module Controllers.Chat.Chatroom
   ( ChatMessage (ChatMessage),
     Chatroom,
     subscribeMessagesLive,

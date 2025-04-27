@@ -10,8 +10,8 @@ import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
 import Control.Monad
 import Control.Monad.STM
-import Controllers.Chat.Model.Chatroom
-import qualified Controllers.Chat.Model.Chatroom as CR (ChatMessage (ChatMessage), Chatroom, SendMessage (SendMessage), sendMessage)
+import Controllers.Chat.Chatroom
+import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom, SendMessage (SendMessage), sendMessage)
 import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, withDefinitionsAsync)
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame

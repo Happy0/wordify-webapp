@@ -5,8 +5,8 @@ module Handler.Game where
 
 import Control.Concurrent
 import Control.Error (note)
-import Controllers.Chat.Model.Chatroom (subscribeMessagesLive)
-import qualified Controllers.Chat.Model.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
+import Controllers.Chat.Chatroom (subscribeMessagesLive)
+import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import qualified Controllers.Definition.DefinitionService as D
 import Controllers.Game.Api

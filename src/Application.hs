@@ -34,7 +34,7 @@ import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
 import Controllers.Chat.Chat (getChat)
-import Controllers.Chat.Model.Chatroom (Chatroom)
+import Controllers.Chat.Chatroom (Chatroom)
 import Controllers.Common.CacheableSharedResource
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl, toDefinitionServiceImpl)
 import Controllers.Definition.FreeDictionaryService (FreeDictionaryService (FreeDictionaryService))
