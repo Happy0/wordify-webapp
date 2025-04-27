@@ -5,6 +5,7 @@ module Controllers.Game.GameMessage
   )
 where
 
+import Controllers.Definition.DefinitionService (Definition)
 import Data.Maybe (Maybe)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
@@ -12,9 +13,8 @@ import Wordify.Rules.Player (Player)
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile (Tile)
 import Prelude (Int)
-import Controllers.Definition.DefinitionService (Definition)
 
-data ChatMessage = ChatMessage {user :: Text, message :: Text, when :: UTCTime}
+data ChatMessage = ChatMessage {user :: Text, message :: Text, when :: UTCTime, messageNumber :: Int}
 
 data MoveSummary
   = BoardMoveSummary

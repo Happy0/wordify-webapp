@@ -116,8 +116,9 @@ module.exports = function(opts) {
             var playerName = data.player;
             var message = data.message;
             var when = data.when;
+            var messageNumber = data.messageNumber;
 
-            controller.addChatMessage(playerName, message, when);
+            controller.addChatMessage(playerName, message, when, messageNumber);
         },
         "potentialScore" : function(data) {
             var potentialScore = data.potentialScore;

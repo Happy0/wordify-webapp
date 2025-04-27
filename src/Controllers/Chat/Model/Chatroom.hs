@@ -9,7 +9,7 @@ module Controllers.Chat.Model.Chatroom
   )
 where
 
-import ClassyPrelude (Bool (..), IO, Maybe (Just, Nothing), Text, UTCTime, const, for_, forever, liftIO, pure, when, ($), (.), (<$>), (<*>), (>>))
+import ClassyPrelude (Bool (..), IO, Int, Maybe (Just, Nothing), Text, UTCTime, const, for_, forever, liftIO, pure, when, ($), (.), (<$>), (<*>), (>>))
 import ClassyPrelude.Conduit (Monoid (mconcat))
 import Control.Concurrent (ThreadId, forkIO)
 import Control.Concurrent.STM (STM, TChan, TVar, atomically, dupTChan, modifyTVar, newTChan, newTVarIO, readTChan, readTVar, writeTChan, writeTVar)
@@ -21,19 +21,19 @@ import Util.ConduitChan (chanSource)
 -- TODO: include user IDs and do migration so that database 'chat' rows have user IDs
 data SendMessage = SendMessage {userDisplayName :: Text, message :: Text}
 
-data ChatMessage = ChatMessage {displayName :: Text, chatMessage :: Text, sentTime :: UTCTime}
+data ChatMessage = ChatMessage {displayName :: Text, chatMessage :: Text, sentTime :: UTCTime, messageNumber :: Int}
 
 data Chatroom = Chatroom
   { chatroomId :: Text,
     sequenceWriteChannel :: TChan SendMessage,
     chatBroadcastChannel :: TChan ChatMessage,
     persistChatMessage :: Text -> ChatMessage -> IO (),
-    getChatMessages :: Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO (),
+    getChatMessages :: Text -> Maybe Int -> C.ConduitT () ChatMessage IO (),
     thawed :: TVar Bool,
     threadId :: TVar (Maybe ThreadId)
   }
 
-makeChatroom :: (Text -> ChatMessage -> IO ()) -> (Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
+makeChatroom :: (Text -> ChatMessage -> IO ()) -> (Text -> Maybe Int -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
 makeChatroom persistChatMessage getChatMessagesLive chatroomId = do
   (writeChannel, broadcastChan) <- atomically $ (,) <$> newTChan <*> newTChan
   thawed <- newTVarIO False
@@ -45,10 +45,10 @@ sendMessage chatroom message = do
   thawChatroom chatroom
   atomically (writeTChan (sequenceWriteChannel chatroom) message)
 
-subscribeMessagesLive :: Chatroom -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()
-subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) since = do
+subscribeMessagesLive :: Chatroom -> Maybe Int -> C.ConduitT () ChatMessage IO ()
+subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) sinceMessageNumber = do
   broadcastChannel <- liftIO $ (atomically . dupTChan) subChannel
-  let existingChatMessages = getChatMessages chatroomId since
+  let existingChatMessages = getChatMessages chatroomId sinceMessageNumber
   let liveMessagesConduit = chanSource broadcastChannel
   mconcat [existingChatMessages, liveMessagesConduit]
 
@@ -63,7 +63,8 @@ workerLoop :: Chatroom -> IO loop
 workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ _ _) = forever $ do
   msg <- atomically (readTChan sequenceWriteChannel)
   now <- getCurrentTime
-  let chatMessage = ChatMessage (userDisplayName msg) (message msg) now
+  -- TODO: database migration that stores these message numbers
+  let chatMessage = ChatMessage (userDisplayName msg) (message msg) now 0
   -- TODO: stop this loop from exiting due to IO errors
   persistChatMessage roomId chatMessage
   atomically (writeTChan broadcastChan chatMessage)

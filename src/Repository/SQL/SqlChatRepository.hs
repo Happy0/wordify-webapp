@@ -1,6 +1,6 @@
 module Repository.SQL.SqlChatRepository (SqlChatRepositoryBackend (SqlChatRepositoryBackend)) where
 
-import ClassyPrelude (IO, Maybe (Just, Nothing), Monad, MonadIO, UTCTime, flip, lift, liftIO, return, undefined, ($))
+import ClassyPrelude (Bool (False, True), IO, Int, Maybe (Just, Nothing), Monad, MonadIO, UTCTime, flip, lift, liftIO, return, undefined, ($), (>))
 import Conduit (ConduitT)
 import Data.Conduit (ConduitT, (.|))
 import qualified Data.Conduit.List as CL
@@ -19,25 +19,26 @@ instance ChatRepository SqlChatRepositoryBackend where
   getChatMessages (SqlChatRepositoryBackend pool) = getChatMessagesImpl pool
 
 saveChatMessageImpl :: Pool SqlBackend -> ChatMessageEntity -> IO ()
-saveChatMessageImpl pool (ChatMessageEntity chatroomId senderDisplayName message now) = do
+saveChatMessageImpl pool (ChatMessageEntity chatroomId senderDisplayName message now messageNumber) = do
   withPool pool $ do
     _ <- insert (M.ChatMessage chatroomId now senderDisplayName message)
     return ()
 
 -- TODO: this loads all messages into memory rather than truely streaming them. Even the Persist SQL's 'selectSource' implementation
 -- doesn't truely stream - would need ot manually page through the results. in a custom 'stream source' implementation
-getChatMessagesImpl :: (MonadIO m) => Pool SqlBackend -> T.Text -> Maybe UTCTime -> ConduitT () ChatMessageEntity m ()
-getChatMessagesImpl pool chatroomId (Just messagesAfter) = do
+getChatMessagesImpl :: (MonadIO m) => Pool SqlBackend -> T.Text -> Maybe Int -> ConduitT () ChatMessageEntity m ()
+getChatMessagesImpl pool chatroomId sinceMessageNumber = do
   -- TODO: rename ChatMessageGame field to ChatMessageRoomId
-  allMessages <- liftIO (withPool pool $ selectList [M.ChatMessageGame ==. chatroomId, M.ChatMessageCreatedAt >. messagesAfter] [])
-  let messages = L.map chatMessageFromEntity allMessages
-  CL.sourceList messages
-getChatMessagesImpl pool chatroomId Nothing = do
   allMessages <- liftIO (withPool pool $ selectList [M.ChatMessageGame ==. chatroomId] [])
-  let messages = L.map chatMessageFromEntity allMessages
-  CL.sourceList messages
+  let messages = L.zipWith chatMessageFromEntity [1 ..] allMessages
+  -- TODO: store the message number in the database and use that to filter in the query - needs migration
+  CL.sourceList messages .| CL.filter (isGreaterThanMessageNumber sinceMessageNumber)
+  where
+    isGreaterThanMessageNumber :: Maybe Int -> ChatMessageEntity -> Bool
+    isGreaterThanMessageNumber Nothing _ = True
+    isGreaterThanMessageNumber (Just since) (ChatMessageEntity _ _ _ _ messageNumber) = messageNumber > since
 
-chatMessageFromEntity :: Entity M.ChatMessage -> ChatMessageEntity
-chatMessageFromEntity (Entity _ (M.ChatMessage roomId created user message)) = ChatMessageEntity roomId user message created
+chatMessageFromEntity :: Int -> Entity M.ChatMessage -> ChatMessageEntity
+chatMessageFromEntity messageNumber (Entity _ (M.ChatMessage roomId created user message)) = ChatMessageEntity roomId user message created messageNumber
 
 withPool = flip runSqlPersistMPool

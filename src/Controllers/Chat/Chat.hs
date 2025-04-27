@@ -14,13 +14,13 @@ getChat chatRepository chatroomId = Right <$> makeChatroom (saveChatMessage chat
 saveChatMessage :: ChatRepositoryImpl -> Text -> ChatMessage -> IO ()
 saveChatMessage chatRepository chatroomId msg = saveChatMessageImpl chatRepository (toChatMessageEntity chatroomId msg)
 
-getChatMessages :: ChatRepositoryImpl -> Text -> Maybe UTCTime -> C.ConduitT () ChatMessage IO ()
+getChatMessages :: ChatRepositoryImpl -> Text -> Maybe Int -> C.ConduitT () ChatMessage IO ()
 getChatMessages chatRepository roomId since = getChatMessagesImpl chatRepository roomId since C..| CL.map fromChatMessageEntity
 
 fromChatMessageEntity :: ChatMessageEntity -> ChatMessage
-fromChatMessageEntity (ChatMessageEntity _ senderDisplayName message now) =
-  ChatMessage senderDisplayName message now
+fromChatMessageEntity (ChatMessageEntity _ senderDisplayName message now chatMessageNumber) =
+  ChatMessage senderDisplayName message now chatMessageNumber
 
 toChatMessageEntity :: Text -> ChatMessage -> ChatMessageEntity
-toChatMessageEntity roomId (ChatMessage senderDisplayName message now) =
-  ChatMessageEntity roomId senderDisplayName message now
+toChatMessageEntity roomId (ChatMessage senderDisplayName message now chatMessageNumber) =
+  ChatMessageEntity roomId senderDisplayName message now chatMessageNumber

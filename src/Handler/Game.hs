@@ -73,13 +73,13 @@ getConnectionStatuses serverGame = do
   snapshot <- makeServerGameSnapshot serverGame
   pure $ connectionStatuses (snapshotPlayers snapshot)
 
-chatMessageSinceQueryParamValue :: Handler (Maybe UTCTime)
+chatMessageSinceQueryParamValue :: Handler (Maybe Int)
 chatMessageSinceQueryParamValue = do
-  queryParamValue <- lookupGetParam "chatMessagesSince"
-  let sinceEpochSeconds = note "No chat message since param specific" queryParamValue >>= (fmap fst . rational)
-  case sinceEpochSeconds of
-    Right secondsSinceUnixEpoch -> pure $ Just ((posixSecondsToUTCTime . fromRational) secondsSinceUnixEpoch)
-    _ -> pure Nothing
+  queryParamValue <- lookupGetParam "chatMessagesSinceMessageNumber"
+  let maybeMessageNumber = note "No chat message since param specific" queryParamValue >>= decimal
+  case maybeMessageNumber of
+    Left _ -> pure Nothing
+    Right (messageNumber, _) -> pure (Just messageNumber)
 
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -147,9 +147,9 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               round.controller.setPlayerToMove(#{toJSON playing});
 
               function connectWebsocket() {
-                var lastChatMessageReceived = round.controller.getLastChatMessageReceivedSecondsSinceEpoch();
+                var lastChatMessageReceived = round.controller.getLastChatMessageReceived();
 
-                var url = document.URL + `?chatMessagesSince=${lastChatMessageReceived}`;
+                var url = document.URL + `?chatMessagesSinceMessageNumber=${lastChatMessageReceived}`;
 
                 url = url.replace("http:", "ws:").replace("https:", "wss:");
                 conn = new WebSocket(url);
@@ -183,17 +183,17 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
           <div #scrabbleground>
       |]
 
-subscribeChatGameMessages :: CR.Chatroom -> Maybe UTCTime -> ConduitT () GameMessage IO ()
+subscribeChatGameMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage IO ()
 subscribeChatGameMessages chatroom since = subscribeMessagesLive chatroom since .| CL.map toGameMessage
   where
     toGameMessage :: CR.ChatMessage -> GameMessage
-    toGameMessage (CR.ChatMessage displayName chatMessage sentTime) =
-      PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime)
+    toGameMessage (CR.ChatMessage displayName chatMessage sentTime messageNumber) =
+      PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime messageNumber)
 
 subscribeGameMessages :: TChan GameMessage -> ConduitT () GameMessage IO ()
 subscribeGameMessages = chanSource
 
-handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe UTCTime -> IO ()
+handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> IO ()
 handleBroadcastMessages connection serverGame chatroom chatMessagesSince = do
   let chatMessagesSubscription = subscribeChatGameMessages chatroom chatMessagesSince .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
   let gameMessagesSubscription = subscribeGameMessages serverGame .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
@@ -215,7 +215,7 @@ sendInitialGameState connection serverGameSnapshot maybeUser = do
   let initialGameState = initialSocketMessage serverGameSnapshot maybeUser
   mapM_ (C.sendTextData connection . toJSONResponse) initialGameState
 
-handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe UTCTime -> IO ()
+handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> IO ()
 handleWebsocket app connection gameId maybeUser chatMessagesSince = runResourceT $ do
   (_, eitherServerGame) <- getCacheableResource (games app) gameId
   (_, eitherChatRoom) <- getCacheableResource (chatRooms app) gameId

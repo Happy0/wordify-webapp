@@ -250,11 +250,11 @@ module.exports = function(opts) {
         m.endComputation();
     }
 
-    var addChatMessage = function(sender, message, when) {
+    var addChatMessage = function(sender, message, when, messageNumber) {
         m.startComputation();
         var messages = data.chatMessages;
-        messages.push({sender: sender, message: message, when: when});
-        data.lastChatMessageReceived = when;
+        messages.push({sender: sender, message: message, when: when, messageNumber: messageNumber});
+        data.lastChatMessageReceived = messageNumber;
         m.endComputation();
     }
 
@@ -387,12 +387,8 @@ module.exports = function(opts) {
         m.endComputation()
     }
 
-    var getLastChatMessageReceivedSecondsSinceEpoch = function() {
-        if (!data.lastChatMessageReceived) {
-            return null
-        } else {
-            return new Date(data.lastChatMessageReceived).getTime() / 1000;
-        }
+    var getLastChatMessageReceived = function() {
+        return data.lastChatMessageReceived;
     }
 
     var sortMessages = function() {
@@ -468,7 +464,7 @@ module.exports = function(opts) {
         playerDisconnect: playerDisconnect,
         addDefinitions: addDefinitions,
         requestDefinition: requestDefinition,
-        getLastChatMessageReceivedSecondsSinceEpoch: getLastChatMessageReceivedSecondsSinceEpoch,
+        getLastChatMessageReceived: getLastChatMessageReceived,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
     };

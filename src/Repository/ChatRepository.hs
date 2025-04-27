@@ -8,7 +8,7 @@ module Repository.ChatRepository
   )
 where
 
-import ClassyPrelude (IO, Maybe)
+import ClassyPrelude (IO, Int, Maybe)
 import Conduit (ConduitT)
 import qualified Data.Text as T
 import Data.Time (UTCTime)
@@ -18,14 +18,15 @@ data ChatMessageEntity = ChatMessageEntity
     chatroomId :: T.Text,
     senderDisplayName :: T.Text,
     message :: T.Text,
-    timestamp :: UTCTime
+    timestamp :: UTCTime,
+    messageNumber :: Int
   }
 
 class ChatRepository a where
   saveChatMessage :: a -> ChatMessageEntity -> IO ()
-  getChatMessages :: a -> T.Text -> Maybe UTCTime -> ConduitT () ChatMessageEntity IO ()
+  getChatMessages :: a -> T.Text -> Maybe Int -> ConduitT () ChatMessageEntity IO ()
 
-data ChatRepositoryImpl = ChatRepositoryImpl (ChatMessageEntity -> IO ()) (T.Text -> Maybe UTCTime -> ConduitT () ChatMessageEntity IO ())
+data ChatRepositoryImpl = ChatRepositoryImpl (ChatMessageEntity -> IO ()) (T.Text -> Maybe Int -> ConduitT () ChatMessageEntity IO ())
 
 toChatRepositoryImpl :: (ChatRepository a) => a -> ChatRepositoryImpl
 toChatRepositoryImpl repository =
@@ -34,5 +35,5 @@ toChatRepositoryImpl repository =
 saveChatMessageImpl :: ChatRepositoryImpl -> ChatMessageEntity -> IO ()
 saveChatMessageImpl (ChatRepositoryImpl saveChatMessageImpl _) = saveChatMessageImpl
 
-getChatMessagesImpl :: ChatRepositoryImpl -> T.Text -> Maybe UTCTime -> ConduitT () ChatMessageEntity IO ()
+getChatMessagesImpl :: ChatRepositoryImpl -> T.Text -> Maybe Int -> ConduitT () ChatMessageEntity IO ()
 getChatMessagesImpl (ChatRepositoryImpl _ getChatMessagesImpl) = getChatMessagesImpl
