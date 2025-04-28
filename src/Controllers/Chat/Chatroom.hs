@@ -9,14 +9,12 @@ module Controllers.Chat.Chatroom
   )
 where
 
-import ClassyPrelude (Bool (..), IO, Int, Maybe (Just, Nothing), Text, UTCTime, const, for_, forever, liftIO, pure, when, ($), (.), (<$>), (<*>), (>>))
-import ClassyPrelude.Conduit (Monoid (mconcat))
-import Control.Concurrent (ThreadId, forkIO)
-import Control.Concurrent.STM (STM, TChan, TVar, atomically, dupTChan, modifyTVar, newTChan, newTVarIO, readTChan, readTVar, writeTChan, writeTVar)
-import qualified Data.Conduit as C (ConduitT, yield)
+import ClassyPrelude (IO, Int, Maybe (Nothing), Monoid (mconcat), Text, UTCTime, forever, liftIO, pure, ($), (.), (<$>), (<*>))
+import Control.Concurrent.STM (TChan, atomically, dupTChan, newTChan, readTChan, writeTChan)
+import qualified Data.Conduit as C (ConduitT)
 import Data.Time.Clock (getCurrentTime)
-import GHC.Conc (killThread)
 import Util.ConduitChan (chanSource)
+import Util.WorkerThread (WorkerThread, newUnstartedWorkerThread, startIfNotStarted, stopIfNotStopped)
 
 -- TODO: include user IDs and do migration so that database 'chat' rows have user IDs
 data SendMessage = SendMessage {userDisplayName :: Text, message :: Text}
@@ -29,16 +27,15 @@ data Chatroom = Chatroom
     chatBroadcastChannel :: TChan ChatMessage,
     persistChatMessage :: Text -> ChatMessage -> IO (),
     getChatMessages :: Text -> Maybe Int -> C.ConduitT () ChatMessage IO (),
-    thawed :: TVar Bool,
-    threadId :: TVar (Maybe ThreadId)
+    workerThread :: WorkerThread
   }
 
 makeChatroom :: (Text -> ChatMessage -> IO ()) -> (Text -> Maybe Int -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
 makeChatroom persistChatMessage getChatMessagesLive chatroomId = do
   (writeChannel, broadcastChan) <- atomically $ (,) <$> newTChan <*> newTChan
-  thawed <- newTVarIO False
-  threadId <- newTVarIO Nothing
-  pure (Chatroom chatroomId writeChannel broadcastChan persistChatMessage getChatMessagesLive thawed threadId)
+  workerThread <- newUnstartedWorkerThread
+  let chatroom = Chatroom chatroomId writeChannel broadcastChan persistChatMessage getChatMessagesLive workerThread
+  pure chatroom
 
 sendMessage :: Chatroom -> SendMessage -> IO ()
 sendMessage chatroom message = do
@@ -46,21 +43,14 @@ sendMessage chatroom message = do
   atomically (writeTChan (sequenceWriteChannel chatroom) message)
 
 subscribeMessagesLive :: Chatroom -> Maybe Int -> C.ConduitT () ChatMessage IO ()
-subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) sinceMessageNumber = do
+subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _) sinceMessageNumber = do
   broadcastChannel <- liftIO $ (atomically . dupTChan) subChannel
   let existingChatMessages = getChatMessages chatroomId sinceMessageNumber
   let liveMessagesConduit = chanSource broadcastChannel
   mconcat [existingChatMessages, liveMessagesConduit]
 
-thawChatroom :: Chatroom -> IO ()
-thawChatroom chatroom = do
-  chatroomNeedsThawed <- claimedAsGoingToThaw chatroom
-  when chatroomNeedsThawed $ do
-    thread <- forkIO (workerLoop chatroom)
-    atomically (writeTVar (threadId chatroom) (Just thread))
-
 workerLoop :: Chatroom -> IO loop
-workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ _ _) = forever $ do
+workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ _) = forever $ do
   msg <- atomically (readTChan sequenceWriteChannel)
   now <- getCurrentTime
   -- TODO: database migration that stores these message numbers
@@ -69,22 +59,8 @@ workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessag
   persistChatMessage roomId chatMessage
   atomically (writeTChan broadcastChan chatMessage)
 
-claimedAsGoingToThaw :: Chatroom -> IO Bool
-claimedAsGoingToThaw chatroom =
-  atomically $ do
-    isAlreadyThawed <- readTVar (thawed chatroom)
-    if isAlreadyThawed
-      then pure False
-      else modifyTVar (thawed chatroom) (const True) >> pure True
+thawChatroom :: Chatroom -> IO ()
+thawChatroom chatroom = startIfNotStarted (workerThread chatroom) (workerLoop chatroom)
 
 freezeChatroom :: Chatroom -> IO ()
-freezeChatroom chatroom = do
-  workerThreadId <- atomically (freezeChatroomTransaction chatroom)
-  for_ workerThreadId killThread
-
-freezeChatroomTransaction :: Chatroom -> STM (Maybe ThreadId)
-freezeChatroomTransaction (Chatroom _ _ _ _ _ thawed threadId) = do
-  writeTVar thawed False
-  workerThreadId <- readTVar threadId
-  writeTVar threadId Nothing
-  pure workerThreadId
+freezeChatroom chatroom = stopIfNotStopped (workerThread chatroom)
