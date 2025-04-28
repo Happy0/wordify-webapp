@@ -1,7 +1,8 @@
 module Controllers.Game.GameDefinitionController (GameDefinitionController, DefinitionResponse (DefinitionResponse), makeGameDefinitionController, storeGameDefinitions, killWorkerThread, getStoredDefinitions) where
 
-import ClassyPrelude (Either (Left, Right), IO, UTCTime, getCurrentTime, map, pure, undefined, writeTQueue, ($))
+import ClassyPrelude (Either (Left, Right), IO, UTCTime, getCurrentTime, map, pure, undefined, void, writeTQueue, ($))
 import Conduit (ConduitT)
+import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (TQueue, atomically, newTQueue, readTQueue)
 import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, getDefinitionsImpl)
 import Data.Text (Text)
@@ -10,7 +11,7 @@ import Util.WorkerThread (WorkerThread, newUnstartedWorkerThread, startIfNotStar
 
 data DefinitionResponse = DefinitionResponse Text UTCTime [Definition]
 
-data GameDefinitionWorkItem = GameDefinitionWorkItem {gameId :: Text, word :: Text, withStoredResult :: DefinitionResponse -> IO ()}
+data GameDefinitionWorkItem = GameDefinitionWorkItem {gameId :: Text, word :: Text, definitions :: Either Text [Definition], withStoredResult :: DefinitionResponse -> IO ()}
 
 data GameDefinitionController = GameDefinitionController
   { definitionService :: DefinitionServiceImpl,
@@ -29,8 +30,7 @@ makeGameDefinitionController definitionService definitionRepository = do
 definitionWorkerLoop :: GameDefinitionController -> IO ()
 definitionWorkerLoop (GameDefinitionController definitionService definitionRepository queue _) = do
   now <- getCurrentTime
-  GameDefinitionWorkItem gameId word withStoredResult <- atomically $ readTQueue queue
-  defs <- getDefinitionsImpl definitionService word
+  GameDefinitionWorkItem gameId word defs withStoredResult <- atomically $ readTQueue queue
 
   -- TODO: handle error on save killing thread
   case defs of
@@ -45,9 +45,12 @@ definitionWorkerLoop (GameDefinitionController definitionService definitionRepos
     wordDefinitionItem (Definition partOfSpeech definition example) = WordDefinitionItem partOfSpeech definition example
 
 storeGameDefinitions :: GameDefinitionController -> Text -> Text -> (DefinitionResponse -> IO ()) -> IO ()
-storeGameDefinitions worker@(GameDefinitionController _ _ workQueue definitionWorker) gameId word withStoredResultAsync = do
+storeGameDefinitions worker@(GameDefinitionController definitionService _ workQueue definitionWorker) gameId word withStoredResultAsync = do
   startIfNotStarted definitionWorker (definitionWorkerLoop worker)
-  atomically (writeTQueue workQueue (GameDefinitionWorkItem gameId word withStoredResultAsync))
+
+  void $ forkIO $ do
+    defs <- getDefinitionsImpl definitionService word
+    atomically (writeTQueue workQueue (GameDefinitionWorkItem gameId word defs withStoredResultAsync))
 
 getStoredDefinitions :: GameDefinitionController -> Text -> ConduitT () GameWordItem IO ()
 getStoredDefinitions (GameDefinitionController _ definitionRepository _ _) word = getGameDefinitionsImpl definitionRepository word
