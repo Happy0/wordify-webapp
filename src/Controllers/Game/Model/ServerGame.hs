@@ -47,7 +47,7 @@ data ServerGame = ServerGame
   { gameId :: Text,
     game :: TVar G.Game,
     playing :: [(Text, TVar SP.ServerPlayer)],
-    broadcastChannel :: (TChan GameMessage),
+    broadcastChannel :: TChan GameMessage,
     createdAt :: UTCTime,
     lastMoveMadeAt :: TVar (Maybe UTCTime),
     finishedAt :: TVar (Maybe UTCTime)

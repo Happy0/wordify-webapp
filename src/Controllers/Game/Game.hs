@@ -10,8 +10,11 @@ import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
 import Control.Monad
 import Control.Monad.STM
+import Controllers.Chat.Chatroom
+import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom, SendMessage (SendMessage), sendMessage)
 import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, withDefinitionsAsync)
 import Controllers.Game.Api
+import Controllers.Game.GameDefinitionController (DefinitionResponse (..), GameDefinitionController, storeGameDefinitions)
 import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.Game.Persist as P
@@ -86,44 +89,29 @@ persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen p
 withNotifyJoinAndLeave :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
 withNotifyJoinAndLeave pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
 
-performRequest :: ServerGame -> DefinitionServiceImpl -> DefinitionRepositoryImpl -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
+performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Pool SqlBackend -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
 performRequest serverGame _ _ pool player (BoardMove placed) =
   handleBoardMove serverGame pool (player >>= getPlayerNumber serverGame) placed
 performRequest serverGame _ _ pool player (ExchangeMove exchanged) =
   handleExchangeMove serverGame pool (player >>= getPlayerNumber serverGame) exchanged
 performRequest serverGame _ _ pool player PassMove =
   handlePassMove serverGame pool (player >>= getPlayerNumber serverGame)
-performRequest serverGame _ _ pool player (SendChatMessage msg) =
-  handleChatMessage serverGame pool player msg
+performRequest serverGame chatroom _ pool player (SendChatMessage msg) =
+  handleChatMessage serverGame chatroom pool player msg
 performRequest serverGame _ _ pool player (AskPotentialScore placed) =
   handlePotentialScore serverGame placed
-performRequest serverGame definitionService definitionRepository _ player (AskDefinition word) =
-  handleAskDefinition definitionService definitionRepository serverGame (player >>= getPlayerNumber serverGame) word
+performRequest serverGame _ gameDefinitionWorker _ player (AskDefinition word) =
+  handleAskDefinition gameDefinitionWorker serverGame (player >>= getPlayerNumber serverGame) word
 
-handleDefinitionResult :: DefinitionRepositoryImpl -> ServerGame -> Text -> Either Text [Definition] -> IO ()
-handleDefinitionResult definitionRepositoryImpl serverGame word result = do
-  now <- getCurrentTime
-  let channel = broadcastChannel serverGame
-  case result of
-    Left err -> do
-      saveGameDefinitionsImpl definitionRepositoryImpl now (gameId serverGame) word []
-      atomically (writeTChan channel (WordDefinitions word now []))
-    Right definitions -> do
-      saveGameDefinitionsImpl definitionRepositoryImpl now (gameId serverGame) word (Prelude.map wordDefinitionItem definitions)
-      atomically (writeTChan channel (WordDefinitions word now definitions))
-  where
-    wordDefinitionItem :: Definition -> WordDefinitionItem
-    wordDefinitionItem (Definition partOfSpeech definition example) =
-      WordDefinitionItem partOfSpeech definition example
-
-handleAskDefinition :: DefinitionServiceImpl -> DefinitionRepositoryImpl -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
-handleAskDefinition definitionService definitionRepository serverGame Nothing word =
+handleAskDefinition :: GameDefinitionController -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
+handleAskDefinition definitionWorker serverGame Nothing word =
   return $ InvalidCommand "Observers cannot request definitions."
-handleAskDefinition definitionService definitionRepository serverGame (Just _) word =
-  handleDefinitionAsync word (handleDefinitionResult definitionRepository serverGame word) >> pure AskDefinitionSuccess
+handleAskDefinition definitionWorker serverGame (Just _) word = do
+  storeGameDefinitions definitionWorker (gameId serverGame) word $ \(DefinitionResponse word time definitions defNumber) -> atomically $ do
+    let channel = broadcastChannel serverGame
+    writeTChan channel (WordDefinitions word time definitions defNumber)
+  pure AskDefinitionSuccess
   where
-    handleDefinitionAsync word = withDefinitionsAsync definitionService word 5
-
     wordPlayedInGame :: ServerGame -> Bool
     wordPlayedInGame serverGame = undefined
 
@@ -213,23 +201,15 @@ handlePassMove sharedServerGame pool (Just playerNo) =
     moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
-handleChatMessage :: ServerGame -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
-handleChatMessage _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-handleChatMessage serverGame pool (Just user) messageText =
+handleChatMessage :: ServerGame -> Chatroom -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
+handleChatMessage _ _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
+handleChatMessage serverGame chatroom pool (Just user) messageText =
   do
-    -- TODO: deal with race conditions around "current time" being used on socket init if two players chat quickly
-    -- 'lastUpdate' on serverGame???
     now <- getCurrentTime
     gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
     let serverPlayer = getServerPlayerSnapshot gameSnapshot user
-
     let playerName = serverPlayer >>= SP.name
 
     case playerName of
       Nothing -> return $ InvalidCommand "Internal server error"
-      Just playerName -> do
-        let channel = broadcastChannel serverGame
-        let message = PlayerChat $ ChatMessage playerName messageText now
-        P.persistGameUpdate pool (gameId serverGame) (gameState gameSnapshot) message
-        atomically $ writeTChan channel message
-        return ChatSuccess
+      Just playerName -> sendMessage chatroom (CR.SendMessage playerName messageText) >> return ChatSuccess

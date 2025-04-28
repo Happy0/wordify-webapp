@@ -1,24 +1,23 @@
 module Controllers.Common.CacheableSharedResource (makeResourceCache, makeGlobalResourceCache, withCacheableResource, getCacheableResource, ResourceCache) where
 
-import qualified Control.Foldl as Foldl
-import qualified DeferredFolds.UnfoldlM as UnfoldlM
-
 import ClassyPrelude (liftIO)
 import Control.Concurrent
 import Control.Concurrent.STM (TVar, modifyTVar)
 import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
+import qualified Control.Foldl as Foldl
 import Control.Monad
 import Control.Monad.STM
 import Data.Either
 import Data.Int
 import Data.Text
 import Data.Time
+import qualified DeferredFolds.UnfoldlM as UnfoldlM
+import qualified StmContainers.Map as M
 import UnliftIO.Resource
 import Prelude
-import qualified StmContainers.Map as M
 
-data CacheItem a = CacheItem { cacheItem :: a, connections :: TVar Int }
+data CacheItem a = CacheItem {cacheItem :: a, connections :: TVar Int}
 
 data ResourceCache err a = ResourceCache
   { cache :: (M.Map Text (CacheItem a)),
@@ -29,7 +28,7 @@ data ResourceCache err a = ResourceCache
   }
 
 increaseSharersByOne :: CacheItem a -> STM Int
-increaseSharersByOne (CacheItem item connections) = modifyTVar' connections (+1) >> readTVar connections
+increaseSharersByOne (CacheItem item connections) = modifyTVar' connections (+ 1) >> readTVar connections
 
 decreaseSharersByOne :: CacheItem a -> STM Int
 decreaseSharersByOne (CacheItem item connections) = modifyTVar' connections (\item -> item - 1) >> readTVar connections
@@ -37,7 +36,7 @@ decreaseSharersByOne (CacheItem item connections) = modifyTVar' connections (\it
 numberOfSharers :: CacheItem a -> STM Int
 numberOfSharers (CacheItem item connections) = readTVar connections
 
-makeResourceCache :: MonadResource m => (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> m (ReleaseKey, ResourceCache err a)
+makeResourceCache :: (MonadResource m) => (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> m (ReleaseKey, ResourceCache err a)
 makeResourceCache loadResourceOp onRemoval = do
   allocate (allocateResource loadResourceOp onRemoval) deallocateResource
   where
@@ -103,12 +102,13 @@ removeIfNoSharers cache cleanupMap resourceId = do
     Just cached -> do
       sharers <- numberOfSharers cached
 
-      if (sharers == 0) then do
-        removeFromCache cache resourceId
-        removeScheduledCleanup cleanupMap resourceId
-        return (Just (cacheItem cached))
-      else
-        return Nothing
+      if (sharers == 0)
+        then do
+          removeFromCache cache resourceId
+          removeScheduledCleanup cleanupMap resourceId
+          return (Just (cacheItem cached))
+        else
+          return Nothing
 
 loadCacheableResource :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
 loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _ _) resourceId = do
@@ -120,7 +120,7 @@ loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _ _) r
         handlerSharerJoin resourceCache resource resourceId
         pure $ Just resource
 
-  case existingItem of 
+  case existingItem of
     Just item -> pure $ Right item
     Nothing -> do
       resource <- loadResourceOp resourceId
@@ -136,7 +136,7 @@ loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _ _) r
                 let item = CacheItem newResource numConnections
                 M.insert item resourceId cache
                 pure item
-            
+
             handlerSharerJoin resourceCache result resourceId
             pure (Right result)
 
@@ -144,16 +144,15 @@ stmMapToList :: M.Map k v -> STM [(k, v)]
 stmMapToList = UnfoldlM.foldM (Foldl.generalize Foldl.list) . M.unfoldlM
 
 withCacheableResource :: ResourceCache err a -> Text -> (Either err a -> IO ()) -> IO ()
-withCacheableResource cache resourceId op = 
+withCacheableResource cache resourceId op =
   runResourceT $ do
     (_, cachedResource) <- getCacheableResource cache resourceId
     liftIO $ op cachedResource
 
-getCacheableResource :: MonadResource m =>ResourceCache err a -> Text -> m (ReleaseKey, Either err a)
+getCacheableResource :: (MonadResource m) => ResourceCache err a -> Text -> m (ReleaseKey, Either err a)
 getCacheableResource resourceCache resourceId = do
   (releaseKey, cacheEntry) <- allocate (allocateResource resourceCache resourceId) (deAllocateResource resourceCache)
   return (releaseKey, cacheItem <$> cacheEntry)
-
   where
     allocateResource :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
     allocateResource resourceCache resourceId = loadCacheableResource resourceCache resourceId

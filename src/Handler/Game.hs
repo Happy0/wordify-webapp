@@ -4,11 +4,15 @@
 module Handler.Game where
 
 import Control.Concurrent
-import Control.Error (note)
+import Control.Error (lastDef, note)
+import Controllers.Chat.Chatroom (subscribeMessagesLive)
+import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
+import qualified Controllers.Definition.DefinitionService as D
 import Controllers.Game.Api
 import Controllers.Game.Api (initialSocketMessage)
 import Controllers.Game.Game
+import Controllers.Game.GameDefinitionController (GameDefinitionController, getStoredDefinitions)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
@@ -32,6 +36,8 @@ import Import
 import InactivityTracker
 import Model.Api
 import qualified Network.WebSockets.Connection as C
+import Repository.DefinitionRepository (DefinitionRepositoryImpl, GameWordItem (GameWordItem), WordDefinitionItem (WordDefinitionItem), getGameDefinitionsImpl)
+import Util.ConduitChan (chanSource)
 import Wordify.Rules.Board
 import Wordify.Rules.Dictionary
 import qualified Wordify.Rules.Game as G
@@ -41,8 +47,6 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.Core
 import Yesod.WebSockets
-import qualified Controllers.Definition.DefinitionService as D
-import Repository.DefinitionRepository(DefinitionRepositoryImpl, WordDefinitionItem(WordDefinitionItem), GameWordItem(GameWordItem), getGameDefinitionsImpl)
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -70,13 +74,21 @@ getConnectionStatuses serverGame = do
   snapshot <- makeServerGameSnapshot serverGame
   pure $ connectionStatuses (snapshotPlayers snapshot)
 
-chatMessageSinceQueryParamValue :: Handler (Maybe UTCTime)
+chatMessageSinceQueryParamValue :: Handler (Maybe Int)
 chatMessageSinceQueryParamValue = do
-  queryParamValue <- lookupGetParam "chatMessagesSince"
-  let sinceEpochSeconds = note "No chat message since param specific" queryParamValue >>= (fmap fst . rational)
-  case sinceEpochSeconds of
-    Right secondsSinceUnixEpoch -> pure $ Just ((posixSecondsToUTCTime . fromRational) secondsSinceUnixEpoch)
-    _ -> pure Nothing
+  queryParamValue <- lookupGetParam "chatMessagesSinceMessageNumber"
+  let maybeMessageNumber = note "No chat message since param specific" queryParamValue >>= decimal
+  case maybeMessageNumber of
+    Left _ -> pure Nothing
+    Right (messageNumber, _) -> pure (Just messageNumber)
+
+definitionsSinceQueryParamValue :: Handler (Maybe Int)
+definitionsSinceQueryParamValue = do
+  queryParamValue <- lookupGetParam "definitionsSinceMessageNumber"
+  let maybeMessageNumber = note "No chat message since param specific" queryParamValue >>= decimal
+  case maybeMessageNumber of
+    Left _ -> pure Nothing
+    Right (messageNumber, _) -> pure (Just messageNumber)
 
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -144,9 +156,10 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               round.controller.setPlayerToMove(#{toJSON playing});
 
               function connectWebsocket() {
-                var lastChatMessageReceived = round.controller.getLastChatMessageReceivedSecondsSinceEpoch();
+                var lastChatMessageReceived = round.controller.getLastChatMessageReceived();
+                var lastDefinitionReceived = round.controller.getLastDefinitionReceived();
 
-                var url = document.URL + `?chatMessagesSince=${lastChatMessageReceived}`;
+                var url = document.URL + `?chatMessagesSinceMessageNumber=${lastChatMessageReceived}&definitionsSinceMessageNumber=${lastDefinitionReceived}`;
 
                 url = url.replace("http:", "ws:").replace("https:", "wss:");
                 conn = new WebSocket(url);
@@ -180,42 +193,63 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
           <div #scrabbleground>
       |]
 
+subscribeChatGameMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage IO ()
+subscribeChatGameMessages chatroom since = subscribeMessagesLive chatroom since .| CL.map toGameMessage
+  where
+    toGameMessage :: CR.ChatMessage -> GameMessage
+    toGameMessage (CR.ChatMessage displayName chatMessage sentTime messageNumber) =
+      PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime messageNumber)
+
+subscribeGameMessages :: TChan GameMessage -> ConduitT () GameMessage IO ()
+subscribeGameMessages = chanSource
+
+handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> IO ()
+handleBroadcastMessages connection serverGame chatroom chatMessagesSince = do
+  let chatMessagesSubscription = subscribeChatGameMessages chatroom chatMessagesSince .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+  let gameMessagesSubscription = subscribeGameMessages serverGame .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+
+  race_ (runConduit chatMessagesSubscription) (runConduit gameMessagesSubscription)
+
+handleInboundSocketMessages :: App -> C.Connection -> CR.Chatroom -> ServerGame -> Maybe AuthUser -> IO ()
+handleInboundSocketMessages app connection chatroom serverGame maybeUser = forever
+  $ do
+    msg <- C.receiveData connection
+    case eitherDecode msg of
+      Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
+      Right parsedCommand -> do
+        response <- liftIO $ performRequest serverGame chatroom (gameDefinitionController app) (appConnPool app) maybeUser parsedCommand
+        C.sendTextData connection $ toJSONResponse $ response
+
+sendInitialGameState :: C.Connection -> ServerGameSnapshot -> Maybe AuthUser -> IO ()
+sendInitialGameState connection serverGameSnapshot maybeUser = do
+  let initialGameState = initialSocketMessage serverGameSnapshot maybeUser
+  mapM_ (C.sendTextData connection . toJSONResponse) initialGameState
+
+handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> IO ()
+handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince = runResourceT $ do
+  (_, eitherServerGame) <- getCacheableResource (games app) gameId
+  (_, eitherChatRoom) <- getCacheableResource (chatRooms app) gameId
+
+  case (eitherServerGame, eitherChatRoom) of
+    (Left err, _) -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
+    (_, Left err) -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
+    (Right serverGame, Right chatroom) -> do
+      let inactivityTrackerState = inactivityTracker app
+      (channel, gameSnapshot) <- liftIO (atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame)
+      liftIO $ withTrackWebsocketActivity inactivityTrackerState $ do
+        withNotifyJoinAndLeave (appConnPool app) serverGame maybeUser $ do
+          sendInitialGameState connection gameSnapshot maybeUser
+          sendPreviousDefinitions (gameDefinitionController app) gameId definitionsSince connection
+          let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince
+          let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
+          race_ handleOutbound handleInbound
+
 gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
 gameApp app gameId maybeUser = do
   connection <- ask
   chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
-
-  liftIO $
-    withCacheableResource (games app) gameId $ \result ->
-      case result of
-        Left err -> C.sendTextData connection (toJSONResponse (InvalidCommand err))
-        Right serverGame -> do
-          let inactivityTrackerState = inactivityTracker app
-          (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
-          liftIO (handleWebsocketConnection inactivityTrackerState gameSnapshot connection (appConnPool app) (definitionService app) (definitionRepository app) gameId serverGame channel maybeUser chatMessagesSinceParam)
-
-handleWebsocketConnection :: TVar InactivityTracker -> ServerGameSnapshot -> C.Connection -> ConnectionPool -> D.DefinitionServiceImpl -> DefinitionRepositoryImpl -> Text -> ServerGame -> TChan GameMessage -> Maybe AuthUser -> Maybe UTCTime -> IO ()
-handleWebsocketConnection inactivityTracker serverGameSnapshot connection pool definitionService definitionRepository gameId serverGame channel maybeUser chatMessagesSince =
-  withTrackWebsocketActivity inactivityTracker $ do
-    withNotifyJoinAndLeave pool serverGame maybeUser $ do
-      let initialiseGameSocketMessage = initialSocketMessage serverGameSnapshot maybeUser
-      mapM_ (C.sendTextData connection . toJSONResponse) initialiseGameSocketMessage
-      sendPreviousChatMessages pool gameId chatMessagesSince connection
-      sendPreviousDefinitions definitionRepository gameId chatMessagesSince connection
-
-      race_
-        ( forever $
-            (atomically . readTChan) channel >>= C.sendTextData connection . toJSONResponse
-        )
-        ( forever $
-            do
-              msg <- C.receiveData connection
-              case eitherDecode msg of
-                Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
-                Right parsedCommand -> do
-                  response <- liftIO $ performRequest serverGame definitionService definitionRepository pool maybeUser parsedCommand
-                  C.sendTextData connection $ toJSONResponse $ response
-        )
+  definitionsSinceParam <- lift definitionsSinceQueryParamValue
+  liftIO (handleWebsocket app connection gameId maybeUser chatMessagesSinceParam definitionsSinceParam)
 
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]
 gameToMoveSummaries game =
@@ -234,32 +268,19 @@ gameToMoveSummaries game =
     Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
     (G.History originalBag moves) = G.history game
 
-{-
-    Send the chat log history to the client from the given date onwards if supplied (otherwise from the beginning)
--}
-sendPreviousChatMessages :: Pool SqlBackend -> Text -> Maybe UTCTime -> C.Connection -> IO ()
-sendPreviousChatMessages pool gameId Nothing connection = do
-  liftIO $
-    flip runSqlPersistMPool pool $
-      getChatMessages gameId $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
-sendPreviousChatMessages pool gameId (Just since) connection = do
-  liftIO $
-    flip runSqlPersistMPool pool $
-      getChatMessagesSince gameId since $$ CL.map toJSONResponse $= CL.mapM_ (liftIO . C.sendTextData connection)
-
-sendPreviousDefinitions :: DefinitionRepositoryImpl -> Text -> Maybe UTCTime -> C.Connection -> IO ()
-sendPreviousDefinitions definitionRepository gameId since connection = 
-  runConduit $ getGameDefinitionsImpl definitionRepository gameId .| CL.filter (isAfter since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+sendPreviousDefinitions :: GameDefinitionController -> Text -> Maybe Int -> C.Connection -> IO ()
+sendPreviousDefinitions gameDefinitionController gameId since connection =
+  runConduit $ getStoredDefinitions gameDefinitionController gameId .| CL.filter (isAfterDefinitionNumber since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
   where
     mapDefinitions :: GameWordItem -> GameMessage
-    mapDefinitions (GameWordItem word createdAt definitions) =
+    mapDefinitions (GameWordItem word createdAt definitions definitionNumber) =
       let wordDefinitions = map makeDefinition definitions
-      in WordDefinitions word createdAt wordDefinitions
+       in WordDefinitions word createdAt wordDefinitions definitionNumber
 
-    isAfter :: Maybe UTCTime -> GameWordItem -> Bool
-    isAfter Nothing (GameWordItem _ createdAt _) = True
-    isAfter (Just since) (GameWordItem _ createdAt _) = createdAt > since
+    isAfterDefinitionNumber :: Maybe Int -> GameWordItem -> Bool
+    isAfterDefinitionNumber Nothing (GameWordItem _ createdAt _ _) = True
+    isAfterDefinitionNumber (Just defNo) (GameWordItem _ _ _ definitionNumber) = definitionNumber > defNo
 
     makeDefinition :: WordDefinitionItem -> D.Definition
-    makeDefinition (WordDefinitionItem partOfSpeech definition example)  =
+    makeDefinition (WordDefinitionItem partOfSpeech definition example) =
       D.Definition partOfSpeech definition example

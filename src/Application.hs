@@ -33,7 +33,12 @@ import Control.Error.Util
 import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
+import Controllers.Chat.Chat (getChat)
+import Controllers.Chat.Chatroom (Chatroom)
 import Controllers.Common.CacheableSharedResource
+import Controllers.Definition.DefinitionService (DefinitionServiceImpl, toDefinitionServiceImpl)
+import Controllers.Definition.FreeDictionaryService (FreeDictionaryService (FreeDictionaryService))
+import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Persist (getGame, getLobby)
 import Controllers.GameLobby.Model.GameLobby
@@ -79,6 +84,10 @@ import Network.Wai.Middleware.RequestLogger
     outputFormat,
   )
 import OAuthDetails (OAuthDetails, buildOAuthDetails)
+import Repository.ChatRepository
+import Repository.DefinitionRepository (toDefinitionRepositoryImpl)
+import Repository.SQL.SqlChatRepository
+import Repository.SQL.SqlDefinitionRepository (DefinitionRepositorySQLBackend (DefinitionRepositorySQLBackend))
 import System.Environment
 import System.Log.FastLogger
   ( defaultBufSize,
@@ -89,10 +98,6 @@ import System.Random
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 import qualified Prelude as P
-import Controllers.Definition.DefinitionService(DefinitionServiceImpl, toDefinitionServiceImpl)
-import Controllers.Definition.FreeDictionaryService(FreeDictionaryService(FreeDictionaryService))
-import Repository.DefinitionRepository(toDefinitionRepositoryImpl)
-import Repository.SQL.SqlDefinitionRepository(DefinitionRepositorySQLBackend(DefinitionRepositorySQLBackend))
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -119,44 +124,47 @@ makeFoundation appSettings inactivityTracker = do
 
   authDetails <- getAuthDetails
 
-  let definitionService = toDefinitionServiceImpl FreeDictionaryService
-
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies definitionRepository = App {..}
+  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool
   pool <-
-    flip runLoggingT logFunc $
-      createSqlitePool
+    flip runLoggingT logFunc
+      $ createSqlitePool
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
 
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
+  let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
+  chatrooms <- makeGlobalResourceCache (getChat chatRepository) Nothing
+
   games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
   gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing
 
+  let definitionService = toDefinitionServiceImpl FreeDictionaryService
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
+  gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies definitionRepository
+  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =
   do
-    runExceptT $
-      do
+    runExceptT
+      $ do
         clientId <- ExceptT $ note "Missing AUTH_CLIENT_ID environment variable" <$> (lookupEnv "AUTH_CLIENT_ID")
         clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> (lookupEnv "AUTH_CLIENT_SECRET")
         authBaseUri <- ExceptT $ note "Missing AUTH_BASE_URI environment variable" <$> (lookupEnv "AUTH_BASE_URI")
@@ -229,20 +237,20 @@ makeLogWare foundation =
 -- | Warp settings for the given foundation value.
 warpSettings :: App -> Settings
 warpSettings foundation =
-  setPort (appPort $ appSettings foundation) $
-    setHost (appHost $ appSettings foundation) $
-      setOnException
-        ( \_req e ->
-            when (defaultShouldDisplayException e) $
-              messageLoggerSource
-                foundation
-                (appLogger foundation)
-                $(qLocation >>= liftLoc)
-                "yesod"
-                LevelError
-                (toLogStr $ "Exception from Warp: " ++ show e)
-        )
-        defaultSettings
+  setPort (appPort $ appSettings foundation)
+    $ setHost (appHost $ appSettings foundation)
+    $ setOnException
+      ( \_req e ->
+          when (defaultShouldDisplayException e)
+            $ messageLoggerSource
+              foundation
+              (appLogger foundation)
+              $(qLocation >>= liftLoc)
+              "yesod"
+              LevelError
+              (toLogStr $ "Exception from Warp: " ++ show e)
+      )
+      defaultSettings
 
 -- | For yesod devel, return the Warp settings and WAI Application.
 getApplicationDev :: IO (Settings, Application)

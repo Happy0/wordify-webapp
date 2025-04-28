@@ -1,6 +1,6 @@
-module Controllers.Game.Persist (getGame, getChatMessages, getChatMessagesSince, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
+module Controllers.Game.Persist (getGame, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (putStrLn,Either(Right,Left), IO, Maybe (Just, Nothing), Word64, liftIO, mapConcurrently, (.), ($), (==), flip, error, (++), (+), otherwise, show, fst, repeat, snd, maybe, id)
+import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==))
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -26,6 +26,8 @@ import qualified Model as M
 import Repository.GameRepository (GameSummary)
 import System.Random
 import System.Random.Internal
+import System.Random.SplitMix
+import Text.Read (read)
 import Wordify.Rules.Board
 import Wordify.Rules.Game
 import Wordify.Rules.LetterBag
@@ -33,16 +35,6 @@ import Wordify.Rules.Move
 import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
-import System.Random.SplitMix
-import Text.Read (read)
-
-getChatMessagesSince gameId since =
-  selectSource [M.ChatMessageGame ==. gameId, M.ChatMessageCreatedAt >. since] [Asc M.ChatMessageCreatedAt]
-    $= chatMessageFromEntity
-
-getChatMessages gameId =
-  selectSource [M.ChatMessageGame ==. gameId] [Asc M.ChatMessageCreatedAt]
-    $= chatMessageFromEntity
 
 deleteLobby :: App -> T.Text -> IO ()
 deleteLobby app gameId = do
@@ -240,7 +232,7 @@ updatePlayerLastSeen :: Pool SqlBackend -> T.Text -> T.Text -> UTCTime -> IO ()
 updatePlayerLastSeen pool gameId playerId now = return ()
 
 persistGameUpdate :: Pool SqlBackend -> T.Text -> Game -> GameMessage -> IO ()
-persistGameUpdate pool gameId _ (PlayerChat chatMessage) = persistChatMessage pool gameId chatMessage
+persistGameUpdate pool gameId _ (PlayerChat chatMessage) = pure ()
 persistGameUpdate pool gameId gameState (PlayerBoardMove moveNumber placed _ _ _ _) =
   persistBoardMove pool gameId gameState placed
 persistGameUpdate pool gameId gameState (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId gameState
@@ -315,12 +307,6 @@ updateGameSummary pool gameId gameState = do
     gameFinished game = gameStatus game == Finished
     gameBoardTextRepresentation = textRepresentation . board
 
-persistChatMessage :: Pool SqlBackend -> T.Text -> ChatMessage -> IO ()
-persistChatMessage pool gameId (ChatMessage user message now) = do
-  withPool pool $ do
-    insert (M.ChatMessage gameId now user message)
-    return ()
-
 tilesToDbRepresentation :: [Tile] -> T.Text
 tilesToDbRepresentation tiles = T.pack $ L.map tileToDbRepresentation tiles
 
@@ -328,11 +314,6 @@ tileToDbRepresentation :: Tile -> C.Char
 tileToDbRepresentation (Letter lettr val) = lettr
 tileToDbRepresentation (Blank Nothing) = '_'
 tileToDbRepresentation (Blank (Just letter)) = C.toLower letter
-
-chatMessageFromEntity :: Monad m => Conduit (Entity M.ChatMessage) m GameMessage
-chatMessageFromEntity = CL.map fromEntity
-  where
-    fromEntity (Entity _ (M.ChatMessage _ created user message)) = PlayerChat (ChatMessage user message created)
 
 moveFromEntity :: Board -> LetterBag -> M.Move -> Either T.Text Move
 moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
@@ -390,18 +371,18 @@ dbTileRepresentationToTiles letterBag textRepresentation =
       | (C.isLower character) = Right $ Blank (Just $ C.toUpper character)
       | character == '_' = Right $ Blank Nothing
       | otherwise = case Mp.lookup character letterMap of
-         Just tile -> Right tile
-         _ -> Left $ T.pack $ [character] ++ " not found in letterbag"
+          Just tile -> Right tile
+          _ -> Left $ T.pack $ [character] ++ " not found in letterbag"
 
 stdGenToText :: StdGen -> T.Text
-stdGenToText stdGen = 
-  let (a,b) = toSeedStdGen stdGen
-  in T.concat [T.pack (show a), " ", T.pack (show b)]
+stdGenToText stdGen =
+  let (a, b) = toSeedStdGen stdGen
+   in T.concat [T.pack (show a), " ", T.pack (show b)]
 
-stdGenFromText :: T.Text -> StdGen 
-stdGenFromText stdGenText = 
-  let [a,b] = T.split (== ' ') stdGenText
-  in fromSeedStdGen (read (T.unpack a), (read (T.unpack b)))
+stdGenFromText :: T.Text -> StdGen
+stdGenFromText stdGenText =
+  let [a, b] = T.split (== ' ') stdGenText
+   in fromSeedStdGen (read (T.unpack a), (read (T.unpack b)))
 
 toSeedStdGen :: StdGen -> (Word64, Word64)
 toSeedStdGen = unseedSMGen . unStdGen

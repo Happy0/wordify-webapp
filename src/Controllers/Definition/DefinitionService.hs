@@ -1,4 +1,4 @@
-module Controllers.Definition.DefinitionService (DefinitionService (getDefinitions), Definition (Definition), DefinitionServiceImpl (DefinitionServiceImpl), definitions, toDefinitionServiceImpl, withDefinitionsAsync) where
+module Controllers.Definition.DefinitionService (DefinitionService (getDefinitions), Definition (Definition), DefinitionServiceImpl (DefinitionServiceImpl), definitions, toDefinitionServiceImpl, withDefinitionsAsync, getDefinitionsImpl) where
 
 import ClassyPrelude (Either (Left), IO, Int, Maybe, Show, either, id, pure, void, ($), (*), (.), (>>), (>>=))
 import Control.Concurrent (forkIO, threadDelay)
@@ -30,3 +30,6 @@ getDefinitionOrTimeout (DefinitionServiceImpl getDefinitions) word timeoutAfter 
   where
     timeout :: Int -> IO (Either T.Text [Definition])
     timeout timeoutAfter = threadDelay (1000000 * timeoutAfter) >> pure (Left "Timed out while getting definition.")
+
+getDefinitionsImpl :: DefinitionServiceImpl -> T.Text -> IO (Either T.Text [Definition])
+getDefinitionsImpl (DefinitionServiceImpl getDefinitions) word = getDefinitions word

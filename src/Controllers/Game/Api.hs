@@ -23,9 +23,9 @@ module Controllers.Game.Api
 where
 
 import Control.Applicative
+import Controllers.Definition.DefinitionService (Definition (Definition))
 import Controllers.Game.GameMessage (ChatMessage (ChatMessage), GameMessage (..), MoveSummary (..))
 import Controllers.Game.Model.ServerGame (ServerGame, ServerGameSnapshot (gameState, snapshotPlayers), getSnapshotPlayerNumber)
-import Controllers.Definition.DefinitionService(Definition(Definition))
 import Controllers.Game.Model.ServerPlayer
 import Controllers.User.Model.AuthUser (AuthUser)
 import Data.Aeson
@@ -82,7 +82,7 @@ data ServerResponse
 data ConnectionStatus = ConnectionStatus Int Bool (Maybe UTCTime)
 
 instance ToJSON ChatMessage where
-  toJSON (ChatMessage user message when) = object ["player" .= user, "message" .= message, "when" .= when]
+  toJSON (ChatMessage user message when messageNumber) = object ["player" .= user, "message" .= message, "when" .= when, "messageNumber" .= messageNumber]
 
 toWord :: Direction -> Text
 toWord Horizontal = "horizontal"
@@ -111,13 +111,17 @@ instance ToJSON MoveSummary where
       ]
 
 wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
+
 boardSummaryType = ("board" :: Text)
+
 passSummaryType = ("pass" :: Text)
+
 exchangeSummaryType = ("exchange" :: Text)
+
 gameEndSummaryType = ("gameEnd" :: Text)
 
 instance ToJSON Definition where
-  toJSON (Definition partOfSpeech definition example) = object [ "partOfSpeech" .= partOfSpeech, "definition" .= definition, "example" .= example ]
+  toJSON (Definition partOfSpeech definition example) = object ["partOfSpeech" .= partOfSpeech, "definition" .= definition, "example" .= example]
 
 instance ServerMessage GameMessage where
   commandName PlayerBoardMove {} = "playerBoardMove"
@@ -127,7 +131,7 @@ instance ServerMessage GameMessage where
   commandName (PlayerChat {}) = "playerChat"
   commandName (PlayerConnect _ _) = "playerConnect"
   commandName (PlayerDisconnect _ _) = "playerDisconnect"
-  commandName (WordDefinitions _ _ _) = "wordDefinitions"
+  commandName (WordDefinitions _ _ _ _) = "wordDefinitions"
 
 instance ToJSON GameMessage where
   toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
@@ -153,7 +157,7 @@ instance ToJSON GameMessage where
   toJSON (PlayerConnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
   toJSON (PlayerDisconnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
   toJSON (PlayerChat chatMessage) = toJSON chatMessage
-  toJSON (WordDefinitions word when definitions) = object ["word" .= word, "when" .= when, "definitions" .= toJSON definitions]
+  toJSON (WordDefinitions word when definitions definitionNumber) = object ["word" .= word, "when" .= when, "definitions" .= toJSON definitions, "definitionNumber" .= definitionNumber]
 
 instance FromJSON ClientMessage where
   parseJSON (Object request) = do
