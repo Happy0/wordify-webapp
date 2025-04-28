@@ -9,7 +9,7 @@ module Controllers.Chat.Chatroom
   )
 where
 
-import ClassyPrelude (IO, Int, Maybe (Nothing), Monoid (mconcat), Text, UTCTime, forever, liftIO, pure, ($), (.), (<$>), (<*>))
+import ClassyPrelude (IO, Int, Maybe (Nothing), Monoid (mconcat), Text, UTCTime, forever, liftIO, pure, ($), (+), (.), (<$>), (<*>))
 import Control.Concurrent.STM (TChan, atomically, dupTChan, newTChan, readTChan, writeTChan)
 import qualified Data.Conduit as C (ConduitT)
 import Data.Time.Clock (getCurrentTime)
@@ -27,14 +27,15 @@ data Chatroom = Chatroom
     chatBroadcastChannel :: TChan ChatMessage,
     persistChatMessage :: Text -> ChatMessage -> IO (),
     getChatMessages :: Text -> Maybe Int -> C.ConduitT () ChatMessage IO (),
+    countChatMessages :: Text -> IO Int,
     workerThread :: WorkerThread
   }
 
-makeChatroom :: (Text -> ChatMessage -> IO ()) -> (Text -> Maybe Int -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
-makeChatroom persistChatMessage getChatMessagesLive chatroomId = do
+makeChatroom :: (Text -> ChatMessage -> IO ()) -> (Text -> Maybe Int -> C.ConduitT () ChatMessage IO ()) -> (Text -> IO Int) -> Text -> IO Chatroom
+makeChatroom persistChatMessage getChatMessagesLive countChatMessages chatroomId = do
   (writeChannel, broadcastChan) <- atomically $ (,) <$> newTChan <*> newTChan
   workerThread <- atomically newUnstartedWorkerThread
-  let chatroom = Chatroom chatroomId writeChannel broadcastChan persistChatMessage getChatMessagesLive workerThread
+  let chatroom = Chatroom chatroomId writeChannel broadcastChan persistChatMessage getChatMessagesLive countChatMessages workerThread
   pure chatroom
 
 sendMessage :: Chatroom -> SendMessage -> IO ()
@@ -43,18 +44,18 @@ sendMessage chatroom message = do
   atomically (writeTChan (sequenceWriteChannel chatroom) message)
 
 subscribeMessagesLive :: Chatroom -> Maybe Int -> C.ConduitT () ChatMessage IO ()
-subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _) sinceMessageNumber = do
+subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) sinceMessageNumber = do
   broadcastChannel <- liftIO $ (atomically . dupTChan) subChannel
   let existingChatMessages = getChatMessages chatroomId sinceMessageNumber
   let liveMessagesConduit = chanSource broadcastChannel
   mconcat [existingChatMessages, liveMessagesConduit]
 
 workerLoop :: Chatroom -> IO loop
-workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ _) = forever $ do
+workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ countChatMessages _) = forever $ do
   msg <- atomically (readTChan sequenceWriteChannel)
   now <- getCurrentTime
-  -- TODO: database migration that stores these message numbers
-  let chatMessage = ChatMessage (userDisplayName msg) (message msg) now 0
+  messageNumber <- (+ 1) <$> countChatMessages roomId
+  let chatMessage = ChatMessage (userDisplayName msg) (message msg) now messageNumber
   -- TODO: stop this loop from exiting due to IO errors
   persistChatMessage roomId chatMessage
   atomically (writeTChan broadcastChan chatMessage)

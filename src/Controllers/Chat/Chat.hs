@@ -5,11 +5,11 @@ import Controllers.Chat.Chatroom (ChatMessage (ChatMessage), Chatroom, makeChatr
 import qualified Data.Conduit as C (ConduitT, (.|))
 import qualified Data.Conduit.List as CL (map)
 import qualified Data.Text as T
-import Repository.ChatRepository (ChatMessageEntity (ChatMessageEntity), ChatRepositoryImpl, getChatMessagesImpl, saveChatMessageImpl)
+import Repository.ChatRepository (ChatMessageEntity (ChatMessageEntity), ChatRepositoryImpl, countChatMessagesImpl, getChatMessagesImpl, saveChatMessageImpl)
 
 getChat :: ChatRepositoryImpl -> T.Text -> IO (Either Text Chatroom)
 getChat _ "" = pure (Left "Chatroom ID cannot be empty")
-getChat chatRepository chatroomId = Right <$> makeChatroom (saveChatMessage chatRepository) (getChatMessages chatRepository) chatroomId
+getChat chatRepository chatroomId = Right <$> makeChatroom (saveChatMessage chatRepository) (getChatMessages chatRepository) (countChatMessagesImpl chatRepository) chatroomId
 
 saveChatMessage :: ChatRepositoryImpl -> Text -> ChatMessage -> IO ()
 saveChatMessage chatRepository chatroomId msg = saveChatMessageImpl chatRepository (toChatMessageEntity chatroomId msg)

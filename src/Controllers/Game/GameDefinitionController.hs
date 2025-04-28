@@ -4,6 +4,7 @@ import ClassyPrelude (Either (Left, Right), IO, Int, UTCTime, getCurrentTime, ma
 import Conduit (ConduitT)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (TQueue, atomically, newTQueue, readTQueue)
+import Control.Monad (forever)
 import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, getDefinitionsImpl)
 import Data.Text (Text)
 import Repository.DefinitionRepository (DefinitionRepository (getDefinitions), DefinitionRepositoryImpl, GameWordItem, WordDefinitionItem (WordDefinitionItem), countGameWordDefinitionsImpl, getGameDefinitionsImpl, saveGameDefinitionsImpl)
@@ -28,16 +29,17 @@ makeGameDefinitionController definitionService definitionRepository = do
   pure gameDefinitionWorker
 
 definitionWorkerLoop :: GameDefinitionController -> IO ()
-definitionWorkerLoop (GameDefinitionController definitionService definitionRepository queue _) = do
+definitionWorkerLoop (GameDefinitionController definitionService definitionRepository queue _) = forever $ do
   now <- getCurrentTime
   GameDefinitionWorkItem gameId word defs withStoredResult <- atomically $ readTQueue queue
 
   -- TODO: handle error on save killing thread
   case defs of
     Left err -> do
+      -- todo: deal with code duplication by using 'either' function to default to empty list
       saveGameDefinitionsImpl definitionRepository now gameId word []
-      let definitionNumber = 0
-      withStoredResult (DefinitionResponse word now [] definitionNumber)
+      definitionNum <- (+ 1) <$> countGameWordDefinitionsImpl definitionRepository gameId
+      withStoredResult (DefinitionResponse word now [] definitionNum)
     Right definitions -> do
       saveGameDefinitionsImpl definitionRepository now gameId word (map wordDefinitionItem definitions)
       definitionNum <- (+ 1) <$> countGameWordDefinitionsImpl definitionRepository gameId
