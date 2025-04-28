@@ -107,9 +107,9 @@ handleAskDefinition :: GameDefinitionController -> ServerGame -> Maybe Int -> Te
 handleAskDefinition definitionWorker serverGame Nothing word =
   return $ InvalidCommand "Observers cannot request definitions."
 handleAskDefinition definitionWorker serverGame (Just _) word = do
-  storeGameDefinitions definitionWorker (gameId serverGame) word $ \(DefinitionResponse word time definitions) -> atomically $ do
+  storeGameDefinitions definitionWorker (gameId serverGame) word $ \(DefinitionResponse word time definitions defNumber) -> atomically $ do
     let channel = broadcastChannel serverGame
-    writeTChan channel (WordDefinitions word time definitions)
+    writeTChan channel (WordDefinitions word time definitions defNumber)
   pure AskDefinitionSuccess
   where
     wordPlayedInGame :: ServerGame -> Bool

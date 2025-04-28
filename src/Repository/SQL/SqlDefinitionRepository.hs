@@ -1,7 +1,8 @@
 module Repository.SQL.SqlDefinitionRepository (DefinitionRepositorySQLBackend (DefinitionRepositorySQLBackend), getDefinitionsImpl) where
 
 import ClassyPrelude (IO, Int, Maybe (Just, Nothing), Ord, Ordering, UTCTime, compare, flip, fromMaybe, fst, liftIO, map, mapM, pure, return, sortBy, uncurry, undefined, zipWith, ($), (++), (.), (<$>))
-import Conduit (ConduitT)
+import Conduit (ConduitT, lengthC, runConduit, yield, (.|))
+import Controllers.Game.Model.ServerGame (ServerGame (gameId))
 import Data.Conduit.List (sourceList)
 import qualified Data.Map.Strict as Map
 import Data.Pool
@@ -9,7 +10,7 @@ import qualified Data.Text as T
 import qualified Database.Esqueleto as E
 import Database.Persist.Sql
 import qualified Model as M
-import Repository.DefinitionRepository (DefinitionRepository (getDefinitions, getGameDefinitions, saveGameDefinitions), GameWordItem (GameWordItem), WordDefinitionItem (WordDefinitionItem))
+import Repository.DefinitionRepository (DefinitionRepository (countGameDefinitions, getDefinitions, getGameDefinitions, saveGameDefinitions), GameWordItem (GameWordItem), WordDefinitionItem (WordDefinitionItem))
 
 data DefinitionRepositorySQLBackend = DefinitionRepositorySQLBackend (Pool SqlBackend)
 
@@ -17,9 +18,14 @@ instance DefinitionRepository DefinitionRepositorySQLBackend where
   getDefinitions (DefinitionRepositorySQLBackend pool) word = getDefinitionsImpl pool word
   saveGameDefinitions (DefinitionRepositorySQLBackend pool) when gameId word definitions = saveGameDefinitionsImpl pool when gameId word definitions
   getGameDefinitions (DefinitionRepositorySQLBackend pool) gameId = getGameDefinitionsImpl pool gameId
+  countGameDefinitions (DefinitionRepositorySQLBackend pool) gameId = countGameDefinitionsImpl pool gameId
 
 getDefinitionsImpl :: Pool SqlBackend -> T.Text -> IO [WordDefinitionItem]
 getDefinitionsImpl pool = undefined
+
+-- TODO: do this in SQl ;x
+countGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> IO Int
+countGameDefinitionsImpl pool gameId = runConduit $ getGameDefinitionsImpl pool gameId .| lengthC
 
 getGameDefinitionsImpl :: Pool SqlBackend -> T.Text -> ConduitT () GameWordItem IO ()
 getGameDefinitionsImpl pool gameId = do
@@ -39,13 +45,13 @@ makeGameWordDefinitions definitions =
        in makeGameWorkItems groupedByWordAndTimestamp
   where
     makeGameWorkItems :: Map.Map (T.Text, UTCTime) [(M.GameDefinition, Maybe M.Definition)] -> [GameWordItem]
-    makeGameWorkItems grouped = map (uncurry makeGameWordItem) (Map.toList grouped)
+    makeGameWorkItems grouped = zipWith (uncurry makeGameWordItem) (Map.toList grouped) [1 ..]
 
-    makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, Maybe M.Definition)] -> GameWordItem
-    makeGameWordItem (word, createdAt) defs =
+    makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, Maybe M.Definition)] -> Int -> GameWordItem
+    makeGameWordItem (word, createdAt) defs defNo =
       let wordsWithDefinitions = fromMaybe [] (mapM definitionOrEmpty defs)
        in let wordDefinitions = map makeDefinition (sortDefinitions wordsWithDefinitions)
-           in GameWordItem word createdAt wordDefinitions
+           in GameWordItem word createdAt wordDefinitions defNo
       where
         definitionOrEmpty :: (M.GameDefinition, Maybe M.Definition) -> Maybe (M.GameDefinition, M.Definition)
         definitionOrEmpty (gameDef, Just def) = Just (gameDef, def)

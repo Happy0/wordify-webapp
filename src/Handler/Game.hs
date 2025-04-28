@@ -82,6 +82,14 @@ chatMessageSinceQueryParamValue = do
     Left _ -> pure Nothing
     Right (messageNumber, _) -> pure (Just messageNumber)
 
+definitionsSinceQueryParamValue :: Handler (Maybe Int)
+definitionsSinceQueryParamValue = do
+  queryParamValue <- lookupGetParam "definitionsSinceMessageNumber"
+  let maybeMessageNumber = note "No chat message since param specific" queryParamValue >>= decimal
+  case maybeMessageNumber of
+    Left _ -> pure Nothing
+    Right (messageNumber, _) -> pure (Just messageNumber)
+
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
 renderGamePage app gameId maybeUser (Right serverGame) = do
@@ -216,8 +224,8 @@ sendInitialGameState connection serverGameSnapshot maybeUser = do
   let initialGameState = initialSocketMessage serverGameSnapshot maybeUser
   mapM_ (C.sendTextData connection . toJSONResponse) initialGameState
 
-handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> IO ()
-handleWebsocket app connection gameId maybeUser chatMessagesSince = runResourceT $ do
+handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> IO ()
+handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince = runResourceT $ do
   (_, eitherServerGame) <- getCacheableResource (games app) gameId
   (_, eitherChatRoom) <- getCacheableResource (chatRooms app) gameId
 
@@ -230,7 +238,7 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince = runResourceT
       liftIO $ withTrackWebsocketActivity inactivityTrackerState $ do
         withNotifyJoinAndLeave (appConnPool app) serverGame maybeUser $ do
           sendInitialGameState connection gameSnapshot maybeUser
-          sendPreviousDefinitions (gameDefinitionController app) gameId Nothing connection
+          sendPreviousDefinitions (gameDefinitionController app) gameId definitionsSince connection
           let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince
           let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
           race_ handleOutbound handleInbound
@@ -239,7 +247,8 @@ gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
 gameApp app gameId maybeUser = do
   connection <- ask
   chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
-  liftIO (handleWebsocket app connection gameId maybeUser chatMessagesSinceParam)
+  definitionsSinceParam <- lift definitionsSinceQueryParamValue
+  liftIO (handleWebsocket app connection gameId maybeUser chatMessagesSinceParam definitionsSinceParam)
 
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]
 gameToMoveSummaries game =
@@ -258,18 +267,18 @@ gameToMoveSummaries game =
     Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
     (G.History originalBag moves) = G.history game
 
-sendPreviousDefinitions :: GameDefinitionController -> Text -> Maybe UTCTime -> C.Connection -> IO ()
+sendPreviousDefinitions :: GameDefinitionController -> Text -> Maybe Int -> C.Connection -> IO ()
 sendPreviousDefinitions gameDefinitionController gameId since connection =
-  runConduit $ getStoredDefinitions gameDefinitionController gameId .| CL.filter (isAfter since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+  runConduit $ getStoredDefinitions gameDefinitionController gameId .| CL.filter (isAfterDefinitionNumber since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
   where
     mapDefinitions :: GameWordItem -> GameMessage
-    mapDefinitions (GameWordItem word createdAt definitions) =
+    mapDefinitions (GameWordItem word createdAt definitions definitionNumber) =
       let wordDefinitions = map makeDefinition definitions
-       in WordDefinitions word createdAt wordDefinitions
+       in WordDefinitions word createdAt wordDefinitions definitionNumber
 
-    isAfter :: Maybe UTCTime -> GameWordItem -> Bool
-    isAfter Nothing (GameWordItem _ createdAt _) = True
-    isAfter (Just since) (GameWordItem _ createdAt _) = createdAt > since
+    isAfterDefinitionNumber :: Maybe Int -> GameWordItem -> Bool
+    isAfterDefinitionNumber Nothing (GameWordItem _ createdAt _ _) = True
+    isAfterDefinitionNumber (Just defNo) (GameWordItem _ _ _ definitionNumber) = definitionNumber > defNo
 
     makeDefinition :: WordDefinitionItem -> D.Definition
     makeDefinition (WordDefinitionItem partOfSpeech definition example) =

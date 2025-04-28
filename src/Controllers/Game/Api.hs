@@ -131,7 +131,7 @@ instance ServerMessage GameMessage where
   commandName (PlayerChat {}) = "playerChat"
   commandName (PlayerConnect _ _) = "playerConnect"
   commandName (PlayerDisconnect _ _) = "playerDisconnect"
-  commandName (WordDefinitions _ _ _) = "wordDefinitions"
+  commandName (WordDefinitions _ _ _ _) = "wordDefinitions"
 
 instance ToJSON GameMessage where
   toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
@@ -157,7 +157,7 @@ instance ToJSON GameMessage where
   toJSON (PlayerConnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
   toJSON (PlayerDisconnect playerNumber time) = object ["playerNumber" .= playerNumber, "when" .= time]
   toJSON (PlayerChat chatMessage) = toJSON chatMessage
-  toJSON (WordDefinitions word when definitions) = object ["word" .= word, "when" .= when, "definitions" .= toJSON definitions]
+  toJSON (WordDefinitions word when definitions definitionNumber) = object ["word" .= word, "when" .= when, "definitions" .= toJSON definitions, "definitionNumber" .= definitionNumber]
 
 instance FromJSON ClientMessage where
   parseJSON (Object request) = do

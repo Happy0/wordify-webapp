@@ -1,15 +1,15 @@
 module Controllers.Game.GameDefinitionController (GameDefinitionController, DefinitionResponse (DefinitionResponse), makeGameDefinitionController, storeGameDefinitions, killWorkerThread, getStoredDefinitions) where
 
-import ClassyPrelude (Either (Left, Right), IO, UTCTime, getCurrentTime, map, pure, undefined, void, writeTQueue, ($))
+import ClassyPrelude (Either (Left, Right), IO, Int, UTCTime, getCurrentTime, map, pure, undefined, void, writeTQueue, ($), (+), (<$>))
 import Conduit (ConduitT)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (TQueue, atomically, newTQueue, readTQueue)
 import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, getDefinitionsImpl)
 import Data.Text (Text)
-import Repository.DefinitionRepository (DefinitionRepositoryImpl, GameWordItem, WordDefinitionItem (WordDefinitionItem), getGameDefinitionsImpl, saveGameDefinitionsImpl)
+import Repository.DefinitionRepository (DefinitionRepository (getDefinitions), DefinitionRepositoryImpl, GameWordItem, WordDefinitionItem (WordDefinitionItem), countGameWordDefinitionsImpl, getGameDefinitionsImpl, saveGameDefinitionsImpl)
 import Util.WorkerThread (WorkerThread, newUnstartedWorkerThread, startIfNotStarted, stopIfNotStopped)
 
-data DefinitionResponse = DefinitionResponse Text UTCTime [Definition]
+data DefinitionResponse = DefinitionResponse Text UTCTime [Definition] Int
 
 data GameDefinitionWorkItem = GameDefinitionWorkItem {gameId :: Text, word :: Text, definitions :: Either Text [Definition], withStoredResult :: DefinitionResponse -> IO ()}
 
@@ -36,10 +36,12 @@ definitionWorkerLoop (GameDefinitionController definitionService definitionRepos
   case defs of
     Left err -> do
       saveGameDefinitionsImpl definitionRepository now gameId word []
-      withStoredResult (DefinitionResponse word now [])
+      let definitionNumber = 0
+      withStoredResult (DefinitionResponse word now [] definitionNumber)
     Right definitions -> do
       saveGameDefinitionsImpl definitionRepository now gameId word (map wordDefinitionItem definitions)
-      withStoredResult (DefinitionResponse word now definitions)
+      definitionNum <- (+ 1) <$> countGameWordDefinitionsImpl definitionRepository gameId
+      withStoredResult (DefinitionResponse word now definitions definitionNum)
   where
     wordDefinitionItem :: Definition -> WordDefinitionItem
     wordDefinitionItem (Definition partOfSpeech definition example) = WordDefinitionItem partOfSpeech definition example
