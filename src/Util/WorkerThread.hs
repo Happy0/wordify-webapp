@@ -1,6 +1,6 @@
 module Util.WorkerThread (WorkerThread, newUnstartedWorkerThread, startIfNotStarted, stopIfNotStopped) where
 
-import ClassyPrelude (Bool (False, True), IO, TVar, atomically, pure, readTVar, readTVarIO, when, writeTVar, ($))
+import ClassyPrelude (Bool (False, True), IO, TVar, atomically, newTVar, pure, readTVar, readTVarIO, when, writeTVar, ($))
 import Control.Concurrent (ThreadId, forkIO, killThread)
 import Control.Concurrent.STM (STM, newTVarIO)
 import Data.Foldable (for_)
@@ -8,10 +8,10 @@ import Data.Maybe (Maybe (Just, Nothing))
 
 data WorkerThread = WorkerThread {started :: TVar Bool, threadId :: TVar (Maybe ThreadId)}
 
-newUnstartedWorkerThread :: IO WorkerThread
+newUnstartedWorkerThread :: STM WorkerThread
 newUnstartedWorkerThread = do
-  started <- newTVarIO False
-  threadId <- newTVarIO Nothing
+  started <- newTVar False
+  threadId <- newTVar Nothing
   pure (WorkerThread started threadId)
 
 startIfNotStarted :: WorkerThread -> IO () -> IO ()

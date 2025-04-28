@@ -33,7 +33,7 @@ data Chatroom = Chatroom
 makeChatroom :: (Text -> ChatMessage -> IO ()) -> (Text -> Maybe Int -> C.ConduitT () ChatMessage IO ()) -> Text -> IO Chatroom
 makeChatroom persistChatMessage getChatMessagesLive chatroomId = do
   (writeChannel, broadcastChan) <- atomically $ (,) <$> newTChan <*> newTChan
-  workerThread <- newUnstartedWorkerThread
+  workerThread <- atomically newUnstartedWorkerThread
   let chatroom = Chatroom chatroomId writeChannel broadcastChan persistChatMessage getChatMessagesLive workerThread
   pure chatroom
 
