@@ -12,6 +12,7 @@ import qualified Controllers.Definition.DefinitionService as D
 import Controllers.Game.Api
 import Controllers.Game.Api (initialSocketMessage)
 import Controllers.Game.Game
+import Controllers.Game.GameDefinitionController (GameDefinitionController, getStoredDefinitions)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
@@ -207,7 +208,7 @@ handleInboundSocketMessages app connection chatroom serverGame maybeUser = forev
     case eitherDecode msg of
       Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
       Right parsedCommand -> do
-        response <- liftIO $ performRequest serverGame chatroom (definitionService app) (definitionRepository app) (appConnPool app) maybeUser parsedCommand
+        response <- liftIO $ performRequest serverGame chatroom (gameDefinitionController app) (appConnPool app) maybeUser parsedCommand
         C.sendTextData connection $ toJSONResponse $ response
 
 sendInitialGameState :: C.Connection -> ServerGameSnapshot -> Maybe AuthUser -> IO ()
@@ -229,6 +230,7 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince = runResourceT
       liftIO $ withTrackWebsocketActivity inactivityTrackerState $ do
         withNotifyJoinAndLeave (appConnPool app) serverGame maybeUser $ do
           sendInitialGameState connection gameSnapshot maybeUser
+          sendPreviousDefinitions (gameDefinitionController app) gameId Nothing connection
           let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince
           let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
           race_ handleOutbound handleInbound
@@ -256,9 +258,9 @@ gameToMoveSummaries game =
     Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
     (G.History originalBag moves) = G.history game
 
-sendPreviousDefinitions :: DefinitionRepositoryImpl -> Text -> Maybe UTCTime -> C.Connection -> IO ()
-sendPreviousDefinitions definitionRepository gameId since connection =
-  runConduit $ getGameDefinitionsImpl definitionRepository gameId .| CL.filter (isAfter since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+sendPreviousDefinitions :: GameDefinitionController -> Text -> Maybe UTCTime -> C.Connection -> IO ()
+sendPreviousDefinitions gameDefinitionController gameId since connection =
+  runConduit $ getStoredDefinitions gameDefinitionController gameId .| CL.filter (isAfter since) .| CL.map mapDefinitions .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
   where
     mapDefinitions :: GameWordItem -> GameMessage
     mapDefinitions (GameWordItem word createdAt definitions) =

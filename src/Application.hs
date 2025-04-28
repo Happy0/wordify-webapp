@@ -38,6 +38,7 @@ import Controllers.Chat.Chatroom (Chatroom)
 import Controllers.Common.CacheableSharedResource
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl, toDefinitionServiceImpl)
 import Controllers.Definition.FreeDictionaryService (FreeDictionaryService (FreeDictionaryService))
+import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Persist (getGame, getLobby)
 import Controllers.GameLobby.Model.GameLobby
@@ -123,12 +124,10 @@ makeFoundation appSettings inactivityTracker = do
 
   authDetails <- getAuthDetails
 
-  let definitionService = toDefinitionServiceImpl FreeDictionaryService
-
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies definitionRepository chatRooms = App {..}
+  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
@@ -154,10 +153,12 @@ makeFoundation appSettings inactivityTracker = do
   games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
   gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing
 
+  let definitionService = toDefinitionServiceImpl FreeDictionaryService
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
+  gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies definitionRepository chatrooms
+  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =

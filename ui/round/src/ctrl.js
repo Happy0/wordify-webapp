@@ -255,6 +255,9 @@ module.exports = function(opts) {
         var messages = data.chatMessages;
         messages.push({sender: sender, message: message, when: when, messageNumber: messageNumber});
         data.lastChatMessageReceived = messageNumber;
+
+        // TODO: don't just sort the full list on every invocation, god... (just insert into the right place)
+        sortMessages();
         m.endComputation();
     }
 

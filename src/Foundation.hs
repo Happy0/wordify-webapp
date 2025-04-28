@@ -17,6 +17,7 @@ import Control.Monad.Logger (LogSource)
 import Controllers.Chat.Chatroom
 import Controllers.Common.CacheableSharedResource
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl)
+import Controllers.Game.GameDefinitionController (GameDefinitionController)
 import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser)
@@ -76,8 +77,7 @@ data App = App
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
     inactivityTracker :: TVar InactivityTracker,
-    definitionService :: DefinitionServiceImpl,
-    definitionRepository :: DefinitionRepositoryImpl
+    gameDefinitionController :: GameDefinitionController
   }
 
 data MenuItem = MenuItem
