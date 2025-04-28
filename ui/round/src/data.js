@@ -14,8 +14,11 @@ module.exports = function(opts) {
         playerNumber : null, // our player number
         exchangeMode : false, // Player is selecting tiles to exchange,
 
-        // 2025-03-28T23:21:21.877940745Z | null if none received yet
+        // The message number of the last change message received (e.g. 12)
         lastChatMessageReceived: null,
+
+        // The message number of the last definition message received (e.g. 12)
+        lastDefinitionReceived: null,
 
         // [{sender: sender, message: message} || {word: "word", definition: {"definition": "..", "partOfSpeech": "...", "example": "..." | undefined}}
         chatMessages : [],

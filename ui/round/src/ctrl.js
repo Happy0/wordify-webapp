@@ -394,6 +394,10 @@ module.exports = function(opts) {
         return data.lastChatMessageReceived;
     }
 
+    var getLastDefinitionReceived = function() {
+        return data.lastDefinitionReceived
+    }
+
     var sortMessages = function() {
         data.chatMessages.sort(function(a, b) {
             if (a.when < b.when) {
@@ -420,7 +424,7 @@ module.exports = function(opts) {
 
         sortMessages();
 
-        data.lastChatMessageReceived = definitions.when;
+        data.lastDefinitionReceived = definitions.definitionNumber;
         
         m.endComputation();
     }
@@ -468,6 +472,7 @@ module.exports = function(opts) {
         addDefinitions: addDefinitions,
         requestDefinition: requestDefinition,
         getLastChatMessageReceived: getLastChatMessageReceived,
+        getLastDefinitionReceived: getLastDefinitionReceived,
         scrabbleGroundCtrl: scrabbleGroundCtrl,
         socket: socket
     };

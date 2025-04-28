@@ -4,7 +4,7 @@
 module Handler.Game where
 
 import Control.Concurrent
-import Control.Error (note)
+import Control.Error (lastDef, note)
 import Controllers.Chat.Chatroom (subscribeMessagesLive)
 import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
@@ -157,8 +157,9 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
               function connectWebsocket() {
                 var lastChatMessageReceived = round.controller.getLastChatMessageReceived();
+                var lastDefinitionReceived = round.controller.getLastDefinitionReceived();
 
-                var url = document.URL + `?chatMessagesSinceMessageNumber=${lastChatMessageReceived}`;
+                var url = document.URL + `?chatMessagesSinceMessageNumber=${lastChatMessageReceived}&definitionsSinceMessageNumber=${lastDefinitionReceived}`;
 
                 url = url.replace("http:", "ws:").replace("https:", "wss:");
                 conn = new WebSocket(url);
