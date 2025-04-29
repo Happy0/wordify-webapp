@@ -1,6 +1,6 @@
 module Repository.SQL.SqlDefinitionRepository (DefinitionRepositorySQLBackend (DefinitionRepositorySQLBackend), getDefinitionsImpl) where
 
-import ClassyPrelude (IO, Int, Maybe (Just, Nothing), Ord, Ordering, UTCTime, compare, flip, fromMaybe, fst, liftIO, map, mapM, pure, return, sortBy, uncurry, undefined, zipWith, ($), (++), (.), (<$>))
+import ClassyPrelude (IO, Int, Maybe (Just, Nothing), Ord, Ordering, UTCTime (UTCTime), compare, flip, fromMaybe, fst, liftIO, map, mapM, pure, return, snd, sortBy, uncurry, undefined, zipWith, ($), (++), (.), (<$>))
 import Conduit (ConduitT, lengthC, runConduit, yield, (.|))
 import Controllers.Game.Model.ServerGame (ServerGame (gameId))
 import Data.Conduit.List (sourceList)
@@ -45,12 +45,15 @@ makeGameWordDefinitions definitions =
    in let groupedByWordAndTimestamp = groupByKey (extractWordAndTimeStamp . fst) entities
        in makeGameWorkItems groupedByWordAndTimestamp
   where
-    -- TODO: store request number and sort by that instead - needs DB migration
+    -- TODO: store request number and sort by that instead in sql query - needs DB migration
     makeGameWorkItems :: Map.Map (T.Text, UTCTime) [(M.GameDefinition, Maybe M.Definition)] -> [GameWordItem]
-    makeGameWorkItems grouped = sortBy largerCreatedAtTimestamp $ zipWith (uncurry makeGameWordItem) (Map.toList grouped) [1 ..]
+    makeGameWorkItems grouped = zipWith (uncurry makeGameWordItem) (sortGroupsByTimestamp (Map.toList grouped)) [1 ..]
 
-    largerCreatedAtTimestamp :: GameWordItem -> GameWordItem -> Ordering
-    largerCreatedAtTimestamp (GameWordItem _ createdAt1 _ _) (GameWordItem _ createdAt2 _ _) = compare createdAt1 createdAt2
+    sortGroupsByTimestamp :: [((T.Text, UTCTime), a)] -> [((T.Text, UTCTime), a)]
+    sortGroupsByTimestamp = sortBy (\a b -> largerCreatedAtTimestamp (snd (fst a)) (snd (fst b)))
+
+    largerCreatedAtTimestamp :: UTCTime -> UTCTime -> Ordering
+    largerCreatedAtTimestamp createdAt1 createdAt2 = compare createdAt1 createdAt2
 
     makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, Maybe M.Definition)] -> Int -> GameWordItem
     makeGameWordItem (word, createdAt) defs defNo =
