@@ -34,6 +34,7 @@ getGameDefinitionsImpl pool gameId = do
       E.from $ \(gameDef `E.LeftOuterJoin` def) -> do
         E.on (gameDef E.^. M.GameDefinitionDefinitionId E.==. def E.?. M.DefinitionId)
         E.where_ (gameDef E.^. M.GameDefinitionGameId E.==. E.val (M.GameKey gameId))
+        E.orderBy [E.asc (gameDef E.^. M.GameDefinitionCreatedAt)]
         return (gameDef, def)
   -- TODO: stream from database using appropriate query rather than loading all into memory and grouping
   sourceList (makeGameWordDefinitions defs)
@@ -44,8 +45,12 @@ makeGameWordDefinitions definitions =
    in let groupedByWordAndTimestamp = groupByKey (extractWordAndTimeStamp . fst) entities
        in makeGameWorkItems groupedByWordAndTimestamp
   where
+    -- TODO: store request number and sort by that instead - needs DB migration
     makeGameWorkItems :: Map.Map (T.Text, UTCTime) [(M.GameDefinition, Maybe M.Definition)] -> [GameWordItem]
-    makeGameWorkItems grouped = zipWith (uncurry makeGameWordItem) (Map.toList grouped) [1 ..]
+    makeGameWorkItems grouped = sortBy largerCreatedAtTimestamp $ zipWith (uncurry makeGameWordItem) (Map.toList grouped) [1 ..]
+
+    largerCreatedAtTimestamp :: GameWordItem -> GameWordItem -> Ordering
+    largerCreatedAtTimestamp (GameWordItem _ createdAt1 _ _) (GameWordItem _ createdAt2 _ _) = compare createdAt1 createdAt2
 
     makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, Maybe M.Definition)] -> Int -> GameWordItem
     makeGameWordItem (word, createdAt) defs defNo =
