@@ -21,6 +21,7 @@ import Controllers.User.Persist
 import Data.Aeson
 import Data.Conduit
 import qualified Data.Conduit.List as CL
+import Data.Either (fromRight)
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
@@ -100,7 +101,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let rack = P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
   let players = G.players gameSoFar
   let playing = G.playerNumber gameSoFar
-  let numTilesRemaining = (bagSize (G.bag gameSoFar))
+  let numTilesRemaining = bagSize (G.bag gameSoFar)
   let gameMoveSummaries = gameToMoveSummaries gameSoFar
 
   connectionStatuses <- atomically $ getConnectionStatuses serverGame
@@ -109,14 +110,14 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
     Left err -> invalidArgs [err]
     Right _ -> liftIO (return ())
 
-  let summaries = either (\_ -> []) id gameMoveSummaries
+  let summaries = fromRight [] gameMoveSummaries
 
   defaultLayout $ do
-    addStylesheet $ (StaticR css_scrabble_css)
-    addStylesheet $ (StaticR css_round_css)
-    addStylesheet $ (StaticR css_bootstrap_css)
-    addScript $ (StaticR js_round_js)
-    addScript $ (StaticR js_touchpunch_js)
+    addStylesheet $ StaticR css_scrabble_css
+    addStylesheet $ StaticR css_round_css
+    addStylesheet $ StaticR css_bootstrap_css
+    addScript $ StaticR js_round_js
+    addScript $ StaticR js_touchpunch_js
     toWidget
       [julius|
               jQuery.noConflict();
@@ -218,7 +219,7 @@ handleInboundSocketMessages app connection chatroom serverGame maybeUser = forev
       Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
       Right parsedCommand -> do
         response <- liftIO $ performRequest serverGame chatroom (gameDefinitionController app) (appConnPool app) maybeUser parsedCommand
-        C.sendTextData connection $ toJSONResponse $ response
+        C.sendTextData connection $ toJSONResponse response
 
 sendInitialGameState :: C.Connection -> ServerGameSnapshot -> Maybe AuthUser -> IO ()
 sendInitialGameState connection serverGameSnapshot maybeUser = do
@@ -233,10 +234,10 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSin
   case (eitherServerGame, eitherChatRoom) of
     (Left err, _) -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
     (_, Left err) -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
-    (Right serverGame, Right chatroom) -> do
+    (Right serverGame, Right chatroom) -> liftIO $ do
       let inactivityTrackerState = inactivityTracker app
-      (channel, gameSnapshot) <- liftIO (atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame)
-      liftIO $ withTrackWebsocketActivity inactivityTrackerState $ do
+      (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
+      withTrackWebsocketActivity inactivityTrackerState $ do
         withNotifyJoinAndLeave (appConnPool app) serverGame maybeUser $ do
           sendInitialGameState connection gameSnapshot maybeUser
           sendPreviousDefinitions (gameDefinitionController app) gameId definitionsSince connection
@@ -256,7 +257,7 @@ gameToMoveSummaries game =
   if not (null moves)
     then do
       let gameTransitions = restoreGameLazy emptyGame $ NE.fromList (toList moves)
-      let reconstructedGameSummaries = sequence . map (fmap transitionToSummary) $ NE.toList gameTransitions
+      let reconstructedGameSummaries = mapM (fmap transitionToSummary) $ NE.toList gameTransitions
       case reconstructedGameSummaries of
         Left err -> Left (pack (show err))
         Right summaries -> Right summaries
