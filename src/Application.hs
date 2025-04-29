@@ -34,7 +34,7 @@ import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
 import Controllers.Chat.Chat (getChat)
-import Controllers.Chat.Chatroom (Chatroom)
+import Controllers.Chat.Chatroom (Chatroom, freezeChatroom)
 import Controllers.Common.CacheableSharedResource
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl, toDefinitionServiceImpl)
 import Controllers.Definition.FreeDictionaryService (FreeDictionaryService (FreeDictionaryService))
@@ -148,7 +148,7 @@ makeFoundation appSettings inactivityTracker = do
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
-  chatrooms <- makeGlobalResourceCache (getChat chatRepository) Nothing
+  chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
 
   games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
   gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing

@@ -9,11 +9,19 @@ module Controllers.Chat.Chatroom
   )
 where
 
-import ClassyPrelude (IO, Int, Maybe (Nothing), Monoid (mconcat), Text, UTCTime, forever, liftIO, pure, ($), (+), (.), (<$>), (<*>))
+import ClassyPrelude (Exception (fromException), IO, Int, Maybe (Nothing), Monoid (mconcat), Text, UTCTime, const, forever, isJust, isNothing, liftIO, pack, pure, putStrLn, show, unless, ($), (+), (.), (<$>), (<*>))
+import ClassyPrelude.Conduit (Maybe (Just))
 import Control.Concurrent.STM (TChan, atomically, dupTChan, newTChan, readTChan, writeTChan)
+import Control.Error (maybe)
+import Control.Exception (SomeException, throw, try)
+import Control.Exception.Base (AsyncException)
+import Control.Monad (Monad ((>>)), when)
+import Data.Bool (Bool, not)
 import qualified Data.Conduit as C (ConduitT)
+import Data.Either (Either (Left, Right))
 import Data.Time.Clock (getCurrentTime)
 import Util.ConduitChan (chanSource)
+import Util.Exception (printAndIgnoreSyncException)
 import Util.WorkerThread (WorkerThread, newUnstartedWorkerThread, startIfNotStarted, stopIfNotStopped)
 
 -- TODO: include user IDs and do migration so that database 'chat' rows have user IDs
@@ -50,15 +58,20 @@ subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) s
   let liveMessagesConduit = chanSource broadcastChannel
   mconcat [existingChatMessages, liveMessagesConduit]
 
-workerLoop :: Chatroom -> IO loop
-workerLoop (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ countChatMessages _) = forever $ do
-  msg <- atomically (readTChan sequenceWriteChannel)
+processNextMessage :: Chatroom -> SendMessage -> IO ()
+processNextMessage (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ countChatMessages _) msg = do
   now <- getCurrentTime
   messageNumber <- (+ 1) <$> countChatMessages roomId
   let chatMessage = ChatMessage (userDisplayName msg) (message msg) now messageNumber
   -- TODO: stop this loop from exiting due to IO errors
   persistChatMessage roomId chatMessage
   atomically (writeTChan broadcastChan chatMessage)
+
+workerLoop :: Chatroom -> IO loop
+workerLoop chatroom@(Chatroom _ sequenceWriteChannel _ _ _ _ _) = forever $ do
+  msg <- atomically (readTChan sequenceWriteChannel)
+  result <- try (processNextMessage chatroom msg)
+  printAndIgnoreSyncException result
 
 thawChatroom :: Chatroom -> IO ()
 thawChatroom chatroom = startIfNotStarted (workerThread chatroom) (workerLoop chatroom)
