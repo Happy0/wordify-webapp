@@ -12,6 +12,7 @@ module Controllers.GameLobby.Model.GameLobby
     duplicateBroadcastChannel,
     inLobby,
     lobbyIsFull,
+    gameLanguage
   )
 where
 
@@ -45,7 +46,8 @@ data GameLobby = GameLobby
     channel :: TChan LobbyMessage,
     -- TODO: rename this to 'lobbyGenerator'
     playerIdGenerator :: TVar StdGen,
-    openedAt :: UTCTime
+    openedAt :: UTCTime,
+    gameLanguage :: T.Text
   }
 
 gameStarted :: ClientLobbyJoinResult -> Bool

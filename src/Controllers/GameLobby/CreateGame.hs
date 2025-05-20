@@ -32,12 +32,12 @@ createGame app numPlayers locale =
     do
       newGameId <- lift $ T.pack . fst . randomString 8 <$> getStdGen
       newGame <- setupGame app locale numPlayers
-      initialLobby <- lift $ createGameLobby app newGameId newGame numPlayers
+      initialLobby <- lift $ createGameLobby app newGameId newGame numPlayers locale
       _ <- lift $ persistNewLobby (appConnPool app) newGameId locale initialLobby
       return newGameId
 
-createGameLobby :: App -> Text -> Game -> Int -> IO GameLobby
-createGameLobby app gameId game numPlayers =
+createGameLobby :: App -> Text -> Game -> Int -> Text -> IO GameLobby
+createGameLobby app gameId game numPlayers gameLanguage =
   do
     generator <- getStdGen
     timeCreated <- getCurrentTime
@@ -46,7 +46,7 @@ createGameLobby app gameId game numPlayers =
       broadcastChan <- newBroadcastTChan
       newGenerator <- newTVar generator
       serverPlayers <- newTVar []
-      let initialLobby = GameLobby game serverPlayers numPlayers broadcastChan newGenerator timeCreated
+      let initialLobby = GameLobby game serverPlayers numPlayers broadcastChan newGenerator timeCreated gameLanguage
       return initialLobby
 
 setupGame :: App -> Locale -> Int -> (ExceptT Text IO Game)
@@ -66,7 +66,7 @@ setupGame app locale numPlayers =
 getLetterbagAndDictionary :: Locale -> LocalisedGameSetups -> Either Text (Dictionary, LetterBag)
 getLetterbagAndDictionary locale setups =
   do
-    setup <- note "Invalid locale" $ M.lookup locale setups
+    setup <- note (T.concat ["Invalid locale: ", locale]) $ M.lookup locale setups
     return (localisedDictionary setup, localisedLetterBag setup)
 
 createPlayers :: Int -> Either Text (Player, Player, Maybe (Player, Maybe Player))

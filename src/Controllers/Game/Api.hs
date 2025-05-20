@@ -371,13 +371,13 @@ instance ToJSON Pos where
 
 instance FromJSON Tile where
   parseJSON (Object value) = do
-    letter <- value .: "letter"
+    letter <- value .: "letter" :: Parser [Char]
     tileValue <- value .: "value"
 
     return $
       case tileValue of
         0 -> case letter of
-          '_' -> Blank Nothing
+          "_" -> Blank Nothing
           chr -> Blank (Just chr)
         x -> Letter letter tileValue
   parseJSON _ = fail "Tile must be a JSON object value, rather than an array, etc"

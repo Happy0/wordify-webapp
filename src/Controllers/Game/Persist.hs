@@ -1,6 +1,6 @@
 module Controllers.Game.Persist (getGame, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==))
+import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==), String, Bool, notElem)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -35,12 +35,43 @@ import Wordify.Rules.Move
 import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
+import qualified Data.List.Split as SL
+import Database.Sqlite (Connection)
+import Database.Esqueleto (ConnectionPool)
 
 deleteLobby :: App -> T.Text -> IO ()
 deleteLobby app gameId = do
   withPool (appConnPool app) $ do
     deleteWhere [M.LobbyGameId ==. gameId]
     deleteWhere [M.LobbyPlayerGame ==. gameId]
+
+performGameLobbyLetterbagMigration :: ConnectionPool -> M.Lobby -> IO ()
+performGameLobbyLetterbagMigration pool (M.Lobby gameId originalLetterBag letterBagSeed maybeLocale numPlayers createdAt) = do
+  when (isOldLetterBagFormat originalLetterBag) $ updateLobbyLetterBag pool gameId originalLetterBag
+
+performGameLetterBagMigration :: ConnectionPool -> M.Game -> IO ()
+performGameLetterBagMigration pool (M.Game gameId originalLetterBag letterBagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _) = do
+  when (isOldLetterBagFormat originalLetterBag) $ updateGameLetterBag pool gameId originalLetterBag
+
+updateLobbyLetterBag :: ConnectionPool -> T.Text -> T.Text -> IO ()
+updateLobbyLetterBag pool gameId newLetterBag = do
+  withPool pool $ do
+    update
+      (M.LobbyKey gameId)
+      [ M.LobbyOriginalLetterBag =. migrateGameLetterbagFormat newLetterBag ]
+
+updateGameLetterBag :: ConnectionPool -> T.Text -> T.Text -> IO ()
+updateGameLetterBag pool gameId newLetterBag = do
+  withPool pool $ do
+    update
+      (M.GameKey gameId)
+      [ M.GameOriginalLetterBag =. migrateGameLetterbagFormat newLetterBag ]
+
+migrateGameLetterbagFormat :: T.Text -> T.Text
+migrateGameLetterbagFormat = T.intersperse ','
+
+isOldLetterBagFormat :: T.Text -> Bool
+isOldLetterBagFormat = notElem ','
 
 getLobby :: ConnectionPool -> LocalisedGameSetups -> T.Text -> IO (Either T.Text GameLobby)
 getLobby pool localisedGameSetups gameId = do
@@ -49,6 +80,7 @@ getLobby pool localisedGameSetups gameId = do
     case maybeLobby of
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just lobbyModel -> do
+        liftIO (performGameLobbyLetterbagMigration pool (entityVal lobbyModel))
         players <- selectList [M.LobbyPlayerGame ==. gameId] []
         return $ Right (lobbyModel, players)
 
@@ -68,7 +100,7 @@ getLobby pool localisedGameSetups gameId = do
         tiles <- hoistEither $ dbTileRepresentationToTiles bag originalLetterBag
         let bag = makeBagUsingGenerator tiles (stdGenFromText letterBagSeed :: StdGen)
         pendingGame <- hoistEither $ mapLeft (T.pack . show) (makeGame lobbyPlayers bag dictionary)
-        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt
+        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt locale
     Left err -> return $ Left err
 
 getLobbyPlayer :: ConnectionPool -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
@@ -110,6 +142,7 @@ getGame pool localisedGameSetups gameId = do
     case maybeGame of
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just gameModel -> do
+        liftIO (performGameLetterBagMigration pool (entityVal gameModel))
         players <- selectList [M.PlayerGameId ==. gameId] []
         moves <- selectList [M.MoveGame ==. gameId] []
         return $ Right (gameModel, players, L.map entityVal moves)
@@ -308,12 +341,12 @@ updateGameSummary pool gameId gameState = do
     gameBoardTextRepresentation = textRepresentation . board
 
 tilesToDbRepresentation :: [Tile] -> T.Text
-tilesToDbRepresentation tiles = T.pack $ L.map tileToDbRepresentation tiles
+tilesToDbRepresentation tiles = T.pack (L.intercalate "," (L.map tileToDbRepresentation tiles))
 
-tileToDbRepresentation :: Tile -> C.Char
+tileToDbRepresentation :: Tile -> String
 tileToDbRepresentation (Letter lettr val) = lettr
-tileToDbRepresentation (Blank Nothing) = '_'
-tileToDbRepresentation (Blank (Just letter)) = C.toLower letter
+tileToDbRepresentation (Blank Nothing) = "_"
+tileToDbRepresentation (Blank (Just letter)) = L.map C.toLower letter
 
 moveFromEntity :: Board -> LetterBag -> M.Move -> Either T.Text Move
 moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
@@ -363,16 +396,16 @@ playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive
 
 dbTileRepresentationToTiles :: LetterBag -> T.Text -> Either T.Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =
-  sequence $ fmap getTile (T.unpack textRepresentation)
+  mapM getTile (SL.splitOn "," (T.unpack textRepresentation))
   where
     letterMap = validLetters letterBag
-    getTile :: C.Char -> Either T.Text Tile
-    getTile character
-      | (C.isLower character) = Right $ Blank (Just $ C.toUpper character)
-      | character == '_' = Right $ Blank Nothing
-      | otherwise = case Mp.lookup character letterMap of
+    getTile :: String -> Either T.Text Tile
+    getTile stringRepresentation
+      | L.all C.isLower stringRepresentation = Right $ Blank (Just $ L.map C.toUpper stringRepresentation)
+      | stringRepresentation == "_" = Right $ Blank Nothing
+      | otherwise = case Mp.lookup stringRepresentation letterMap of
           Just tile -> Right tile
-          _ -> Left $ T.pack $ [character] ++ " not found in letterbag"
+          _ -> Left $ T.pack $ stringRepresentation ++ " not found in letterbag"
 
 stdGenToText :: StdGen -> T.Text
 stdGenToText stdGen =
