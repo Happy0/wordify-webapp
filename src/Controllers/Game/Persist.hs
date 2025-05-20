@@ -1,6 +1,6 @@
 module Controllers.Game.Persist (getGame, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==), String)
+import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==), String, Bool, notElem)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -35,13 +35,43 @@ import Wordify.Rules.Move
 import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
-import qualified Data.List.Split as L
+import qualified Data.List.Split as SL
+import Database.Sqlite (Connection)
+import Database.Esqueleto (ConnectionPool)
 
 deleteLobby :: App -> T.Text -> IO ()
 deleteLobby app gameId = do
   withPool (appConnPool app) $ do
     deleteWhere [M.LobbyGameId ==. gameId]
     deleteWhere [M.LobbyPlayerGame ==. gameId]
+
+performGameLobbyLetterbagMigration :: ConnectionPool -> M.Lobby -> IO ()
+performGameLobbyLetterbagMigration pool (M.Lobby gameId originalLetterBag letterBagSeed maybeLocale numPlayers createdAt) = do
+  when (isOldLetterBagFormat originalLetterBag) $ updateLobbyLetterBag pool gameId originalLetterBag
+
+performGameLetterBagMigration :: ConnectionPool -> M.Game -> IO ()
+performGameLetterBagMigration pool (M.Game gameId originalLetterBag letterBagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _) = do
+  when (isOldLetterBagFormat originalLetterBag) $ updateGameLetterBag pool gameId originalLetterBag
+
+updateLobbyLetterBag :: ConnectionPool -> T.Text -> T.Text -> IO ()
+updateLobbyLetterBag pool gameId newLetterBag = do
+  withPool pool $ do
+    update
+      (M.LobbyKey gameId)
+      [ M.LobbyOriginalLetterBag =. migrateGameLetterbagFormat newLetterBag ]
+
+updateGameLetterBag :: ConnectionPool -> T.Text -> T.Text -> IO ()
+updateGameLetterBag pool gameId newLetterBag = do
+  withPool pool $ do
+    update
+      (M.GameKey gameId)
+      [ M.GameOriginalLetterBag =. migrateGameLetterbagFormat newLetterBag ]
+
+migrateGameLetterbagFormat :: T.Text -> T.Text
+migrateGameLetterbagFormat = T.intersperse ','
+
+isOldLetterBagFormat :: T.Text -> Bool
+isOldLetterBagFormat = notElem ','
 
 getLobby :: ConnectionPool -> LocalisedGameSetups -> T.Text -> IO (Either T.Text GameLobby)
 getLobby pool localisedGameSetups gameId = do
@@ -50,6 +80,7 @@ getLobby pool localisedGameSetups gameId = do
     case maybeLobby of
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just lobbyModel -> do
+        liftIO (performGameLobbyLetterbagMigration pool (entityVal lobbyModel))
         players <- selectList [M.LobbyPlayerGame ==. gameId] []
         return $ Right (lobbyModel, players)
 
@@ -111,6 +142,7 @@ getGame pool localisedGameSetups gameId = do
     case maybeGame of
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just gameModel -> do
+        liftIO (performGameLetterBagMigration pool (entityVal gameModel))
         players <- selectList [M.PlayerGameId ==. gameId] []
         moves <- selectList [M.MoveGame ==. gameId] []
         return $ Right (gameModel, players, L.map entityVal moves)
@@ -364,7 +396,7 @@ playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive
 
 dbTileRepresentationToTiles :: LetterBag -> T.Text -> Either T.Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =
-  mapM getTile (L.splitOn "," (T.unpack textRepresentation))
+  mapM getTile (SL.splitOn "," (T.unpack textRepresentation))
   where
     letterMap = validLetters letterBag
     getTile :: String -> Either T.Text Tile
