@@ -98,6 +98,7 @@ import System.Random
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
 import qualified Prelude as P
+import Migrations.DatabaseTileListFormatMigration (runTileListMigration)
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -146,6 +147,7 @@ makeFoundation appSettings inactivityTracker = do
 
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
+  runTileListMigration pool
 
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
   chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
