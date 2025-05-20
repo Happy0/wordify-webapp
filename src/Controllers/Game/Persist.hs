@@ -1,6 +1,6 @@
 module Controllers.Game.Persist (getGame, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==))
+import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==), String)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -35,6 +35,7 @@ import Wordify.Rules.Move
 import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile
+import qualified Data.List.Split as L
 
 deleteLobby :: App -> T.Text -> IO ()
 deleteLobby app gameId = do
@@ -68,7 +69,7 @@ getLobby pool localisedGameSetups gameId = do
         tiles <- hoistEither $ dbTileRepresentationToTiles bag originalLetterBag
         let bag = makeBagUsingGenerator tiles (stdGenFromText letterBagSeed :: StdGen)
         pendingGame <- hoistEither $ mapLeft (T.pack . show) (makeGame lobbyPlayers bag dictionary)
-        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt
+        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt locale
     Left err -> return $ Left err
 
 getLobbyPlayer :: ConnectionPool -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
@@ -308,12 +309,12 @@ updateGameSummary pool gameId gameState = do
     gameBoardTextRepresentation = textRepresentation . board
 
 tilesToDbRepresentation :: [Tile] -> T.Text
-tilesToDbRepresentation tiles = T.pack $ L.map tileToDbRepresentation tiles
+tilesToDbRepresentation tiles = T.pack (L.intercalate "," (L.map tileToDbRepresentation tiles))
 
-tileToDbRepresentation :: Tile -> C.Char
+tileToDbRepresentation :: Tile -> String
 tileToDbRepresentation (Letter lettr val) = lettr
-tileToDbRepresentation (Blank Nothing) = '_'
-tileToDbRepresentation (Blank (Just letter)) = C.toLower letter
+tileToDbRepresentation (Blank Nothing) = "_"
+tileToDbRepresentation (Blank (Just letter)) = L.map C.toLower letter
 
 moveFromEntity :: Board -> LetterBag -> M.Move -> Either T.Text Move
 moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
@@ -363,16 +364,16 @@ playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive
 
 dbTileRepresentationToTiles :: LetterBag -> T.Text -> Either T.Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =
-  sequence $ fmap getTile (T.unpack textRepresentation)
+  mapM getTile (L.splitOn "," (T.unpack textRepresentation))
   where
     letterMap = validLetters letterBag
-    getTile :: C.Char -> Either T.Text Tile
-    getTile character
-      | (C.isLower character) = Right $ Blank (Just $ C.toUpper character)
-      | character == '_' = Right $ Blank Nothing
-      | otherwise = case Mp.lookup character letterMap of
+    getTile :: String -> Either T.Text Tile
+    getTile stringRepresentation
+      | L.all C.isLower stringRepresentation = Right $ Blank (Just $ L.map C.toUpper stringRepresentation)
+      | stringRepresentation == "_" = Right $ Blank Nothing
+      | otherwise = case Mp.lookup stringRepresentation letterMap of
           Just tile -> Right tile
-          _ -> Left $ T.pack $ [character] ++ " not found in letterbag"
+          _ -> Left $ T.pack $ stringRepresentation ++ " not found in letterbag"
 
 stdGenToText :: StdGen -> T.Text
 stdGenToText stdGen =

@@ -10,6 +10,11 @@
                         <select #num-players>
                             $forall i <- numPlayerOptions
                                 <option value="#{show i}"> #{show i}
+                    <div>
+                        <p> Language
+                        <select #game-language>
+                            $forall lang <- gameLanguages
+                                <option value="#{lang}"> #{lang}
 
                 <div .modal-footer>
                     <button .btn .btn-default .create-game-button type="button">Create

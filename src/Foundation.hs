@@ -131,6 +131,8 @@ appHeader =
     $(widgetFile "game-dialog")
   where
     numPlayerOptions = [2 .. 4]
+    gameLanguages :: [String]
+    gameLanguages = ["en", "es"]
 
 -- For now just don't show 'create game' button if the user isn't logged in.
 -- Todo: Prompt the user to log in

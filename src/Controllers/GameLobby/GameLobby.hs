@@ -31,12 +31,13 @@ joinClient app gameLobby gameId userId =
     now <- getCurrentTime
     serverPlayer <- makeLobbyServerPlayer app gameId userId
     result <- atomically $ updateLobbyState app gameLobby serverPlayer gameId now
+    let language = gameLanguage gameLobby
 
     case result of
       Left errorMessage -> return $ Left errorMessage
       Right (ClientLobbyJoinResult broadcastChannel (Just createdGame) _) ->
         do
-          _ <- startGame app gameId broadcastChannel createdGame
+          _ <- startGame app gameId language broadcastChannel createdGame
           return result
       Right (ClientLobbyJoinResult broadcastChannel _ previouslyJoined) ->
         unless
@@ -64,12 +65,12 @@ updateLobbyState app lobby serverPlayer gameId now = do
 
   if lobbyFull then pure $ Left LobbyAlreadyFull else Right <$> handleJoinClient app gameId lobby serverPlayer now
 
-startGame :: App -> T.Text -> TChan LobbyMessage -> ServerGame -> IO ()
-startGame app gameId channel serverGame = do
+startGame :: App -> T.Text -> T.Text -> TChan LobbyMessage -> ServerGame -> IO ()
+startGame app gameId gameLanguage channel serverGame = do
   do
     let pool = appConnPool app
     deleteLobby app gameId
-    persistNewGame pool gameId "en" serverGame
+    persistNewGame pool gameId gameLanguage serverGame
     -- Inform the clients that the game has been started
     atomically (writeTChan channel (LobbyFull gameId))
 

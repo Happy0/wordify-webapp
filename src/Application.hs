@@ -187,8 +187,8 @@ loadGameBundles =
 loadGameBundle :: String -> IO (Text, LocalisedGameSetup)
 loadGameBundle locale =
   do
-    bag <- loadBag $ "config/localised_setups" ++ "/" ++ (locale) ++ "/" ++ "bag"
-    dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ (locale) ++ "/" ++ "dict"
+    bag <- loadBag $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "bag"
+    dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "dict"
     return $ (pack locale, GameSetup dictionary bag)
 
 loadBag :: String -> IO LetterBag

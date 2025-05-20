@@ -13,11 +13,16 @@ var getNumPlayersSelected = function() {
     return optionElement.options[optionElement.selectedIndex].value;
 };
 
+var getLocale = function() {
+    var optionElement = document.getElementById("game-language");
+    return optionElement.options[optionElement.selectedIndex].value;
+}
+
 var createGameClicked = function() {
     var playersSelected = getNumPlayersSelected();
 
     createGameRequest.num_players = parseInt(playersSelected);
-    createGameRequest.locale = "en";
+    createGameRequest.locale = getLocale();
 
     var payload = JSON.stringify(createGameRequest);
 
