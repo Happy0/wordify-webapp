@@ -122,6 +122,9 @@ module.exports = function(opts) {
 
 
     var setPlayerToMove = function(playerToMove) {
+        if (playerToMove == data.playerToMove)
+            return;
+
         m.startComputation();
         data.playerToMove = playerToMove;
 
