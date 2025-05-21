@@ -45,34 +45,6 @@ deleteLobby app gameId = do
     deleteWhere [M.LobbyGameId ==. gameId]
     deleteWhere [M.LobbyPlayerGame ==. gameId]
 
-performGameLobbyLetterbagMigration :: ConnectionPool -> M.Lobby -> IO ()
-performGameLobbyLetterbagMigration pool (M.Lobby gameId originalLetterBag letterBagSeed maybeLocale numPlayers createdAt) = do
-  when (isOldLetterBagFormat originalLetterBag) $ updateLobbyLetterBag pool gameId originalLetterBag
-
-performGameLetterBagMigration :: ConnectionPool -> M.Game -> IO ()
-performGameLetterBagMigration pool (M.Game gameId originalLetterBag letterBagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _) = do
-  when (isOldLetterBagFormat originalLetterBag) $ updateGameLetterBag pool gameId originalLetterBag
-
-updateLobbyLetterBag :: ConnectionPool -> T.Text -> T.Text -> IO ()
-updateLobbyLetterBag pool gameId newLetterBag = do
-  withPool pool $ do
-    update
-      (M.LobbyKey gameId)
-      [ M.LobbyOriginalLetterBag =. migrateGameLetterbagFormat newLetterBag ]
-
-updateGameLetterBag :: ConnectionPool -> T.Text -> T.Text -> IO ()
-updateGameLetterBag pool gameId newLetterBag = do
-  withPool pool $ do
-    update
-      (M.GameKey gameId)
-      [ M.GameOriginalLetterBag =. migrateGameLetterbagFormat newLetterBag ]
-
-migrateGameLetterbagFormat :: T.Text -> T.Text
-migrateGameLetterbagFormat = T.intersperse ','
-
-isOldLetterBagFormat :: T.Text -> Bool
-isOldLetterBagFormat = notElem ','
-
 getLobby :: ConnectionPool -> LocalisedGameSetups -> T.Text -> IO (Either T.Text GameLobby)
 getLobby pool localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
@@ -80,7 +52,6 @@ getLobby pool localisedGameSetups gameId = do
     case maybeLobby of
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just lobbyModel -> do
-        liftIO (performGameLobbyLetterbagMigration pool (entityVal lobbyModel))
         players <- selectList [M.LobbyPlayerGame ==. gameId] []
         return $ Right (lobbyModel, players)
 
@@ -142,7 +113,6 @@ getGame pool localisedGameSetups gameId = do
     case maybeGame of
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just gameModel -> do
-        liftIO (performGameLetterBagMigration pool (entityVal gameModel))
         players <- selectList [M.PlayerGameId ==. gameId] []
         moves <- selectList [M.MoveGame ==. gameId] []
         return $ Right (gameModel, players, L.map entityVal moves)
