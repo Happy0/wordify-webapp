@@ -38,6 +38,9 @@ import Wordify.Rules.Pos
 import Wordify.Rules.ScrabbleError
 import Wordify.Rules.Tile
 import Prelude
+import Model.GameSetup (extraRules, LocalisedGameSetup)
+import qualified Control.Arrow as A
+import Wordify.Rules.Extra.ExtraRule (applyExtraRules, finalTransition, RuleApplicationsResult (finalTransition))
 
 handlePlayerConnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
 handlePlayerConnect pool serverGame Nothing = pure ()
@@ -140,7 +143,7 @@ handleMove ::
   Pool SqlBackend ->
   Int ->
   Move ->
-  (Either ScrabbleError GameTransition -> ServerResponse) ->
+  (Either Text GameTransition -> ServerResponse) ->
   IO ServerResponse
 handleMove serverGame pool playerMoving move moveOutcomeHandler =
   do
@@ -150,8 +153,10 @@ handleMove serverGame pool playerMoving move moveOutcomeHandler =
       then return $ InvalidCommand "Not your move"
       else do
         let channel = broadcastChannel serverGame
-        let moveOutcome = makeMove currentGameState move
-        case moveOutcome of
+        let moveOutcome = A.left (pack . show) (makeMove currentGameState move)
+        let moveWithLocalisedRulesOutcome = moveOutcome >>= flip applyLocalisedRules (gameSetup serverGame)
+
+        case moveWithLocalisedRulesOutcome of
           Left err -> return $ moveOutcomeHandler $ Left err
           Right transition -> do
             let eventMessage = transitionToMessage transition
@@ -165,6 +170,13 @@ handleMove serverGame pool playerMoving move moveOutcomeHandler =
 
             return $ moveOutcomeHandler moveOutcome
 
+applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameTransition
+applyLocalisedRules gameTransition localisedGameSetup =
+  let extraLocalisationGameRules = extraRules localisedGameSetup
+  in let ruleApplicationResult = applyExtraRules gameTransition extraLocalisationGameRules
+  in let resultWithTransformedError = A.left (pack. show) ruleApplicationResult
+  in finalTransition <$> resultWithTransformedError
+
 handleBoardMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
 handleBoardMove _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"
 handleBoardMove sharedServerGame pool (Just playerNo) placed =
@@ -175,7 +187,7 @@ handleBoardMove sharedServerGame pool (Just playerNo) placed =
     (PlaceTiles $ M.fromList placed)
     moveOutcomeHandler
   where
-    moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+    moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right (MoveTransition newPlayer _ _)) = BoardMoveSuccess (tilesOnRack newPlayer)
     moveOutcomeHandler (Right _) = BoardMoveSuccess []
 
@@ -189,7 +201,7 @@ handleExchangeMove sharedServerGame pool (Just playerNo) exchanged =
     (Exchange exchanged)
     moveOutcomeHandler
   where
-    moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+    moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
     moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
@@ -198,7 +210,7 @@ handlePassMove _ _ Nothing = return $ InvalidCommand "Observers cannot move"
 handlePassMove sharedServerGame pool (Just playerNo) =
   handleMove sharedServerGame pool playerNo Pass moveOutcomeHandler
   where
-    moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+    moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
 handleChatMessage :: ServerGame -> Chatroom -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse

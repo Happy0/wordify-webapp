@@ -38,6 +38,7 @@ import Wordify.Rules.Tile
 import qualified Data.List.Split as SL
 import Database.Sqlite (Connection)
 import Database.Esqueleto (ConnectionPool)
+import Model.GameSetup (LocalisedGameSetup(..))
 
 deleteLobby :: App -> T.Text -> IO ()
 deleteLobby app gameId = do
@@ -66,12 +67,12 @@ getLobby pool localisedGameSetups gameId = do
         let locale = maybe "en" id maybeLocale
         -- This could be more efficient than individual fetches, but it doesn't matter for now
         let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
-        GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
+        setup@(GameSetup dictionary bag extraRules) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         lobbyPlayers <- hoistEither $ makeGameStatePlayers numPlayers
         tiles <- hoistEither $ dbTileRepresentationToTiles bag originalLetterBag
         let bag = makeBagUsingGenerator tiles (stdGenFromText letterBagSeed :: StdGen)
         pendingGame <- hoistEither $ mapLeft (T.pack . show) (makeGame lobbyPlayers bag dictionary)
-        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt locale
+        return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt locale setup
     Left err -> return $ Left err
 
 getLobbyPlayer :: ConnectionPool -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
@@ -125,7 +126,7 @@ getGame pool localisedGameSetups gameId = do
       runExceptT $ do
         let locale = maybe "en" id maybeLocale
         let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
-        GameSetup dictionary bag <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
+        setup@(GameSetup dictionary bag extraRules) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
         tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
         let letterBag = makeBagUsingGenerator tiles (stdGenFromText bagSeed :: StdGen)
@@ -135,7 +136,7 @@ getGame pool localisedGameSetups gameId = do
 
         currentGame <- hoistEither $ playThroughGame gameWithDisplayNamesSet letterBag moveModels
 
-        liftIO $ atomically (makeServerGame gameId currentGame serverPlayers gameCreatedAt lastMoveMadeAt gameFinishedAt)
+        liftIO $ atomically (makeServerGame gameId currentGame serverPlayers gameCreatedAt lastMoveMadeAt gameFinishedAt setup)
     Left err -> return $ Left err
 
 playThroughGame :: Game -> LetterBag -> [M.Move] -> Either T.Text Game

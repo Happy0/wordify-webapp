@@ -16,6 +16,7 @@ module Controllers.Game.Model.ServerGame
     broadcastChannel,
     getServerPlayerSnapshot,
     getSnapshotPlayerNumber,
+    gameSetup
   )
 where
 
@@ -32,6 +33,7 @@ import Data.Maybe
 import Data.Text
 import qualified Wordify.Rules.Game as G
 import Prelude
+import Model.GameSetup (LocalisedGameSetup)
 
 -- TODO: move this and associated functions to own file
 data ServerGameSnapshot = ServerGameSnapshot
@@ -50,34 +52,35 @@ data ServerGame = ServerGame
     broadcastChannel :: TChan GameMessage,
     createdAt :: UTCTime,
     lastMoveMadeAt :: TVar (Maybe UTCTime),
-    finishedAt :: TVar (Maybe UTCTime)
+    finishedAt :: TVar (Maybe UTCTime),
+    gameSetup :: LocalisedGameSetup
   }
 
 makeServerGameSnapshot :: ServerGame -> STM ServerGameSnapshot
-makeServerGameSnapshot (ServerGame id game playing _ createdAt lastMoveMadeAt finishedAt) = do
+makeServerGameSnapshot (ServerGame id game playing _ createdAt lastMoveMadeAt finishedAt _) = do
   players <- mapM (readTVar . snd) playing
   gameState <- readTVar game
   lastMoveMade <- readTVar lastMoveMadeAt
   finished <- readTVar finishedAt
   return $ ServerGameSnapshot id gameState players createdAt lastMoveMade finished
 
-makeNewServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> STM ServerGame
-makeNewServerGame gameId initialGameState players createdAt = do
+makeNewServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> LocalisedGameSetup -> STM ServerGame
+makeNewServerGame gameId initialGameState players createdAt gameSetup = do
   initialPlayerState <- mapM makeServerPlayerState players
   lastMoveMadeAt <- newTVar Nothing
   finishedAt <- newTVar Nothing
   game <- newTVar initialGameState
   messageChannel <- newBroadcastTChan
-  return (ServerGame gameId game initialPlayerState messageChannel createdAt lastMoveMadeAt finishedAt)
+  return (ServerGame gameId game initialPlayerState messageChannel createdAt lastMoveMadeAt finishedAt gameSetup)
 
-makeServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> STM ServerGame
-makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedAt = do
+makeServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> Maybe UTCTime -> Maybe UTCTime -> LocalisedGameSetup -> STM ServerGame
+makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedAt gameSetup = do
   currentPlayerStates <- mapM makeServerPlayerState serverPlayers
   lastMoveMade <- newTVar lastMoveMadeAt
   finished <- newTVar finishedAt
   game <- newTVar gameState
   messageChannel <- newBroadcastTChan
-  return (ServerGame gameId game currentPlayerStates messageChannel createdAt lastMoveMade finished)
+  return (ServerGame gameId game currentPlayerStates messageChannel createdAt lastMoveMade finished gameSetup)
 
 makeServerPlayerState :: SP.ServerPlayer -> STM (Text, TVar ServerPlayer)
 makeServerPlayerState serverPlayer@(ServerPlayer _ playerId _ _ _) =

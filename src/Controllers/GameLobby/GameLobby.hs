@@ -119,4 +119,4 @@ createGame gameId lobby now =
 
     -- We shuffle so that who gets to go first is randomised.
     let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
-    makeNewServerGame gameId initialGameState shuffledPlayers now
+    makeNewServerGame gameId initialGameState shuffledPlayers now (pendingGameSetup lobby)

@@ -12,7 +12,8 @@ module Controllers.GameLobby.Model.GameLobby
     duplicateBroadcastChannel,
     inLobby,
     lobbyIsFull,
-    gameLanguage
+    gameLanguage,
+    pendingGameSetup
   )
 where
 
@@ -30,6 +31,7 @@ import Data.Time.Clock
 import System.Random
 import Wordify.Rules.Game
 import Prelude
+import Model.GameSetup (LocalisedGameSetup)
 
 data ClientLobbyJoinResult = ClientLobbyJoinResult
   { -- For listening and sending events to the game lobby from the client
@@ -47,7 +49,8 @@ data GameLobby = GameLobby
     -- TODO: rename this to 'lobbyGenerator'
     playerIdGenerator :: TVar StdGen,
     openedAt :: UTCTime,
-    gameLanguage :: T.Text
+    gameLanguage :: T.Text,
+    pendingGameSetup :: LocalisedGameSetup
   }
 
 gameStarted :: ClientLobbyJoinResult -> Bool
