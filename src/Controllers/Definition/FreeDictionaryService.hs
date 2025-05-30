@@ -45,9 +45,10 @@ instance FromJSON FreeDictionaryResponse where
 instance DefinitionService FreeDictionaryService where
   getDefinitions = getDefinitionsImpl
 
-getDefinitionsImpl :: FreeDictionaryService -> T.Text -> IO (Either T.Text [Definition])
-getDefinitionsImpl service word =
+getDefinitionsImpl :: FreeDictionaryService -> T.Text -> T.Text -> IO (Either T.Text [Definition])
+getDefinitionsImpl service word "en" =
   fmap freeDictionaryResponseToDefinition <$> freeDictionaryGetRequest service word
+getDefinitionsImpl service word _ = pure (Right [])
 
 freeDictionaryResponseToDefinition :: FreeDictionaryResponse -> [Definition]
 freeDictionaryResponseToDefinition (FreeDictionaryResponse items) = concatMap (\item -> concatMap definitionFromFreeDictionaryMeaning (meanings item)) items

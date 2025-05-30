@@ -52,12 +52,12 @@ definitionWorkerLoop controller@(GameDefinitionController definitionService defi
   result <- try (handleNextMessage controller workItem)
   printAndIgnoreSyncException result
 
-storeGameDefinitions :: GameDefinitionController -> Text -> Text -> (DefinitionResponse -> IO ()) -> IO ()
-storeGameDefinitions worker@(GameDefinitionController definitionService _ workQueue definitionWorker) gameId word withStoredResultAsync = do
+storeGameDefinitions :: GameDefinitionController -> Text -> Text -> Text -> (DefinitionResponse -> IO ()) -> IO ()
+storeGameDefinitions worker@(GameDefinitionController definitionService _ workQueue definitionWorker) gameId word languageShortCode withStoredResultAsync = do
   startIfNotStarted definitionWorker (definitionWorkerLoop worker)
 
   void $ forkIO $ do
-    defs <- getDefinitionsImpl definitionService word
+    defs <- getDefinitionsImpl definitionService word languageShortCode
     atomically (writeTQueue workQueue (GameDefinitionWorkItem gameId word defs withStoredResultAsync))
 
 getStoredDefinitions :: GameDefinitionController -> Text -> ConduitT () GameWordItem IO ()

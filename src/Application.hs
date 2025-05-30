@@ -158,7 +158,7 @@ makeFoundation appSettings inactivityTracker = do
   games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
   gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing
 
-  let definitionService = toDefinitionServiceImpl (makeWiktionaryService "en")
+  let definitionService = toDefinitionServiceImpl makeWiktionaryService
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
@@ -196,8 +196,8 @@ loadGameBundle locale =
     dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "dict"
 
     case locale of
-      "es_fise" -> return $ (pack locale, GameSetup dictionary bag spanishGameExtraRules)
-      _ -> return $ (pack locale, GameSetup dictionary bag [])
+      "es_fise" -> return $ (pack locale, GameSetup "es" dictionary bag spanishGameExtraRules)
+      _ -> return $ (pack locale, GameSetup (pack locale) dictionary bag [])
     
 
 loadBag :: String -> IO LetterBag

@@ -21,13 +21,13 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     import Text.HTML.TagSoup
     import qualified Data.List.Safe as L
     
-    newtype WiktionaryService = WiktionaryService { languageShortcode :: T.Text }
+    data WiktionaryService = WiktionaryService
 
     data WiktionaryDefinitionEntry = WiktionaryDefinitionEntry { definition :: T.Text, examples :: Maybe [T.Text] }
 
     data WiktionaryDefinition = WiktionaryDefinition {partOfSpeech :: T.Text, language :: T.Text, definitions :: [WiktionaryDefinitionEntry] }
 
-    data WiktionaryDefinitionResponse = WiktionaryDefinitionResponse (M.Map T.Text [WiktionaryDefinition])
+    newtype WiktionaryDefinitionResponse = WiktionaryDefinitionResponse (M.Map T.Text [WiktionaryDefinition])
 
     instance FromJSON WiktionaryDefinitionEntry where
         parseJSON = withObject "DefinitionEntry" $ \obj -> do
@@ -46,7 +46,7 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
         parseJSON obj = WiktionaryDefinitionResponse <$> parseJSON obj
 
     instance DefinitionService WiktionaryService where
-        getDefinitions :: WiktionaryService -> T.Text -> IO (Either T.Text [Definition])
+        getDefinitions :: WiktionaryService -> T.Text -> T.Text -> IO (Either T.Text [Definition])
         getDefinitions = wiktionaryGetDefinitionsImpl
 
     stripHtml :: T.Text -> Either T.Text T.Text
@@ -67,19 +67,19 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     mapDefinition :: WiktionaryDefinition -> Either T.Text [Definition]
     mapDefinition (WiktionaryDefinition partOfSpeech _ definitions) = mapM (`mapWithStrippedHtml` partOfSpeech) definitions
 
-    mapResults :: WiktionaryService -> WiktionaryDefinitionResponse -> Either T.Text [Definition]
-    mapResults (WiktionaryService language) (WiktionaryDefinitionResponse responseMap) = do
-        definitions <- note "No definitions for language found" (M.lookup language responseMap)
+    mapResults :: T.Text -> WiktionaryDefinitionResponse  -> Either T.Text [Definition]
+    mapResults languageShortcode (WiktionaryDefinitionResponse responseMap) = do
+        definitions <- note "No definitions for language found" (M.lookup languageShortcode responseMap)
         results <- mapM mapDefinition definitions
         pure (concat results)
 
     -- TODO: follow any cases of form-of-definition to root definition
 
-    wiktionaryGetDefinitionsImpl :: WiktionaryService ->  T.Text -> IO (Either T.Text [Definition])
-    wiktionaryGetDefinitionsImpl wiktionaryService@(WiktionaryService language) word = do
+    wiktionaryGetDefinitionsImpl :: WiktionaryService ->  T.Text -> T.Text -> IO (Either T.Text [Definition])
+    wiktionaryGetDefinitionsImpl wiktionaryService word localeShortcode = do
         requestResult <- try doRequest :: IO (Either SomeException (Either T.Text WiktionaryDefinitionResponse))
         case requestResult of
-            Right result -> pure $ result >>= mapResults wiktionaryService
+            Right result -> pure $ result >>= mapResults localeShortcode
             Left ex -> pure (Left (T.pack "Error while fetching definition"))
         where
             doRequest = runReq defaultHttpConfig $ do
@@ -95,5 +95,5 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
                             Error err -> pure $ Left (T.pack err)
                     _ -> pure $ Left (T.pack "Error while fetching definition")
 
-    makeWiktionaryService :: T.Text -> WiktionaryService
-    makeWiktionaryService languageShortcode = WiktionaryService languageShortcode
+    makeWiktionaryService :: WiktionaryService
+    makeWiktionaryService = WiktionaryService
