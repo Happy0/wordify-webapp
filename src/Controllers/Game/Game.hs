@@ -38,7 +38,7 @@ import Wordify.Rules.Pos
 import Wordify.Rules.ScrabbleError
 import Wordify.Rules.Tile
 import Prelude
-import Model.GameSetup (extraRules, LocalisedGameSetup)
+import Model.GameSetup (extraRules, LocalisedGameSetup (gameLanguageShortCode))
 import qualified Control.Arrow as A
 import Wordify.Rules.Extra.ExtraRule (applyExtraRules, finalTransition, RuleApplicationsResult (finalTransition))
 
@@ -110,7 +110,8 @@ handleAskDefinition :: GameDefinitionController -> ServerGame -> Maybe Int -> Te
 handleAskDefinition definitionWorker serverGame Nothing word =
   return $ InvalidCommand "Observers cannot request definitions."
 handleAskDefinition definitionWorker serverGame (Just _) word = do
-  storeGameDefinitions definitionWorker (gameId serverGame) word $ \(DefinitionResponse word time definitions defNumber) -> atomically $ do
+  let languageShortCode = gameLanguageShortCode (gameSetup serverGame)
+  storeGameDefinitions definitionWorker (gameId serverGame) word languageShortCode $ \(DefinitionResponse word time definitions defNumber) -> atomically $ do
     let channel = broadcastChannel serverGame
     writeTChan channel (WordDefinitions word time definitions defNumber)
   pure AskDefinitionSuccess
