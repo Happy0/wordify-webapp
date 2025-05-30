@@ -2,7 +2,7 @@
 module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService) where
     import qualified Data.Text as T
     import Controllers.Definition.DefinitionService (DefinitionService (getDefinitions), getDefinitionsImpl, Definition(Definition))
-    import ClassyPrelude (IO, undefined, Maybe, ($), pure, (<$>), traverse, SomeException)
+    import ClassyPrelude (IO, undefined, Maybe, ($), pure, (<$>), traverse, SomeException, (.))
     import Data.Either (Either (..))
     import qualified Data.Map as M
     import Data.Aeson
@@ -20,6 +20,7 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     import ClassyPrelude.Yesod (Maybe(..))
     import Text.HTML.TagSoup
     import qualified Data.List.Safe as L
+    import ClassyPrelude (not)
     
     data WiktionaryService = WiktionaryService
 
@@ -67,11 +68,16 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     mapDefinition :: WiktionaryDefinition -> Either T.Text [Definition]
     mapDefinition (WiktionaryDefinition partOfSpeech _ definitions) = mapM (`mapWithStrippedHtml` partOfSpeech) definitions
 
+    filterEmptyDefinitions :: [Definition] -> [Definition] 
+    filterEmptyDefinitions = L.filter (not . isEmptyDefinition)
+        where
+            isEmptyDefinition (Definition partOfSpeech definition _) = T.null definition
+
     mapResults :: T.Text -> WiktionaryDefinitionResponse  -> Either T.Text [Definition]
     mapResults languageShortcode (WiktionaryDefinitionResponse responseMap) = do
         definitions <- note "No definitions for language found" (M.lookup languageShortcode responseMap)
         results <- mapM mapDefinition definitions
-        pure (concat results)
+        pure (filterEmptyDefinitions (concat results))
 
     -- TODO: follow any cases of form-of-definition to root definition
 
