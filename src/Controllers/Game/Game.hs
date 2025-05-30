@@ -187,7 +187,7 @@ handleBoardMove sharedServerGame pool (Just playerNo) placed =
     (PlaceTiles $ M.fromList placed)
     moveOutcomeHandler
   where
-    moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+    moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right (MoveTransition newPlayer _ _)) = BoardMoveSuccess (tilesOnRack newPlayer)
     moveOutcomeHandler (Right _) = BoardMoveSuccess []
 
@@ -201,7 +201,7 @@ handleExchangeMove sharedServerGame pool (Just playerNo) exchanged =
     (Exchange exchanged)
     moveOutcomeHandler
   where
-    moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+    moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
     moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
@@ -210,7 +210,7 @@ handlePassMove _ _ Nothing = return $ InvalidCommand "Observers cannot move"
 handlePassMove sharedServerGame pool (Just playerNo) =
   handleMove sharedServerGame pool playerNo Pass moveOutcomeHandler
   where
-    moveOutcomeHandler (Left err) = InvalidCommand $ pack . show $ err
+    moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
 handleChatMessage :: ServerGame -> Chatroom -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
