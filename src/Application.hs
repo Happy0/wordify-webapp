@@ -97,8 +97,10 @@ import System.Log.FastLogger
 import System.Random
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
+import Wordify.Rules.Extra.SpanishExtraRule (spanishGameExtraRules)
 import qualified Prelude as P
 import Migrations.DatabaseTileListFormatMigration (runTileListMigration)
+import Model.GameSetup (LocalisedGameSetup (GameSetup))
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -191,7 +193,11 @@ loadGameBundle locale =
   do
     bag <- loadBag $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "bag"
     dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "dict"
-    return $ (pack locale, GameSetup dictionary bag)
+
+    case locale of
+      "es_fise" -> return $ (pack locale, GameSetup dictionary bag spanishGameExtraRules)
+      _ -> return $ (pack locale, GameSetup dictionary bag [])
+    
 
 loadBag :: String -> IO LetterBag
 loadBag locale =

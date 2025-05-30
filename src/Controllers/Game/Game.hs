@@ -38,6 +38,9 @@ import Wordify.Rules.Pos
 import Wordify.Rules.ScrabbleError
 import Wordify.Rules.Tile
 import Prelude
+import Model.GameSetup (extraRules, LocalisedGameSetup)
+import qualified Control.Arrow as A
+import Wordify.Rules.Extra.ExtraRule (applyExtraRules, finalTransition, RuleApplicationsResult (finalTransition))
 
 handlePlayerConnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
 handlePlayerConnect pool serverGame Nothing = pure ()
@@ -140,7 +143,7 @@ handleMove ::
   Pool SqlBackend ->
   Int ->
   Move ->
-  (Either ScrabbleError GameTransition -> ServerResponse) ->
+  (Either Text GameTransition -> ServerResponse) ->
   IO ServerResponse
 handleMove serverGame pool playerMoving move moveOutcomeHandler =
   do
@@ -150,8 +153,10 @@ handleMove serverGame pool playerMoving move moveOutcomeHandler =
       then return $ InvalidCommand "Not your move"
       else do
         let channel = broadcastChannel serverGame
-        let moveOutcome = makeMove currentGameState move
-        case moveOutcome of
+        let moveOutcome = A.left (pack . show) (makeMove currentGameState move)
+        let moveWithLocalisedRulesOutcome = moveOutcome >>= flip applyLocalisedRules (gameSetup serverGame)
+
+        case moveWithLocalisedRulesOutcome of
           Left err -> return $ moveOutcomeHandler $ Left err
           Right transition -> do
             let eventMessage = transitionToMessage transition
@@ -164,6 +169,13 @@ handleMove serverGame pool playerMoving move moveOutcomeHandler =
               writeTChan channel eventMessage
 
             return $ moveOutcomeHandler moveOutcome
+
+applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameTransition
+applyLocalisedRules gameTransition localisedGameSetup =
+  let extraLocalisationGameRules = extraRules localisedGameSetup
+  in let ruleApplicationResult = applyExtraRules gameTransition extraLocalisationGameRules
+  in let resultWithTransformedError = A.left (pack. show) ruleApplicationResult
+  in finalTransition <$> resultWithTransformedError
 
 handleBoardMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
 handleBoardMove _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"

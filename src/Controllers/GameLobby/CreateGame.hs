@@ -25,19 +25,22 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Player
 import Prelude
 import qualified Prelude as P
+import Model.GameSetup( localisedDictionary, localisedLetterBag, LocalisedGameSetup)
 
 createGame :: App -> Int -> Locale -> IO (Either Text Text)
 createGame app numPlayers locale =
   runExceptT $
     do
+      let gameSetups = localisedGameSetups app
+      localeSetup <- hoistEither $ getLocaleSetup locale gameSetups
       newGameId <- lift $ T.pack . fst . randomString 8 <$> getStdGen
-      newGame <- setupGame app locale numPlayers
-      initialLobby <- lift $ createGameLobby app newGameId newGame numPlayers locale
+      newGame <- setupGame localeSetup numPlayers
+      initialLobby <- lift $ createGameLobby app newGameId newGame localeSetup numPlayers locale
       _ <- lift $ persistNewLobby (appConnPool app) newGameId locale initialLobby
       return newGameId
 
-createGameLobby :: App -> Text -> Game -> Int -> Text -> IO GameLobby
-createGameLobby app gameId game numPlayers gameLanguage =
+createGameLobby :: App -> Text -> Game -> LocalisedGameSetup -> Int -> Text -> IO GameLobby
+createGameLobby app gameId game localisedGameSetup numPlayers gameLanguage =
   do
     generator <- getStdGen
     timeCreated <- getCurrentTime
@@ -46,28 +49,24 @@ createGameLobby app gameId game numPlayers gameLanguage =
       broadcastChan <- newBroadcastTChan
       newGenerator <- newTVar generator
       serverPlayers <- newTVar []
-      let initialLobby = GameLobby game serverPlayers numPlayers broadcastChan newGenerator timeCreated gameLanguage
+      let initialLobby = GameLobby game serverPlayers numPlayers broadcastChan newGenerator timeCreated gameLanguage localisedGameSetup
       return initialLobby
 
-setupGame :: App -> Locale -> Int -> (ExceptT Text IO Game)
-setupGame app locale numPlayers =
+setupGame :: LocalisedGameSetup -> Int -> ExceptT Text IO Game
+setupGame localisedGameSetup numPlayers =
   do
-    let gameSetups = localisedGameSetups app
     players <- hoistEither $ createPlayers numPlayers
-    (dictionary, letterbag) <- hoistEither $ getLetterbagAndDictionary locale gameSetups
 
     -- Randomise the order of the letters in the letter bag
-    shuffledLetterbag <- lift $ shuffleWithNewGenerator letterbag
+    shuffledLetterbag <- lift $ shuffleWithNewGenerator (localisedLetterBag localisedGameSetup)
 
     -- Convert a ScrabbleError into a string to return to the client if we failed to create the game
     -- This should never happen when setting up a new game
-    hoistEither $ first (T.pack . show) $ makeGame players shuffledLetterbag dictionary
+    hoistEither $ first (T.pack . show) $ makeGame players shuffledLetterbag (localisedDictionary localisedGameSetup)
 
-getLetterbagAndDictionary :: Locale -> LocalisedGameSetups -> Either Text (Dictionary, LetterBag)
-getLetterbagAndDictionary locale setups =
-  do
-    setup <- note (T.concat ["Invalid locale: ", locale]) $ M.lookup locale setups
-    return (localisedDictionary setup, localisedLetterBag setup)
+getLocaleSetup :: Locale -> LocalisedGameSetups -> Either Text LocalisedGameSetup
+getLocaleSetup locale setups =
+  note (T.concat ["Invalid locale: ", locale]) $ M.lookup locale setups
 
 createPlayers :: Int -> Either Text (Player, Player, Maybe (Player, Maybe Player))
 createPlayers numPlayers

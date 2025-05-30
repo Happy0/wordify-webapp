@@ -35,17 +35,14 @@ import Text.Hamlet (hamletFile)
 import Text.Jasmine (minifym)
 import Wordify.Rules.Dictionary
 import Wordify.Rules.LetterBag
+import Wordify.Rules.Extra.ExtraRule (ExtraRule)
 import Yesod.Auth.Dummy
 import Yesod.Auth.OAuth2
 import Yesod.Auth.OpenId (IdentifierType (Claimed), authOpenId)
 import Yesod.Core.Types (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
 import Yesod.Default.Util (addStaticContentExternal)
-
-data LocalisedGameSetup = GameSetup
-  { localisedDictionary :: Dictionary,
-    localisedLetterBag :: LetterBag
-  }
+import Model.GameSetup (LocalisedGameSetup)
 
 data AuthDetails = AuthDetails
   { clientId :: Text,
@@ -132,7 +129,7 @@ appHeader =
   where
     numPlayerOptions = [2 .. 4]
     gameLanguages :: [String]
-    gameLanguages = ["en", "es"]
+    gameLanguages = ["en", "es_fise"]
 
 -- For now just don't show 'create game' button if the user isn't logged in.
 -- Todo: Prompt the user to log in
