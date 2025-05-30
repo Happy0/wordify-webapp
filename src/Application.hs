@@ -101,6 +101,7 @@ import Wordify.Rules.Extra.SpanishExtraRule (spanishGameExtraRules)
 import qualified Prelude as P
 import Migrations.DatabaseTileListFormatMigration (runTileListMigration)
 import Model.GameSetup (LocalisedGameSetup (GameSetup))
+import Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService)
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -157,7 +158,7 @@ makeFoundation appSettings inactivityTracker = do
   games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
   gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing
 
-  let definitionService = toDefinitionServiceImpl FreeDictionaryService
+  let definitionService = toDefinitionServiceImpl (makeWiktionaryService "en")
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
