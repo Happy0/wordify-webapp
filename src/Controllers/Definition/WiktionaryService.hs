@@ -2,26 +2,29 @@
 module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService) where
     import qualified Data.Text as T
     import Controllers.Definition.DefinitionService (DefinitionService (getDefinitions), getDefinitionsImpl, Definition(Definition))
-    import ClassyPrelude (IO, undefined, Maybe, ($), pure, (<$>), traverse, SomeException, (.))
+    import ClassyPrelude ( IO, undefined,
+      Maybe,
+      ($),
+      pure,
+      (<$>),
+      traverse,
+      SomeException,
+      (.),
+      not,
+      (==))
     import Data.Either (Either (..))
     import qualified Data.Map as M
     import Data.Aeson
-    import Data.Aeson.Types (withObject)
-    import Data.Aeson ((.:))
-    import ClassyPrelude (Either(Right))
     import Control.Exception (try)
     import Control.Monad ((>>=), mapM)
     import Network.HTTP.Req (runReq, defaultHttpConfig, GET (GET), req, https, (/:), NoReqBody (NoReqBody), jsonResponse, responseStatusCode, responseBody)
     import Data.Monoid (mempty)
     import Control.Error (note)
-    import ClassyPrelude (sequence)
     import Data.List (concat)
-    import Prelude (flip)
     import ClassyPrelude.Yesod (Maybe(..))
     import Text.HTML.TagSoup
     import qualified Data.List.Safe as L
-    import ClassyPrelude (not)
-    
+
     data WiktionaryService = WiktionaryService
 
     data WiktionaryDefinitionEntry = WiktionaryDefinitionEntry { definition :: T.Text, examples :: Maybe [T.Text] }
@@ -68,15 +71,20 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     mapDefinition :: WiktionaryDefinition -> Either T.Text [Definition]
     mapDefinition (WiktionaryDefinition partOfSpeech _ definitions) = mapM (`mapWithStrippedHtml` partOfSpeech) definitions
 
-    filterEmptyDefinitions :: [Definition] -> [Definition] 
+    filterEmptyDefinitions :: [Definition] -> [Definition]
     filterEmptyDefinitions = L.filter (not . isEmptyDefinition)
         where
             isEmptyDefinition (Definition partOfSpeech definition _) = T.null definition
 
+    filterSymbolDefinitions :: [WiktionaryDefinition] -> [WiktionaryDefinition]
+    filterSymbolDefinitions = L.filter (not . isSymbolPartOfSpeech)
+        where
+            isSymbolPartOfSpeech (WiktionaryDefinition partOfSpeech _ _) = partOfSpeech == "Symbol"
+
     mapResults :: T.Text -> WiktionaryDefinitionResponse  -> Either T.Text [Definition]
     mapResults languageShortcode (WiktionaryDefinitionResponse responseMap) = do
         definitions <- note "No definitions for language found" (M.lookup languageShortcode responseMap)
-        results <- mapM mapDefinition definitions
+        results <- mapM mapDefinition (filterSymbolDefinitions definitions)
         pure (filterEmptyDefinitions (concat results))
 
     -- TODO: follow any cases of form-of-definition to root definition
