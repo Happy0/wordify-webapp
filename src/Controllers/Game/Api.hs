@@ -275,11 +275,11 @@ appVersion :: Int
 appVersion = 1
 
 transitionToMessage :: GameTransition -> GameMessage
-transitionToMessage et@(ExchangeTransition newGameState beforeExchange afterExchange) =
+transitionToMessage et@(ExchangeTransition newGameState beforeExchange afterExchange tilesExchanged) =
   PlayerExchangeMove
     (G.moveNumber newGameState)
     (G.playerNumber newGameState)
-    (tilesOnRack beforeExchange L.\\ tilesOnRack afterExchange)
+    tilesExchanged
     (transitionToSummary et)
 transitionToMessage pt@(MoveTransition _ newGame wordsFormed) =
   PlayerBoardMove
@@ -311,7 +311,7 @@ transitionToMessage gf@(GameFinished game maybeWords) =
 transitionToSummary :: GameTransition -> MoveSummary
 transitionToSummary (MoveTransition player game formed) = toMoveSummary formed
 transitionToSummary (PassTransition _) = PassMoveSummary
-transitionToSummary (ExchangeTransition _ _ _) = ExchangeMoveSummary
+transitionToSummary (ExchangeTransition _ _ _ _) = ExchangeMoveSummary
 transitionToSummary (GameFinished game maybeWords) =
   GameEndSummary ((toTextScores . snd . wordsWithScores) <$> maybeWords) (G.players game)
   where

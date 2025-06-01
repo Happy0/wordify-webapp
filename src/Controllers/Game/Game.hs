@@ -203,7 +203,7 @@ handleExchangeMove sharedServerGame pool (Just playerNo) exchanged =
     moveOutcomeHandler
   where
     moveOutcomeHandler (Left err) = InvalidCommand err
-    moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
+    moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer _)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
     moveOutcomeHandler _ = InvalidCommand $ "internal server error, unexpected transition"
 
 handlePassMove :: ServerGame -> Pool SqlBackend -> Maybe Int -> IO ServerResponse
