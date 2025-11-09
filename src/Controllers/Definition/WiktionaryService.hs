@@ -17,7 +17,7 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     import Data.Aeson
     import Control.Exception (try)
     import Control.Monad ((>>=), mapM, (>>))
-    import Network.HTTP.Req (runReq, defaultHttpConfig, GET (GET), req, https, (/:), NoReqBody (NoReqBody), jsonResponse, responseStatusCode, responseBody)
+    import Network.HTTP.Req (runReq, defaultHttpConfig, GET (GET), req, https, (/:), NoReqBody (NoReqBody), jsonResponse, responseStatusCode, responseBody, header)
     import Data.Monoid (mempty)
     import Control.Error (note, ExceptT, runExceptT)
     import Data.List (concat)
@@ -177,7 +177,8 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
 
     doRequest :: T.Text -> IO (Either T.Text WiktionaryDefinitionResponse)
     doRequest word = runReq defaultHttpConfig $ do
-        r <- req GET (https "en.wiktionary.org" /: "api" /: "rest_v1" /: "page" /: "definition" /: word) NoReqBody jsonResponse mempty
+        let userAgentHeader = header "User-Agent" "Wordify-Webapp (https://github.com/happy0/wordify-webapp)"
+        r <- req GET (https "en.wiktionary.org" /: "api" /: "rest_v1" /: "page" /: "definition" /: word) NoReqBody jsonResponse userAgentHeader
         let body = (responseBody r :: Value)
         let statusCode = responseStatusCode r
 
