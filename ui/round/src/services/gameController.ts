@@ -1,0 +1,532 @@
+// Game Controller - bridges the transport layer with the game store
+
+import type {
+  IGameCommandSender,
+  IGameMessageHandler,
+  IGameTransport
+} from './interfaces'
+import { tileToWire, positionTileToWire } from './interfaces'
+import type { Position, Tile, PlayerSummary, PlacedTile } from '@/types/game'
+import { BOARD_LAYOUT } from '@/types/game'
+import type {
+  ServerMessage,
+  WireTile,
+  WirePositionTile,
+  ClientMessage
+} from '@/types/protocol'
+import { useGameStore, generateTileId } from '@/stores/gameStore'
+
+// Convert wire tile to internal tile format
+function wireTileToTile(wireTile: WireTile, candidate: boolean = false): Tile {
+  const isBlank = wireTile.value === 0
+  if (isBlank) {
+    return {
+      type: 'blank',
+      assigned: wireTile.letter === '_' ? null : wireTile.letter,
+      candidate,
+      id: generateTileId()
+    }
+  }
+  return {
+    type: 'letter',
+    letter: wireTile.letter,
+    value: wireTile.value,
+    candidate,
+    id: generateTileId()
+  }
+}
+
+export class GameController implements IGameCommandSender, IGameMessageHandler {
+  private transport: IGameTransport
+
+  constructor(transport: IGameTransport) {
+    this.transport = transport
+    this.setupMessageHandling()
+    this.setupReconnectParams()
+  }
+
+  private setupMessageHandling(): void {
+    this.transport.onMessage((data) => {
+      try {
+        const message = JSON.parse(data) as ServerMessage
+        this.handleServerMessage(message)
+      } catch (e) {
+        console.error('Failed to parse server message:', e)
+      }
+    })
+  }
+
+  private setupReconnectParams(): void {
+    this.transport.setReconnectParamsGetter(() => {
+      const store = useGameStore()
+      return {
+        lastChatMessageReceived: store.lastChatMessageReceived,
+        lastDefinitionReceived: store.lastDefinitionReceived
+      }
+    })
+  }
+
+  private handleServerMessage(message: ServerMessage): void {
+    switch (message.command) {
+      case 'initialise':
+        this.onInitialize({
+          playerNumber: message.payload.playerNumber,
+          playerMove: message.payload.playerMove,
+          players: message.payload.players,
+          rack: message.payload.rack,
+          tilesRemaining: message.payload.tilesRemaining,
+          connectionStatuses: message.payload.connectionStatuses,
+          moveHistory: message.payload.moveCommands
+        })
+        break
+
+      case 'boardMoveSuccess':
+        this.onBoardMoveSuccess(message.payload.rack)
+        break
+
+      case 'exchangeMoveSuccess':
+        this.onExchangeMoveSuccess(message.payload.rack)
+        break
+
+      case 'passMoveSuccess':
+        this.onPassMoveSuccess()
+        break
+
+      case 'potentialScore':
+        this.onPotentialScore(message.payload.potentialScore)
+        break
+
+      case 'error':
+        this.onError(message.payload.error)
+        break
+
+      case 'playerBoardMove':
+        this.onPlayerBoardMove({
+          moveNumber: message.payload.moveNumber,
+          placed: message.payload.placed,
+          summary: message.payload.summary,
+          players: message.payload.players,
+          nowPlaying: message.payload.nowPlaying,
+          tilesRemaining: message.payload.tilesRemaining
+        })
+        break
+
+      case 'playerPassMove':
+        this.onPlayerPassMove({
+          moveNumber: message.payload.moveNumber,
+          nowPlaying: message.payload.nowPlaying
+        })
+        break
+
+      case 'playerExchangeMove':
+        this.onPlayerExchangeMove({
+          moveNumber: message.payload.moveNumber,
+          nowPlaying: message.payload.nowPlaying
+        })
+        break
+
+      case 'gameFinished':
+        this.onGameFinished({
+          moveNumber: message.payload.moveNumber,
+          placed: message.payload.placed,
+          summary: message.payload.summary as {
+            type: 'gameEnd'
+            players: { name: string; score: number; endBonus?: number }[]
+            lastMoveScore: number
+            wordsMade: { word: string; score: number }[]
+          }
+        })
+        break
+
+      case 'playerChat':
+        this.onPlayerChat({
+          player: message.payload.player,
+          message: message.payload.message,
+          when: message.payload.when,
+          messageNumber: message.payload.messageNumber
+        })
+        break
+
+      case 'playerConnect':
+        this.onPlayerConnect({
+          playerNumber: message.payload.playerNumber,
+          when: message.payload.when
+        })
+        break
+
+      case 'playerDisconnect':
+        this.onPlayerDisconnect({
+          playerNumber: message.payload.playerNumber,
+          when: message.payload.when
+        })
+        break
+
+      case 'wordDefinitions':
+        this.onWordDefinitions({
+          word: message.payload.word,
+          when: message.payload.when,
+          definitions: message.payload.definitions,
+          definitionNumber: message.payload.definitionNumber
+        })
+        break
+
+      case 'chatSuccess':
+      case 'askDefinitionSuccess':
+        // Acknowledgement only, no action needed
+        break
+    }
+  }
+
+  private send(message: ClientMessage): void {
+    this.transport.send(JSON.stringify(message))
+  }
+
+  // IGameCommandSender implementation
+
+  requestPotentialScore(placements: { pos: Position; tile: Tile }[]): void {
+    this.send({
+      command: 'potentialScore',
+      payload: placements.map(p => positionTileToWire(p.pos, p.tile))
+    })
+  }
+
+  requestDefinition(word: string): void {
+    this.send({
+      command: 'askDefinition',
+      payload: { word }
+    })
+  }
+
+  sendChatMessage(message: string): void {
+    this.send({
+      command: 'say',
+      payload: { message }
+    })
+  }
+
+  submitBoardMove(placements: { pos: Position; tile: Tile }[]): void {
+    this.send({
+      command: 'boardMove',
+      payload: placements.map(p => positionTileToWire(p.pos, p.tile))
+    })
+  }
+
+  submitExchangeMove(tiles: Tile[]): void {
+    this.send({
+      command: 'exchangeMove',
+      payload: tiles.map(tileToWire)
+    })
+  }
+
+  submitPassMove(): void {
+    this.send({
+      command: 'passMove',
+      payload: null
+    })
+  }
+
+  // IGameMessageHandler implementation
+
+  onInitialize(data: {
+    playerNumber: number
+    playerMove: number
+    players: { name: string; score: number; endBonus?: number }[]
+    rack: WireTile[]
+    tilesRemaining: number
+    connectionStatuses: { playerNumber: number; active: boolean; lastSeen: string | null }[]
+    moveHistory: unknown[]
+  }): void {
+    const store = useGameStore()
+
+    // Create player summaries with connection status
+    const playerSummaries: PlayerSummary[] = data.players.map((p, index) => {
+      const connStatus = data.connectionStatuses.find(cs => cs.playerNumber === index)
+      return {
+        name: p.name,
+        score: p.score,
+        endBonus: p.endBonus,
+        connected: connStatus?.active ?? false,
+        lastSeen: connStatus?.lastSeen ? new Date(connStatus.lastSeen).getTime() : undefined
+      }
+    })
+
+    // Build placedTiles from move history
+    // Wire format already uses 1-based coordinates, so we keep them as-is for placedTiles
+    const placedTiles: PlacedTile[] = []
+    for (const moveCmd of data.moveHistory) {
+      const cmd = moveCmd as ServerMessage
+      if (cmd.command === 'playerBoardMove') {
+        for (const placed of cmd.payload.placed) {
+          const tile = wireTileToTile(placed.tile, false)
+          placedTiles.push({
+            position: { x: placed.pos.x, y: placed.pos.y },
+            tile
+          })
+        }
+      }
+    }
+
+    // Convert rack
+    const rack = data.rack.map(t => wireTileToTile(t, true))
+
+    store.initializeGame({
+      myPlayerNumber: data.playerNumber,
+      playerToMove: data.playerMove,
+      players: playerSummaries,
+      moveHistory: [],
+      tilesRemaining: data.tilesRemaining,
+      potentialScore: null,
+      lastMoveReceived: Date.now(),
+      chatMessages: [],
+      lastChatMessageReceived: 0,
+      lastDefinitionReceived: 0,
+      rack,
+      boardLayout: BOARD_LAYOUT,
+      placedTiles,
+      gameEnded: false
+    })
+
+    // Process move history for the move history display
+    for (const moveCmd of data.moveHistory) {
+      const cmd = moveCmd as ServerMessage
+      this.processMoveForHistory(cmd)
+    }
+  }
+
+  private processMoveForHistory(cmd: ServerMessage): void {
+    const store = useGameStore()
+
+    if (cmd.command === 'playerBoardMove') {
+      // Find which player made this move based on move number and players
+      const playerIndex = (cmd.payload.moveNumber - 1) % store.players.length
+      store.addMoveToHistory({
+        type: 'boardMove',
+        playerIndex,
+        overallScore: cmd.payload.summary.overallScore,
+        wordsMade: cmd.payload.summary.wordsMade
+      })
+    } else if (cmd.command === 'playerPassMove') {
+      const playerIndex = (cmd.payload.moveNumber - 1) % store.players.length
+      store.addMoveToHistory({
+        type: 'pass',
+        playerIndex
+      })
+    } else if (cmd.command === 'playerExchangeMove') {
+      const playerIndex = (cmd.payload.moveNumber - 1) % store.players.length
+      store.addMoveToHistory({
+        type: 'exchange',
+        playerIndex
+      })
+    }
+  }
+
+  onBoardMoveSuccess(rack: WireTile[]): void {
+    const store = useGameStore()
+    store.confirmCandidateTiles()
+    store.updateRack(rack.map(t => wireTileToTile(t, true)))
+    store.updatePotentialScore(null)
+  }
+
+  onExchangeMoveSuccess(rack: WireTile[]): void {
+    const store = useGameStore()
+    store.updateRack(rack.map(t => wireTileToTile(t, true)))
+  }
+
+  onPassMoveSuccess(): void {
+    // Move confirmed, no additional action needed
+  }
+
+  onPotentialScore(score: number): void {
+    const store = useGameStore()
+    store.updatePotentialScore(score)
+  }
+
+  onError(error: string): void {
+    const store = useGameStore()
+    store.setError(error)
+  }
+
+  onPlayerBoardMove(data: {
+    moveNumber: number
+    placed: WirePositionTile[]
+    summary: {
+      type: 'board'
+      overallScore: number
+      wordsMade: { word: string; score: number }[]
+    }
+    players: { name: string; score: number; endBonus?: number }[]
+    nowPlaying: number
+    tilesRemaining: number
+  }): void {
+    const store = useGameStore()
+
+    // Place tiles on board (convert from 1-based wire format to 0-based)
+    for (const placed of data.placed) {
+      const tile = wireTileToTile(placed.tile, false)
+      store.placeTileFromServerMove(placed.pos.y - 1, placed.pos.x - 1, tile)
+    }
+
+    // Update players with new scores
+    const playerSummaries: PlayerSummary[] = data.players.map((p, index) => {
+      const existingPlayer = store.players[index]
+      return {
+        name: p.name,
+        score: p.score,
+        endBonus: p.endBonus,
+        connected: existingPlayer?.connected ?? false,
+        lastSeen: existingPlayer?.lastSeen
+      }
+    })
+    store.updatePlayers(playerSummaries)
+
+    // Update game state
+    store.updatePlayerToMove(data.nowPlaying)
+    store.updateTilesRemaining(data.tilesRemaining)
+
+    // Add to move history
+    const playerIndex = (data.moveNumber - 1) % store.players.length
+    store.addMoveToHistory({
+      type: 'boardMove',
+      playerIndex,
+      overallScore: data.summary.overallScore,
+      wordsMade: data.summary.wordsMade
+    })
+  }
+
+  onPlayerPassMove(data: {
+    moveNumber: number
+    nowPlaying: number
+  }): void {
+    const store = useGameStore()
+    store.updatePlayerToMove(data.nowPlaying)
+
+    const playerIndex = (data.moveNumber - 1) % store.players.length
+    store.addMoveToHistory({
+      type: 'pass',
+      playerIndex
+    })
+  }
+
+  onPlayerExchangeMove(data: {
+    moveNumber: number
+    nowPlaying: number
+  }): void {
+    const store = useGameStore()
+    store.updatePlayerToMove(data.nowPlaying)
+
+    const playerIndex = (data.moveNumber - 1) % store.players.length
+    store.addMoveToHistory({
+      type: 'exchange',
+      playerIndex
+    })
+  }
+
+  onGameFinished(data: {
+    moveNumber: number
+    placed: WirePositionTile[]
+    summary: {
+      type: 'gameEnd'
+      players: { name: string; score: number; endBonus?: number }[]
+      lastMoveScore: number
+      wordsMade: { word: string; score: number }[]
+    }
+  }): void {
+    const store = useGameStore()
+
+    // Place final tiles (convert from 1-based wire format to 0-based)
+    for (const placed of data.placed) {
+      const tile = wireTileToTile(placed.tile, false)
+      store.placeTileFromServerMove(placed.pos.y - 1, placed.pos.x - 1, tile)
+    }
+
+    // Update players with final scores and bonuses
+    const playerSummaries: PlayerSummary[] = data.summary.players.map((p, index) => {
+      const existingPlayer = store.players[index]
+      return {
+        name: p.name,
+        score: p.score,
+        endBonus: p.endBonus,
+        connected: existingPlayer?.connected ?? false,
+        lastSeen: existingPlayer?.lastSeen
+      }
+    })
+    store.updatePlayers(playerSummaries)
+
+    // Add final move to history if there was one
+    if (data.placed.length > 0) {
+      const playerIndex = (data.moveNumber - 1) % store.players.length
+      store.addMoveToHistory({
+        type: 'boardMove',
+        playerIndex,
+        overallScore: data.summary.lastMoveScore,
+        wordsMade: data.summary.wordsMade
+      })
+    }
+
+    store.setGameEnded(true)
+  }
+
+  onPlayerChat(data: {
+    player: string
+    message: string
+    when: string
+    messageNumber: number
+  }): void {
+    const store = useGameStore()
+    store.addChatMessage({
+      type: 'message',
+      user: data.player,
+      message: data.message
+    })
+    store.updateLastChatMessageReceived(data.messageNumber)
+  }
+
+  onPlayerConnect(data: {
+    playerNumber: number
+    when: string
+  }): void {
+    const store = useGameStore()
+    store.setPlayerConnected(data.playerNumber, true)
+  }
+
+  onPlayerDisconnect(data: {
+    playerNumber: number
+    when: string
+  }): void {
+    const store = useGameStore()
+    const lastSeen = new Date(data.when).getTime()
+    store.setPlayerConnected(data.playerNumber, false, lastSeen)
+  }
+
+  onWordDefinitions(data: {
+    word: string
+    when: string
+    definitions: { partOfSpeech: string; definition: string; example: string }[]
+    definitionNumber: number
+  }): void {
+    const store = useGameStore()
+
+    // Add each definition as a chat message
+    for (const def of data.definitions) {
+      store.addChatMessage({
+        type: 'definition',
+        word: data.word,
+        partOfSpeech: def.partOfSpeech,
+        definition: def.definition,
+        example: def.example
+      })
+    }
+
+    // Update the last definition number received
+    store.updateLastDefinitionReceived(data.definitionNumber)
+  }
+
+  // Connection management
+  connect(url: string): void {
+    this.transport.connect(url)
+  }
+
+  disconnect(): void {
+    this.transport.disconnect()
+  }
+}

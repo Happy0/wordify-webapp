@@ -115,9 +115,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   defaultLayout $ do
     addStylesheet $ StaticR css_scrabble_css
     addStylesheet $ StaticR css_round_css
-    addStylesheet $ StaticR css_bootstrap_css
     addScript $ StaticR js_round_js
-    addScript $ StaticR js_touchpunch_js
     toWidget
       [julius|
               jQuery.noConflict();

@@ -1,21 +1,30 @@
 {
-    "name": "round",
-    "version": "0.0.1",
-    "description": "A game round in the web application.",
-    "main": "src/main.js",
-    "overrides": {
-        "graceful-fs": "^4.2.11"
-    },
-    "devDependencies": {
-        "browserify": "~9.0.8",
-        "gulp": "^3.9.1",
-        "gulp-util": "~3.0.4",
-        "vinyl-source-stream": "~1.1.0",
-        "watchify": "3.1.1"
-    },
-    "dependencies": {
-        "mithril": "0.2.0",
-        "scrabbleground": "github:happy0/scrabbleground"
-    },
-    "author": "Gordon Martin (https://github.com/happy0)"
+  "name": "wordify-ui",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "build:lib": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "serve": "npx serve ."
+  },
+  "dependencies": {
+    "@primeuix/themes": "^2.0.2",
+    "@tailwindcss/vite": "^4.1.18",
+    "pinia": "^3.0.4",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.4",
+    "tailwindcss": "^4.1.18",
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vue-tsc": "^3.1.4"
+  }
 }
