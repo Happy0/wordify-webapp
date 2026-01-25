@@ -6,8 +6,8 @@ import Aura from '@primeuix/themes/aura'
 import 'primeicons/primeicons.css'
 import './style.css'
 import App from './App.vue'
-import { useGameStore, generateTileId } from './stores/gameStore'
-import type { GameState, Tile, PlacedTile } from './types/game'
+import { useGameStore } from './stores/gameStore'
+import type { GameState, TileInput, PlacedTile } from './types/game'
 import { BOARD_LAYOUT } from './types/game'
 
 const app = createApp(App)
@@ -32,22 +32,22 @@ const store = useGameStore()
 // Pre-played tiles on the board (word "HELLO" horizontally starting at center)
 // Positions use 1-based coordinates as per the wire protocol
 const placedTiles: PlacedTile[] = [
-  { position: { x: 6, y: 8 }, tile: { type: 'letter', letter: 'H', value: 4, candidate: false, id: generateTileId() } },
-  { position: { x: 7, y: 8 }, tile: { type: 'letter', letter: 'E', value: 1, candidate: false, id: generateTileId() } },
-  { position: { x: 8, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1, candidate: false, id: generateTileId() } },
-  { position: { x: 9, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1, candidate: false, id: generateTileId() } },
-  { position: { x: 10, y: 8 }, tile: { type: 'letter', letter: 'O', value: 1, candidate: false, id: generateTileId() } }
+  { position: { x: 6, y: 8 }, tile: { type: 'letter', letter: 'H', value: 4 } },
+  { position: { x: 7, y: 8 }, tile: { type: 'letter', letter: 'E', value: 1 } },
+  { position: { x: 8, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
+  { position: { x: 9, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
+  { position: { x: 10, y: 8 }, tile: { type: 'letter', letter: 'O', value: 1 } }
 ]
 
-// Create mock rack
-const rack: Tile[] = [
-  { type: 'letter', letter: 'W', value: 4, candidate: true, id: generateTileId() },
-  { type: 'letter', letter: 'O', value: 1, candidate: true, id: generateTileId() },
-  { type: 'letter', letter: 'R', value: 1, candidate: true, id: generateTileId() },
-  { type: 'letter', letter: 'D', value: 2, candidate: true, id: generateTileId() },
-  { type: 'blank', assigned: null, candidate: true, id: generateTileId() },
-  { type: 'letter', letter: 'I', value: 1, candidate: true, id: generateTileId() },
-  { type: 'letter', letter: 'N', value: 1, candidate: true, id: generateTileId() }
+// Create mock rack (id and candidate are added internally)
+const rack: TileInput[] = [
+  { type: 'letter', letter: 'W', value: 4 },
+  { type: 'letter', letter: 'O', value: 1 },
+  { type: 'letter', letter: 'R', value: 1 },
+  { type: 'letter', letter: 'D', value: 2 },
+  { type: 'blank', assigned: null },
+  { type: 'letter', letter: 'I', value: 1 },
+  { type: 'letter', letter: 'N', value: 1 }
 ]
 
 // Initialize mock game state

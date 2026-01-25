@@ -100,24 +100,20 @@ export function createWordify(
 }
 
 // Export types for TypeScript users
+// Note: Only input types are exported (TileInput, etc.) - internal types with id/candidate are not exposed
 export type {
   GameState,
-  Tile,
-  BlankTile,
-  LetterTile,
-  BoardSquare,
+  TileInput,
+  BlankTileInput,
+  LetterTileInput,
   PlayerSummary,
   MoveSummary,
   ChatMessage,
   SquareType,
-  PlacedTile,
-  InternalGameState
+  PlacedTile
 } from './types/game'
 
 export type { ConnectionState, IGameCommandSender } from './services/interfaces'
 
 // Export constants
 export { BOARD_LAYOUT, BOARD_SIZE } from './types/game'
-
-// Export helper for generating tile IDs
-export { generateTileId } from './stores/gameStore'

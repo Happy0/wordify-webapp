@@ -22,67 +22,7 @@
     console.log('Wordify loaded:', Object.keys(Wordify));
   </script>
   <script>
-    // Helper to generate unique tile IDs
-    let tileIdCounter = 0;
-    function generateTileId() {
-      return 'tile-' + (++tileIdCounter) + '-' + Date.now();
-    }
-
-    // Create the board with the standard layout
-    const BOARD_SIZE = 15;
-    const BOARD_LAYOUT = [
-      ['TripleWord', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'TripleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'TripleWord'],
-      ['Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal'],
-      ['Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal'],
-      ['DoubleLetter', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'DoubleLetter'],
-      ['Normal', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'Normal'],
-      ['Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal'],
-      ['Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal'],
-      ['TripleWord', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'TripleWord'],
-      ['Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal'],
-      ['Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal'],
-      ['Normal', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'Normal'],
-      ['DoubleLetter', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'DoubleLetter'],
-      ['Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal', 'Normal'],
-      ['Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal'],
-      ['TripleWord', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'TripleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'TripleWord']
-    ];
-
-    // Build the board array
-    const board = [];
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      const rowSquares = [];
-      for (let col = 0; col < BOARD_SIZE; col++) {
-        rowSquares.push({
-          type: BOARD_LAYOUT[row][col],
-          tile: null,
-          row: row,
-          col: col
-        });
-      }
-      board.push(rowSquares);
-    }
-
-    // Add some pre-played tiles (word "HELLO")
-    const playedTiles = [
-      { letter: 'H', value: 4, row: 7, col: 5 },
-      { letter: 'E', value: 1, row: 7, col: 6 },
-      { letter: 'L', value: 1, row: 7, col: 7 },
-      { letter: 'L', value: 1, row: 7, col: 8 },
-      { letter: 'O', value: 1, row: 7, col: 9 }
-    ];
-
-    playedTiles.forEach(function(pt) {
-      board[pt.row][pt.col].tile = {
-        type: 'letter',
-        letter: pt.letter,
-        value: pt.value,
-        candidate: false,
-        id: generateTileId()
-      };
-    });
-
-    // Create the initial game state
+    // Create the initial game state using the new initialization format
     const initialState = {
       myPlayerNumber: 0,
       playerToMove: 0,
@@ -111,26 +51,49 @@
         { type: 'message', user: 'Bob', message: "Let's have fun!" }
       ],
       lastChatMessageReceived: 2,
+      lastDefinitionReceived: 0,
       rack: [
-        { type: 'letter', letter: 'W', value: 4, candidate: true, id: generateTileId() },
-        { type: 'letter', letter: 'O', value: 1, candidate: true, id: generateTileId() },
-        { type: 'letter', letter: 'R', value: 1, candidate: true, id: generateTileId() },
-        { type: 'letter', letter: 'D', value: 2, candidate: true, id: generateTileId() },
-        { type: 'blank', assigned: null, candidate: true, id: generateTileId() },
-        { type: 'letter', letter: 'I', value: 1, candidate: true, id: generateTileId() },
-        { type: 'letter', letter: 'N', value: 1, candidate: true, id: generateTileId() }
+        { type: 'letter', letter: 'W', value: 4 },
+        { type: 'letter', letter: 'O', value: 1 },
+        { type: 'letter', letter: 'R', value: 1 },
+        { type: 'letter', letter: 'D', value: 2 },
+        { type: 'blank', assigned: null },
+        { type: 'letter', letter: 'I', value: 1 },
+        { type: 'letter', letter: 'N', value: 1 }
       ],
-      board: board,
+      // Use the standard board layout exported by the library
+      boardLayout: Wordify.BOARD_LAYOUT,
+      // Sparse array of tiles already placed on the board (positions are 1-based)
+      // Word "HELLO" at row 8, starting at column 6
+      placedTiles: [
+        { position: { x: 6, y: 8 }, tile: { type: 'letter', letter: 'H', value: 4 } },
+        { position: { x: 7, y: 8 }, tile: { type: 'letter', letter: 'E', value: 1 } },
+        { position: { x: 8, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
+        { position: { x: 9, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
+        { position: { x: 10, y: 8 }, tile: { type: 'letter', letter: 'O', value: 1 } }
+      ],
       gameEnded: false
     };
 
-    // Mount the Wordify game
-    const game = Wordify.createWordify('#game-container', initialState);
+    // Mount the Wordify game using the options object format
+    const game = Wordify.createWordify('#game-container', {
+      initialState: initialState
+      // websocketUrl: 'wss://example.com/game/123'  // Uncomment to connect to a websocket
+    });
 
-    // You can update the state later:
+    // Monitor connection state:
+    // game.connectionState.value // 'disconnected', 'connecting', 'connected', or 'error'
+
+    // Connect to websocket later (if not provided in options):
+    // game.connect('wss://example.com/game/123');
+
+    // Disconnect from websocket:
+    // game.disconnect();
+
+    // Update state manually (e.g., for testing without websocket):
     // game.updateState(newState);
 
-    // Or unmount the game:
+    // Clean up when done (also disconnects websocket):
     // game.unmount();
 
     console.log('Wordify game mounted successfully!');

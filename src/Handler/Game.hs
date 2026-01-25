@@ -48,6 +48,7 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.Core
 import Yesod.WebSockets
+import Handler.Model.ClientGame (fromServerPlayer)
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -70,10 +71,10 @@ getGameR gameId = do
     (_, game) <- getCacheableResource (games app) gameId
     lift $ renderGamePage app gameId maybeUser game
 
-getConnectionStatuses :: ServerGame -> STM [ConnectionStatus]
-getConnectionStatuses serverGame = do
+getServerPlayers :: ServerGame -> STM [ServerPlayer]
+getServerPlayers serverGame = do
   snapshot <- makeServerGameSnapshot serverGame
-  pure $ connectionStatuses (snapshotPlayers snapshot)
+  pure $ snapshotPlayers snapshot
 
 chatMessageSinceQueryParamValue :: Handler (Maybe Int)
 chatMessageSinceQueryParamValue = do
@@ -104,7 +105,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let numTilesRemaining = bagSize (G.bag gameSoFar)
   let gameMoveSummaries = gameToMoveSummaries gameSoFar
 
-  connectionStatuses <- atomically $ getConnectionStatuses serverGame
+  serverPlayers <- atomically $ getServerPlayers serverGame
+  let clientPlayers = map fromServerPlayer serverPlayers
 
   case gameMoveSummaries of
     Left err -> invalidArgs [err]
@@ -118,7 +120,6 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
     addScript $ StaticR js_round_js
     toWidget
       [julius|
-              jQuery.noConflict();
 
               var url = document.URL,
               url = url.replace("http:", "ws:").replace("https:", "wss:");
@@ -133,63 +134,11 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               opts.moveHistory = #{toJSON summaries}
               opts.lastMoveReceived = #{toJSON (G.moveNumber gameSoFar)}
               opts.ground.highlightMoveMainWordClass = "highlight-main";
-              opts.connections = #{toJSON connectionStatuses}
 
-              var send = function(objectPayload) {
-                  if (!conn || conn.readyState !== WebSocket.OPEN) {
-                    return false;
-                  }
-
-                  var json = JSON.stringify(objectPayload);
-                  conn.send(json);
-
-                  return true;
-              }
-
-              opts.send = send;
-              var round = Round(opts);
-
-              //TODO: Make a rack be definable in the 'data' object
-              round.controller.updateRack(#{toJSON rack});
-
-              round.controller.setPlayerToMove(#{toJSON playing});
-
-              function connectWebsocket() {
-                var lastChatMessageReceived = round.controller.getLastChatMessageReceived();
-                var lastDefinitionReceived = round.controller.getLastDefinitionReceived();
-
-                var url = document.URL + `?chatMessagesSinceMessageNumber=${lastChatMessageReceived}&definitionsSinceMessageNumber=${lastDefinitionReceived}`;
-
-                url = url.replace("http:", "ws:").replace("https:", "wss:");
-                conn = new WebSocket(url);
-
-                conn.onmessage = function (e) {
-                  var data = JSON.parse(e.data);
-                  round.socketReceive(data);
-                };
-
-                conn.onclose = function(e) {
-                  console.log('Socket is closed. Reconnecting in 1 second.', e.reason);
-                  setTimeout(function() {
-                    connectWebsocket();
-                  }, 1000);
-                };
-
-                conn.onerror = function(err) {
-                  console.error('Socket error: ', err.message, 'Closing.');
-                  conn.close();
-                };
-              }
-
-              connectWebsocket()
-
-              document.addEventListener('DOMContentLoaded', function () {
-                if (Notification.permission !== "granted")
-                  Notification.requestPermission();
-              });
+             
           |]
     [whamlet|
-          <div #scrabbleground>
+          <div #wordifyround>
       |]
 
 subscribeChatGameMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage IO ()

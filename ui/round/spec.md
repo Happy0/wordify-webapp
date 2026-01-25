@@ -205,21 +205,16 @@ type ChatMessage = {
 type Tile = {
     type: "blank",
 
-    // The letter the blank is assigned
-    assigned: string | null,
-
-    // Whether this tile belongs to the user and has not yet been permanently played as a confirmed move on the board
-    candidate: boolean
+    // The letter the blank is assigned (null if unassigned)
+    assigned: string | null
 } | {
     type: "letter",
-    // The letter(s) the tile is assigned
-    assigned: string,
+
+    // The letter(s) on the tile
+    letter: string,
 
     // The value of the tile
-    value: number,
-
-    // Whether this tile belongs to the user and has not yet been permanently played as a confirmed move on the board
-    candidate: boolean
+    value: number
 }
 
 type BoardSquare = {
@@ -395,11 +390,11 @@ Running `npm run build` should produce:
       boardLayout: Wordify.BOARD_LAYOUT,
       // Sparse array of tiles already placed on the board (positions are 1-based)
       placedTiles: [
-        { position: { x: 8, y: 8 }, tile: { type: 'letter', letter: 'H', value: 4, candidate: false, id: 'tile-1' } },
-        { position: { x: 9, y: 8 }, tile: { type: 'letter', letter: 'E', value: 1, candidate: false, id: 'tile-2' } },
-        { position: { x: 10, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1, candidate: false, id: 'tile-3' } },
-        { position: { x: 11, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1, candidate: false, id: 'tile-4' } },
-        { position: { x: 12, y: 8 }, tile: { type: 'letter', letter: 'O', value: 1, candidate: false, id: 'tile-5' } }
+        { position: { x: 8, y: 8 }, tile: { type: 'letter', letter: 'H', value: 4 } },
+        { position: { x: 9, y: 8 }, tile: { type: 'letter', letter: 'E', value: 1 } },
+        { position: { x: 10, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
+        { position: { x: 11, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
+        { position: { x: 12, y: 8 }, tile: { type: 'letter', letter: 'O', value: 1 } }
       ],
       gameEnded: false
     };
@@ -437,5 +432,4 @@ Running `npm run build` should produce:
 The library should also export:
 * `BOARD_LAYOUT` - The standard board layout constant
 * `BOARD_SIZE` - The board size (15)
-* `generateTileId()` - Helper function to generate unique tile IDs
-* TypeScript types for `GameState`, `Tile`, `BoardSquare`, `PlacedTile`, `SquareType`, `PlayerSummary`, `ConnectionState`, `IGameCommandSender`, etc.
+* TypeScript types for `GameState`, `TileInput`, `BlankTileInput`, `LetterTileInput`, `PlacedTile`, `SquareType`, `PlayerSummary`, `MoveSummary`, `ChatMessage`, `ConnectionState`, `IGameCommandSender`

@@ -46,23 +46,32 @@ export type ChatMessage = {
   example: string
 }
 
-// Tile types - blank or letter
-export type BlankTile = {
+// Input tile types for initialization (id and candidate are internal concerns)
+export type BlankTileInput = {
   type: 'blank'
   // The letter the blank is assigned (null if unassigned)
   assigned: string | null
+}
+
+export type LetterTileInput = {
+  type: 'letter'
+  // The letter(s) on the tile
+  letter: string
+  // The value of the tile
+  value: number
+}
+
+export type TileInput = BlankTileInput | LetterTileInput
+
+// Internal tile types (with id and candidate tracking)
+export type BlankTile = BlankTileInput & {
   // Whether this tile belongs to the user and has not yet been permanently played
   candidate: boolean
   // Unique identifier for drag-drop tracking
   id: string
 }
 
-export type LetterTile = {
-  type: 'letter'
-  // The letter(s) the tile is assigned
-  letter: string
-  // The value of the tile
-  value: number
+export type LetterTile = LetterTileInput & {
   // Whether this tile belongs to the user and has not yet been permanently played
   candidate: boolean
   // Unique identifier for drag-drop tracking
@@ -92,7 +101,7 @@ export type Position = {
 // Position uses 1-based coordinates (1-15 for a standard 15x15 board)
 export type PlacedTile = {
   position: { x: number; y: number }
-  tile: Tile
+  tile: TileInput
 }
 
 // Game state representing the entire UI state (input format for initialization)
@@ -117,8 +126,8 @@ export type GameState = {
   lastChatMessageReceived: number
   // The sequence number of the last definition received
   lastDefinitionReceived: number
-  // The user's tile rack - up to 7 letters
-  rack: Tile[]
+  // The user's tile rack - up to 7 letters (tile IDs are optional - generated internally if not provided)
+  rack: TileInput[]
   // The layout of the board defining the type of each square
   // A 15x15 2D array where each entry is a SquareType
   boardLayout: SquareType[][]

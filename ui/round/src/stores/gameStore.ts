@@ -6,6 +6,7 @@ import type {
   MoveSummary,
   ChatMessage,
   Tile,
+  TileInput,
   BoardSquare,
   Position,
   SquareType,
@@ -45,6 +46,15 @@ function createEmptyBoard(): BoardSquare[][] {
   return createBoardFromLayout(BOARD_LAYOUT)
 }
 
+// Convert input tile to internal tile with id and candidate
+function toInternalTile(input: TileInput, candidate: boolean): Tile {
+  return {
+    ...input,
+    candidate,
+    id: generateTileId()
+  }
+}
+
 // Place tiles on the board from the sparse placedTiles array
 // Positions in placedTiles are 1-based and need to be converted to 0-based
 function placeTilesOnBoard(board: BoardSquare[][], placedTiles: PlacedTile[]): void {
@@ -56,7 +66,8 @@ function placeTilesOnBoard(board: BoardSquare[][], placedTiles: PlacedTile[]): v
     if (boardRow) {
       const square = boardRow[col]
       if (square) {
-        square.tile = { ...placed.tile, candidate: false }
+        // Placed tiles are not candidates (already played)
+        square.tile = toInternalTile(placed.tile, false)
       }
     }
   }
@@ -114,7 +125,8 @@ export const useGameStore = defineStore('game', () => {
     chatMessages.value = state.chatMessages
     lastChatMessageReceived.value = state.lastChatMessageReceived
     lastDefinitionReceived.value = state.lastDefinitionReceived
-    rack.value = state.rack
+    // Convert input tiles to internal tiles (rack tiles are candidates)
+    rack.value = state.rack.map(tile => toInternalTile(tile, true))
     gameEnded.value = state.gameEnded
 
     // Construct the board from boardLayout and placedTiles
