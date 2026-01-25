@@ -4,7 +4,6 @@ import ClassyPrelude (Text, Maybe (..), Int, Bool, (>), const, UTCTime (UTCTime)
 import Data.Aeson
 import Controllers.Game.Model.ServerPlayer
 import Data.Time.Clock.POSIX
-import Wordify.Rules.Board
 
 instance ToJSON ClientPlayer where
     toJSON (ClientPlayer name score endBonus connected lastSeen) = object [

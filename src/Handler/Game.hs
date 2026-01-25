@@ -115,26 +115,42 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let summaries = fromRight [] gameMoveSummaries
 
   defaultLayout $ do
-    addStylesheet $ StaticR css_scrabble_css
     addStylesheet $ StaticR css_round_css
     addScript $ StaticR js_round_js
     toWidget
       [julius|
 
-              var url = document.URL,
-              url = url.replace("http:", "ws:").replace("https:", "wss:");
-              var conn;
+              var url = document.URL;
+              var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
 
-              var opts = {element: document.getElementById("scrabbleground")};
-              opts.ground = {}
-              opts.ground.board = #{toJSON (G.board gameSoFar)};
-              opts.players = #{toJSON players}
-              opts.playerNumber = #{toJSON maybePlayerNumber}
-              opts.tilesRemaining = #{toJSON numTilesRemaining}
-              opts.moveHistory = #{toJSON summaries}
-              opts.lastMoveReceived = #{toJSON (G.moveNumber gameSoFar)}
-              opts.ground.highlightMoveMainWordClass = "highlight-main";
+              var initialState = {
+                myPlayerNumber: #{toJSON maybePlayerNumber},
+                playerToMove: #{toJSON playing},
+                players: #{toJSON clientPlayers},
+                // Just allow the first websocket message to initialise this for now
+                moveHistory: [],
+                tilesRemaining: #{toJSON numTilesRemaining},
+                potentialScore: null,
+                lastMoveReceived: Date.now(),
 
+                // Let the websocket deal with these
+                chatMessages: [],
+                lastChatMessageReceived: 0,
+                lastDefinitionReceived: 0,
+
+                // TODO
+                rack: [],
+                boardLayout: Wordify.BOARD_LAYOUT,
+
+                // Let the websocket deal with this
+                placedTiles: [],
+                gameEnded: false
+              }
+              
+              const game = Wordify.createWordify('#wordifyround', {
+                initialState: initialState,
+                websocketUrl: webSocketUrl
+              });
              
           |]
     [whamlet|
