@@ -126,11 +126,12 @@ Tiles are displayed differently depending on their context:
 * Each row contains the overall move score as well as the score of each individual word formed
 * When new moves are added, the widget scrolls to the bottom to show the latest move
 
-#### Chat 
+#### Chat
 
 * Made up of a chat box to display the messages and a box to allow the player to submit messages
 * The user's name who sent the message is displayed to the left of the message and is styled differently to the chat message itself to make it clear that's the name of the user who sent the message.
-* Can also display definitions of words played when they are requested.
+* Can also display definitions of words played when they are requested. Only the first 2 definitions are displayed for each word to avoid flooding the chat.
+* Messages and definitions are displayed in chronological order based on their server timestamps. Definitions appear interspersed with chat messages at the correct time they were received.
 
 ##### Interactions
 * Can submit messages pressing enter

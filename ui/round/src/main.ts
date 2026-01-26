@@ -75,8 +75,8 @@ const mockState: GameState = {
   potentialScore: null,
   lastMoveReceived: Date.now(),
   chatMessages: [
-    { type: 'message', user: 'Alice', message: 'Good luck everyone!' },
-    { type: 'message', user: 'Bob', message: 'Let\'s have fun!' }
+    { type: 'message', user: 'Alice', message: 'Good luck everyone!', when: '2024-01-15T10:00:00Z' },
+    { type: 'message', user: 'Bob', message: 'Let\'s have fun!', when: '2024-01-15T10:01:00Z' }
   ],
   lastChatMessageReceived: 2,
   lastDefinitionReceived: 0,

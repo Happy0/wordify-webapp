@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted, computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 import InputText from 'primevue/inputtext'
@@ -12,6 +12,13 @@ const emit = defineEmits<{
 
 const store = useGameStore()
 const { chatMessages } = storeToRefs(store)
+
+// Sort messages by timestamp so definitions appear in the correct order among chat messages
+const sortedMessages = computed(() => {
+  return [...chatMessages.value].sort((a, b) => {
+    return new Date(a.when).getTime() - new Date(b.when).getTime()
+  })
+})
 
 const messageInput = ref('')
 const chatContainer = ref<HTMLElement | null>(null)
@@ -64,14 +71,14 @@ function handleKeyDown(e: KeyboardEvent) {
       ref="chatContainer"
       class="flex-1 overflow-y-auto space-y-2 min-h-0 mb-3"
     >
-      <template v-if="chatMessages.length === 0">
+      <template v-if="sortedMessages.length === 0">
         <p class="text-gray-400 text-sm text-center py-4">
           No messages yet. Type <code class="bg-gray-100 px-1 rounded">!define word</code> to look up definitions.
         </p>
       </template>
 
       <div
-        v-for="(msg, index) in chatMessages"
+        v-for="(msg, index) in sortedMessages"
         :key="index"
         class="chat-message"
       >

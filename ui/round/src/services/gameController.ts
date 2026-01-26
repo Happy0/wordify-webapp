@@ -476,7 +476,8 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     store.addChatMessage({
       type: 'message',
       user: data.player,
-      message: data.message
+      message: data.message,
+      when: data.when
     })
     store.updateLastChatMessageReceived(data.messageNumber)
   }
@@ -506,14 +507,16 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
   }): void {
     const store = useGameStore()
 
-    // Add each definition as a chat message
-    for (const def of data.definitions) {
+    // Add only the first 2 definitions as chat messages to avoid flooding the chat
+    const limitedDefinitions = data.definitions.slice(0, 2)
+    for (const def of limitedDefinitions) {
       store.addChatMessage({
         type: 'definition',
         word: data.word,
         partOfSpeech: def.partOfSpeech,
         definition: def.definition,
-        example: def.example
+        example: def.example,
+        when: data.when
       })
     }
 

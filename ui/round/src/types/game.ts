@@ -35,6 +35,8 @@ export type ChatMessage = {
   type: 'message'
   user: string
   message: string
+  // Timestamp when the message was received (ISO 8601 string)
+  when: string
 } | {
   type: 'definition'
   word: string
@@ -44,6 +46,8 @@ export type ChatMessage = {
   definition: string
   // Example of the word being used in a sentence
   example: string
+  // Timestamp when the definition was received (ISO 8601 string)
+  when: string
 }
 
 // Input tile types for initialization (id and candidate are internal concerns)
