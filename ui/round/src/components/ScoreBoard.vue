@@ -1,10 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 
 const store = useGameStore()
 const { players, playerToMove, tilesRemaining, gameEnded, myPlayerNumber } = storeToRefs(store)
+
+// Reactive timestamp that updates every minute to keep "last seen" times fresh
+const currentTime = ref(Date.now())
+let updateInterval: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  updateInterval = setInterval(() => {
+    currentTime.value = Date.now()
+  }, 60000) // Update every minute
+})
+
+onUnmounted(() => {
+  if (updateInterval) {
+    clearInterval(updateInterval)
+    updateInterval = null
+  }
+})
 
 // Sort players by score for display (highest first)
 // Note: playerNumber is 1-based (player 1, player 2, etc.) to match the server protocol
@@ -21,7 +38,8 @@ const sortedPlayers = computed(() => {
 
 function formatLastSeen(lastSeen: number | undefined): string {
   if (!lastSeen) return ''
-  const now = Date.now()
+  // Use reactive currentTime to ensure re-render when timer updates
+  const now = currentTime.value
   const diffMs = now - lastSeen
   const diffMins = Math.floor(diffMs / 60000)
 
