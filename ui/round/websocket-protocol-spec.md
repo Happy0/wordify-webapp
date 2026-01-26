@@ -3,6 +3,8 @@
 ## Overview
 This document describes the WebSocket message protocol for a Scrabble-style game. Messages are JSON-encoded and fall into two categories: client-to-server messages and server-to-client messages.
 
+**Important:** Player numbers are 1-based throughout this protocol. In a 2-player game, players are numbered 1 and 2. In a 4-player game, players are numbered 1, 2, 3, and 4.
+
 ---
 
 ## Client Messages
@@ -495,6 +497,13 @@ Bonus types:
 - `TL` - Triple Letter
 - `DW` - Double Word
 - `TW` - Triple Word
+
+### Player Number
+Player numbers are **1-based integers**. In a 2-player game, valid player numbers are `1` and `2`. In a 4-player game, valid player numbers are `1`, `2`, `3`, and `4`.
+
+Fields using player numbers:
+- `playerNumber` - The player's number in the game
+- `playerMove` / `nowPlaying` - Which player's turn it is
 
 ### Player
 ```json

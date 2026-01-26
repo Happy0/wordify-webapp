@@ -7,9 +7,10 @@ const store = useGameStore()
 const { players, playerToMove, tilesRemaining, gameEnded, myPlayerNumber } = storeToRefs(store)
 
 // Sort players by score for display (highest first)
+// Note: playerNumber is 1-based (player 1, player 2, etc.) to match the server protocol
 const sortedPlayers = computed(() => {
   return [...players.value]
-    .map((player, index) => ({ ...player, index }))
+    .map((player, index) => ({ ...player, playerNumber: index + 1 }))
     .sort((a, b) => {
       // Calculate final score including end bonus
       const scoreA = a.score + (a.endBonus ?? 0)
@@ -48,12 +49,12 @@ function formatLastSeen(lastSeen: number | undefined): string {
     <div class="space-y-2">
       <div
         v-for="player in sortedPlayers"
-        :key="player.index"
+        :key="player.playerNumber"
         class="player-row flex items-center gap-2 p-2 rounded-md transition-colors"
         :class="{
-          'bg-amber-100 border-l-4 border-amber-500': playerToMove === player.index && !gameEnded,
-          'bg-gray-50': playerToMove !== player.index || gameEnded,
-          'ring-2 ring-blue-300': player.index === myPlayerNumber
+          'bg-amber-100 border-l-4 border-amber-500': playerToMove === player.playerNumber && !gameEnded,
+          'bg-gray-50': playerToMove !== player.playerNumber || gameEnded,
+          'ring-2 ring-blue-300': player.playerNumber === myPlayerNumber
         }"
       >
         <!-- Connection status indicator -->
@@ -70,7 +71,7 @@ function formatLastSeen(lastSeen: number | undefined): string {
         <div class="flex-1 min-w-0">
           <div class="font-medium text-gray-800 truncate">
             {{ player.name }}
-            <span v-if="player.index === myPlayerNumber" class="text-xs text-blue-500">(you)</span>
+            <span v-if="player.playerNumber === myPlayerNumber" class="text-xs text-blue-500">(you)</span>
           </div>
           <div
             v-if="!player.connected && player.lastSeen"
@@ -100,7 +101,7 @@ function formatLastSeen(lastSeen: number | undefined): string {
 
         <!-- Turn indicator -->
         <div
-          v-if="playerToMove === player.index && !gameEnded"
+          v-if="playerToMove === player.playerNumber && !gameEnded"
           class="flex-shrink-0"
         >
           <i class="pi pi-arrow-right text-amber-600 animate-pulse"></i>
