@@ -92,6 +92,24 @@ definitionsSinceQueryParamValue = do
     Left _ -> pure Nothing
     Right (messageNumber, _) -> pure (Just messageNumber)
 
+
+gamePagelayout :: Widget -> Handler Html
+gamePagelayout widget = do
+  pc <- widgetToPageContent widget
+  withUrlRenderer
+        [hamlet|
+            $doctype 5
+            <html>
+                <head>
+                    <title>Wordify
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    ^{pageHead pc}
+                <body>
+                    <div .special-wrapper>
+                        ^{pageBody pc}
+        |]
+
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
 renderGamePage app gameId maybeUser (Right serverGame) = do
@@ -114,7 +132,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
   let summaries = fromRight [] gameMoveSummaries
 
-  defaultLayout $ do
+  gamePagelayout $ do
     addStylesheet $ StaticR css_round_css
     addScript $ StaticR js_round_js
     toWidget
