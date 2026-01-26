@@ -279,6 +279,12 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     // Convert rack
     const rack = data.rack.map(t => wireTileToTile(t, true))
 
+    // Preserve existing chat state on reconnect - the server only sends new messages
+    // since the sequence numbers provided in the reconnection query parameters
+    const existingChatMessages = store.chatMessages
+    const existingLastChatMessageReceived = store.lastChatMessageReceived
+    const existingLastDefinitionReceived = store.lastDefinitionReceived
+
     store.initializeGame({
       myPlayerNumber: data.playerNumber,
       playerToMove: data.playerMove,
@@ -287,9 +293,9 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
       tilesRemaining: data.tilesRemaining,
       potentialScore: null,
       lastMoveReceived: Date.now(),
-      chatMessages: [],
-      lastChatMessageReceived: 0,
-      lastDefinitionReceived: 0,
+      chatMessages: existingChatMessages,
+      lastChatMessageReceived: existingLastChatMessageReceived,
+      lastDefinitionReceived: existingLastDefinitionReceived,
       rack,
       boardLayout: BOARD_LAYOUT,
       placedTiles,

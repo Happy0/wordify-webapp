@@ -318,6 +318,16 @@ wss://example.com/game/123?chatMessagesSinceMessageNumber=5&definitionsSinceMess
 
 This ensures the server only sends chat messages and definitions that were missed during the disconnection, avoiding duplicate messages.
 
+### Client State Preservation on Reconnect
+
+When the websocket reconnects and the server sends a new `initialise` message, the client must preserve certain state rather than resetting it:
+
+- **Chat messages**: The existing chat messages must be preserved. The server will only send new messages since the sequence number provided in the reconnection query parameters.
+- **lastChatMessageReceived**: Must be preserved to maintain correct message sequencing.
+- **lastDefinitionReceived**: Must be preserved to maintain correct definition sequencing.
+
+This ensures a seamless experience for the user where chat history is not lost during brief disconnections.
+
 # Code Architecture Concerns
 
 * As an entry point, it should be possible to initialise the overall Vue component for the 'game view' with a model of the 'GameState' type as a prop or whatever vue concpet is appropriate here. Assume that there is some server side rendering that will define a HTML document and initialise this vue page with the game state (but don't try to produce this - assume it will happen later.)
