@@ -92,7 +92,9 @@ export function createWordify(
       app.unmount()
     },
     updateState: (state: GameState) => store.initializeGame(state),
-    controller,
+    get controller() {
+      return controller
+    },
     connectionState,
     connect,
     disconnect

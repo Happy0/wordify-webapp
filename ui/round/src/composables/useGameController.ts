@@ -11,13 +11,15 @@ let transport: WebSocketTransport | null = null
 const connectionState = ref<ConnectionState>('disconnected')
 
 export function useGameController(): {
-  controller: IGameCommandSender | null
+  readonly controller: IGameCommandSender | null
   connectionState: Readonly<typeof connectionState>
   connect: (url: string) => void
   disconnect: () => void
 } {
   return {
-    controller,
+    get controller() {
+      return controller
+    },
     connectionState: readonly(connectionState),
     connect: (url: string) => {
       if (!transport) {
