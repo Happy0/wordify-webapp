@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 import InputText from 'primevue/inputtext'
@@ -16,16 +16,19 @@ const { chatMessages } = storeToRefs(store)
 const messageInput = ref('')
 const chatContainer = ref<HTMLElement | null>(null)
 
-// Auto-scroll to bottom when new messages arrive
-watch(
-  () => chatMessages.value.length,
-  async () => {
-    await nextTick()
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    }
+// Scroll chat to bottom
+async function scrollToBottom() {
+  await nextTick()
+  if (chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
   }
-)
+}
+
+// Scroll to bottom on mount (important for mobile where chat panel is conditionally rendered)
+onMounted(scrollToBottom)
+
+// Auto-scroll to bottom when new messages arrive
+watch(() => chatMessages.value.length, scrollToBottom)
 
 function handleSubmit() {
   const trimmed = messageInput.value.trim()

@@ -134,6 +134,7 @@ Tiles are displayed differently depending on their context:
 * Can submit messages pressing enter
 * On the mobile view should be able to use native keyboard to submit messages
 * The user can type "!define <word>" to request a definition of a word
+* The chat should always scroll to the bottom to show the most recent messages, including when the chat panel is first opened on mobile
 
 #### User Tile Rack
 
