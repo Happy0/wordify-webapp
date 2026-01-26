@@ -306,9 +306,15 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
   private processMoveForHistory(cmd: ServerMessage): void {
     const store = useGameStore()
 
+    // Calculate which player made this move based on nowPlaying (who plays next)
+    // nowPlaying is 1-based, we need 0-based index of the player who just moved
+    const getPlayerIndex = (nowPlaying: number) => {
+      const numPlayers = store.players.length
+      return (nowPlaying - 2 + numPlayers) % numPlayers
+    }
+
     if (cmd.command === 'playerBoardMove') {
-      // Find which player made this move based on move number and players
-      const playerIndex = (cmd.payload.moveNumber - 1) % store.players.length
+      const playerIndex = getPlayerIndex(cmd.payload.nowPlaying)
       store.addMoveToHistory({
         type: 'boardMove',
         playerIndex,
@@ -316,13 +322,13 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
         wordsMade: cmd.payload.summary.wordsMade
       })
     } else if (cmd.command === 'playerPassMove') {
-      const playerIndex = (cmd.payload.moveNumber - 1) % store.players.length
+      const playerIndex = getPlayerIndex(cmd.payload.nowPlaying)
       store.addMoveToHistory({
         type: 'pass',
         playerIndex
       })
     } else if (cmd.command === 'playerExchangeMove') {
-      const playerIndex = (cmd.payload.moveNumber - 1) % store.players.length
+      const playerIndex = getPlayerIndex(cmd.payload.nowPlaying)
       store.addMoveToHistory({
         type: 'exchange',
         playerIndex
@@ -394,7 +400,9 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     store.updateTilesRemaining(data.tilesRemaining)
 
     // Add to move history
-    const playerIndex = (data.moveNumber - 1) % store.players.length
+    // Calculate which player made this move: nowPlaying is 1-based, we need 0-based index
+    const numPlayers = store.players.length
+    const playerIndex = (data.nowPlaying - 2 + numPlayers) % numPlayers
     store.addMoveToHistory({
       type: 'boardMove',
       playerIndex,
@@ -410,7 +418,9 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     const store = useGameStore()
     store.updatePlayerToMove(data.nowPlaying)
 
-    const playerIndex = (data.moveNumber - 1) % store.players.length
+    // Calculate which player made this move: nowPlaying is 1-based, we need 0-based index
+    const numPlayers = store.players.length
+    const playerIndex = (data.nowPlaying - 2 + numPlayers) % numPlayers
     store.addMoveToHistory({
       type: 'pass',
       playerIndex
@@ -424,7 +434,9 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     const store = useGameStore()
     store.updatePlayerToMove(data.nowPlaying)
 
-    const playerIndex = (data.moveNumber - 1) % store.players.length
+    // Calculate which player made this move: nowPlaying is 1-based, we need 0-based index
+    const numPlayers = store.players.length
+    const playerIndex = (data.nowPlaying - 2 + numPlayers) % numPlayers
     store.addMoveToHistory({
       type: 'exchange',
       playerIndex
@@ -464,7 +476,9 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
 
     // Add final move to history if there was one
     if (data.placed.length > 0) {
-      const playerIndex = (data.moveNumber - 1) % store.players.length
+      // The player who made the final move is the current playerToMove (1-based),
+      // since it hasn't been updated yet. Convert to 0-based index.
+      const playerIndex = store.playerToMove - 1
       store.addMoveToHistory({
         type: 'boardMove',
         playerIndex,
