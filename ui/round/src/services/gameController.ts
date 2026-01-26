@@ -239,8 +239,9 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     const store = useGameStore()
 
     // Create player summaries with connection status
+    // Note: connectionStatuses.playerNumber is 1-based, so we compare with index + 1
     const playerSummaries: PlayerSummary[] = data.players.map((p, index) => {
-      const connStatus = data.connectionStatuses.find(cs => cs.playerNumber === index)
+      const connStatus = data.connectionStatuses.find(cs => cs.playerNumber === index + 1)
       return {
         name: p.name,
         score: p.score,
@@ -487,7 +488,8 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     when: string
   }): void {
     const store = useGameStore()
-    store.setPlayerConnected(data.playerNumber, true)
+    // Convert from 1-based player number to 0-based index
+    store.setPlayerConnected(data.playerNumber - 1, true)
   }
 
   onPlayerDisconnect(data: {
@@ -496,7 +498,8 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
   }): void {
     const store = useGameStore()
     const lastSeen = new Date(data.when).getTime()
-    store.setPlayerConnected(data.playerNumber, false, lastSeen)
+    // Convert from 1-based player number to 0-based index
+    store.setPlayerConnected(data.playerNumber - 1, false, lastSeen)
   }
 
   onWordDefinitions(data: {

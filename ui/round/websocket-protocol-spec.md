@@ -171,7 +171,9 @@ Sent when a player first connects, containing the full game state.
 }
 ```
 
-**Note:** The `moveCommands` array contains the game history. Each item in this array is a complete server message with its own `command` and `payload` fields, representing moves that have already occurred (e.g., `playerBoardMove`, `playerPassMove`, `playerExchangeMove`, etc.).
+**Notes:**
+- The `moveCommands` array contains the game history. Each item in this array is a complete server message with its own `command` and `payload` fields, representing moves that have already occurred (e.g., `playerBoardMove`, `playerPassMove`, `playerExchangeMove`, etc.).
+- `playerNumber`, `playerMove`, and `connectionStatuses[].playerNumber` are all 1-based (see [Player Number](#player-number) data type).
 
 #### 2. Board Move Success
 Confirms a successful board move and returns updated rack.
@@ -397,6 +399,8 @@ Notifies when a player connects.
 
 **Command:** `playerConnect`
 
+**Note:** `playerNumber` is 1-based (see [Player Number](#player-number) data type).
+
 ```json
 {
   "command": "playerConnect",
@@ -411,6 +415,8 @@ Notifies when a player connects.
 Notifies when a player disconnects.
 
 **Command:** `playerDisconnect`
+
+**Note:** `playerNumber` is 1-based (see [Player Number](#player-number) data type).
 
 ```json
 {
