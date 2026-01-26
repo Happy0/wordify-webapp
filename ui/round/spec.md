@@ -306,7 +306,9 @@ The protocol for the websocket messages is defined in websocket-protocol-spec.md
 
 ## WebSocket Reconnection
 
-When the websocket disconnects and reconnects, the client must tell the server to only send messages that were missed during the disconnection. This is done by appending query parameters to the websocket URL when reconnecting:
+When the websocket disconnects, the client must attempt to reconnect indefinitely until successful. Reconnection attempts should be made every 5 seconds (fixed delay, no exponential backoff). Reconnection only stops when the client explicitly calls disconnect.
+
+When reconnecting, the client must tell the server to only send messages that were missed during the disconnection. This is done by appending query parameters to the websocket URL when reconnecting:
 
 - `chatMessagesSinceMessageNumber`: The sequence number of the last chat message received (from `lastChatMessageReceived` in the game state)
 - `definitionsSinceMessageNumber`: The sequence number of the last definition received (from `lastDefinitionReceived` in the game state)

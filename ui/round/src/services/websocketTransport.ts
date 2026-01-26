@@ -7,16 +7,16 @@ export class WebSocketTransport implements IGameTransport {
   private state: ConnectionState = 'disconnected'
   private messageHandler: ((message: string) => void) | null = null
   private stateChangeHandler: ((state: ConnectionState) => void) | null = null
-  private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 1000
+  private reconnectDelay = 5000 // Fixed 5 second delay between reconnect attempts
   private url: string | null = null
   private reconnectParamsGetter: (() => ReconnectParams) | null = null
   private hasConnectedOnce = false
+  private shouldReconnect = true // Flag to control reconnection behavior
 
   connect(url: string): void {
     this.url = url
     this.hasConnectedOnce = false
+    this.shouldReconnect = true
     this.doConnect()
   }
 
@@ -47,7 +47,6 @@ export class WebSocketTransport implements IGameTransport {
       this.ws = new WebSocket(connectUrl)
 
       this.ws.onopen = () => {
-        this.reconnectAttempts = 0
         this.hasConnectedOnce = true
         this.setState('connected')
       }
@@ -75,22 +74,20 @@ export class WebSocketTransport implements IGameTransport {
   }
 
   private attemptReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+    if (!this.shouldReconnect) {
       return
     }
 
-    this.reconnectAttempts++
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1)
-
+    // Fixed 5 second delay between reconnect attempts, retry indefinitely
     setTimeout(() => {
-      if (this.state === 'disconnected' || this.state === 'error') {
+      if (this.shouldReconnect && (this.state === 'disconnected' || this.state === 'error')) {
         this.doConnect()
       }
-    }, delay)
+    }, this.reconnectDelay)
   }
 
   disconnect(): void {
-    this.reconnectAttempts = this.maxReconnectAttempts // Prevent reconnection
+    this.shouldReconnect = false // Prevent reconnection
     if (this.ws) {
       this.ws.close()
       this.ws = null
