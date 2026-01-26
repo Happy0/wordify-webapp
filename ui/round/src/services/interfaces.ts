@@ -28,6 +28,10 @@ export function positionTileToWire(pos: Position, tile: Tile): WirePositionTile 
 
 // Interface for sending game commands to the server
 export interface IGameCommandSender {
+  // Connection management
+  connect(url: string): void
+  disconnect(): void
+
   // Request potential score for placed tiles
   requestPotentialScore(placements: { pos: Position; tile: Tile }[]): void
 

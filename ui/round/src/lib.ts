@@ -21,7 +21,7 @@ export interface WordifyInstance {
   app: App
   unmount: () => void
   updateState: (state: GameState) => void
-  controller: IGameCommandSender | null
+  controller: IGameCommandSender
   connectionState: Ref<ConnectionState>
   connect: (url: string) => void
   disconnect: () => void
@@ -56,28 +56,21 @@ export function createWordify(
   const store = useGameStore()
   store.initializeGame(opts.initialState)
 
-  // Set up websocket connection if URL provided
+  // Set up websocket transport and controller upfront (never null)
   const connectionState = ref<ConnectionState>('disconnected')
-  let transport: WebSocketTransport | null = null
-  let controller: GameController | null = null
+  const transport = new WebSocketTransport()
+  const controller = new GameController(transport)
+
+  transport.onStateChange((state) => {
+    connectionState.value = state
+  })
 
   const connect = (url: string) => {
-    if (!transport) {
-      transport = new WebSocketTransport()
-      transport.onStateChange((state) => {
-        connectionState.value = state
-      })
-    }
-
-    if (!controller) {
-      controller = new GameController(transport)
-    }
-
     controller.connect(url)
   }
 
   const disconnect = () => {
-    controller?.disconnect()
+    controller.disconnect()
   }
 
   // Auto-connect if websocketUrl was provided
@@ -92,9 +85,7 @@ export function createWordify(
       app.unmount()
     },
     updateState: (state: GameState) => store.initializeGame(state),
-    get controller() {
-      return controller
-    },
+    controller,
     connectionState,
     connect,
     disconnect

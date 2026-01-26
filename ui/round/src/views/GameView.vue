@@ -28,7 +28,7 @@ const props = defineProps<{
 
 const store = useGameStore()
 const { lastError, candidateTilesOnBoard } = storeToRefs(store)
-const gameController = useGameController()
+const { controller, connect } = useGameController()
 const toast = useToast()
 
 // Mobile panel state
@@ -62,7 +62,7 @@ onMounted(() => {
   }
 
   if (props.websocketUrl) {
-    gameController.connect(props.websocketUrl)
+    connect(props.websocketUrl)
   }
 })
 
@@ -70,12 +70,12 @@ onMounted(() => {
 watch(
   candidateTilesOnBoard,
   (candidates) => {
-    if (candidates.length > 0 && gameController.controller) {
+    if (candidates.length > 0) {
       const placements = candidates.map(c => ({
         pos: { x: c.col, y: c.row },
         tile: c.tile
       }))
-      gameController.controller.requestPotentialScore(placements)
+      controller.requestPotentialScore(placements)
     }
   },
   { deep: true }
@@ -104,39 +104,32 @@ function handleBlankLetterSelect(letter: string) {
 }
 
 function handleSubmit() {
-  if (!gameController.controller) return
-
   const placements = store.getCandidateTilePositions()
   if (placements.length > 0) {
-    gameController.controller.submitBoardMove(placements)
+    controller.submitBoardMove(placements)
   }
 }
 
 function handleExchange(tileIds: string[]) {
-  if (!gameController.controller) return
-
   const tiles = tileIds
     .map(id => store.rack.find(t => t.id === id))
     .filter((t): t is Tile => t !== undefined)
 
   if (tiles.length > 0) {
-    gameController.controller.submitExchangeMove(tiles)
+    controller.submitExchangeMove(tiles)
   }
 }
 
 function handlePass() {
-  if (!gameController.controller) return
-  gameController.controller.submitPassMove()
+  controller.submitPassMove()
 }
 
 function handleSendMessage(message: string) {
-  if (!gameController.controller) return
-  gameController.controller.sendChatMessage(message)
+  controller.sendChatMessage(message)
 }
 
 function handleRequestDefinition(word: string) {
-  if (!gameController.controller) return
-  gameController.controller.requestDefinition(word)
+  controller.requestDefinition(word)
 }
 
 // Mobile panel handlers
