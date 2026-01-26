@@ -118,6 +118,7 @@ Tiles are displayed differently depending on their context:
 * If the game is over, the player's end game bonus (based on how many tiles they have left) or penalty is displayed
 * Displays the number of tiles left in the letter bag
 * Makes it clear which player is currently the player to move
+* For disconnected players, displays when they were last seen (e.g., "5m ago"). This display updates automatically every minute to stay fresh without requiring a page refresh.
 
 #### Move History
 
