@@ -455,6 +455,15 @@ Broadcasts word definitions to all players.
 
 ## Data Types
 
+### Timestamp
+Timestamps are ISO 8601 formatted strings in UTC. They may include nanosecond precision (up to 9 decimal places for fractional seconds).
+
+Example: `"2026-01-26T20:14:35.303418622Z"`
+
+Fields using timestamps: `when`, `lastSeen`
+
+**Note:** When storing timestamps internally (e.g., in `GameState.players[].lastSeen`), they should be converted to milliseconds since the Unix epoch for consistency.
+
 ### Position
 ```json
 {

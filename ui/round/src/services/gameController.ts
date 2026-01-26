@@ -36,6 +36,15 @@ function wireTileToTile(wireTile: WireTile, candidate: boolean = false): Tile {
   }
 }
 
+// Parse ISO 8601 timestamp to milliseconds since epoch
+// Handles timestamps with nanosecond precision (e.g., "2026-01-26T20:14:35.303418622Z")
+// by truncating to milliseconds for browser compatibility
+function parseIsoTimestamp(isoString: string): number {
+  // Truncate fractional seconds to 3 digits (milliseconds) for browser compatibility
+  const truncated = isoString.replace(/(\.\d{3})\d+/, '$1')
+  return new Date(truncated).getTime()
+}
+
 export class GameController implements IGameCommandSender, IGameMessageHandler {
   private transport: IGameTransport
 
@@ -247,7 +256,7 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
         score: p.score,
         endBonus: p.endBonus,
         connected: connStatus?.active ?? false,
-        lastSeen: connStatus?.lastSeen ? new Date(connStatus.lastSeen).getTime() : undefined
+        lastSeen: connStatus?.lastSeen ? parseIsoTimestamp(connStatus.lastSeen) : undefined
       }
     })
 
@@ -497,7 +506,7 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     when: string
   }): void {
     const store = useGameStore()
-    const lastSeen = new Date(data.when).getTime()
+    const lastSeen = parseIsoTimestamp(data.when)
     // Convert from 1-based player number to 0-based index
     store.setPlayerConnected(data.playerNumber - 1, false, lastSeen)
   }
