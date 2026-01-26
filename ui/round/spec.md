@@ -122,7 +122,9 @@ Tiles are displayed differently depending on their context:
 #### Move History
 
 * Is a table (but not necessarily literally a HTML table) of all the moves played.
+* Moves are displayed in chronological order: the first move appears at the top, and the latest move appears at the bottom.
 * Each row contains the overall move score as well as the score of each individual word formed
+* When new moves are added, the widget scrolls to the bottom to show the latest move
 
 #### Chat 
 

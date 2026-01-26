@@ -23,11 +23,11 @@ function getPlayerName(playerIndex: number): string {
   return players.value[playerIndex]?.name ?? `Player ${playerIndex + 1}`
 }
 
-// Reverse the history to show most recent first
-const reversedHistory = computed(() => {
-  return [...moveHistory.value].reverse().map((move, idx) => ({
+// Add move numbers to the history (first move at top, latest at bottom)
+const numberedHistory = computed(() => {
+  return moveHistory.value.map((move, idx) => ({
     ...move,
-    moveNumber: moveHistory.value.length - idx
+    moveNumber: idx + 1
   }))
 })
 </script>
@@ -45,7 +45,7 @@ const reversedHistory = computed(() => {
       </template>
 
       <div
-        v-for="(move, index) in reversedHistory"
+        v-for="(move, index) in numberedHistory"
         :key="index"
         class="move-entry p-2 rounded border-l-2 text-sm"
         :class="{
