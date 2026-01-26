@@ -1,4 +1,4 @@
-import { createApp, ref, type App, type Ref } from 'vue'
+import { createApp, type App, type Ref } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
@@ -7,8 +7,7 @@ import 'primeicons/primeicons.css'
 import './style.css'
 import AppComponent from './App.vue'
 import { useGameStore } from './stores/gameStore'
-import { GameController } from './services/gameController'
-import { WebSocketTransport } from './services/websocketTransport'
+import { useGameController } from './composables/useGameController'
 import type { GameState } from './types/game'
 import type { ConnectionState, IGameCommandSender } from './services/interfaces'
 
@@ -56,22 +55,8 @@ export function createWordify(
   const store = useGameStore()
   store.initializeGame(opts.initialState)
 
-  // Set up websocket transport and controller upfront (never null)
-  const connectionState = ref<ConnectionState>('disconnected')
-  const transport = new WebSocketTransport()
-  const controller = new GameController(transport)
-
-  transport.onStateChange((state) => {
-    connectionState.value = state
-  })
-
-  const connect = (url: string) => {
-    controller.connect(url)
-  }
-
-  const disconnect = () => {
-    controller.disconnect()
-  }
+  // Use the shared singleton controller from the composable
+  const { controller, connectionState, connect, disconnect } = useGameController()
 
   // Auto-connect if websocketUrl was provided
   if (opts.websocketUrl) {
