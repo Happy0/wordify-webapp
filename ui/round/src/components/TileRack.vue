@@ -28,20 +28,6 @@ const {
   dragState
 } = useTouchDragDrop()
 
-// Set up callbacks
-setDropCallback((row: number, col: number) => {
-  if (dragState.value.tileId) {
-    emit('tileDrop', row, col, dragState.value.tileId)
-  }
-  draggedTileId.value = null
-  emit('tileEndDrag')
-})
-
-setCancelCallback(() => {
-  draggedTileId.value = null
-  emit('tileEndDrag')
-})
-
 // Set up global touch handlers
 let cleanupTouchHandlers: (() => void) | null = null
 
@@ -78,6 +64,21 @@ function handleDragEnd() {
 
 function onTouchStart(e: TouchEvent, tileId: string) {
   if (!isMyTurn.value) return
+
+  // Set up callbacks on each touch start to ensure they haven't been overwritten
+  // by other components (e.g., board tile dragging)
+  setDropCallback((row: number, col: number) => {
+    if (dragState.value.tileId) {
+      emit('tileDrop', row, col, dragState.value.tileId)
+    }
+    draggedTileId.value = null
+    emit('tileEndDrag')
+  })
+
+  setCancelCallback(() => {
+    draggedTileId.value = null
+    emit('tileEndDrag')
+  })
 
   draggedTileId.value = tileId
   emit('tileStartDrag', tileId)
