@@ -181,13 +181,14 @@ function handleRequestDefinition(word: string) {
 // Mobile panel handlers
 function openMobilePanel(panel: 'scores' | 'history' | 'chat') {
   activeMobilePanel.value = panel
-  // Mark chat as read when opening the chat panel
-  if (panel === 'chat') {
-    saveLastSeenChatMessage()
-  }
 }
 
 function closeMobilePanel() {
+  // Mark chat as read when closing the chat panel (not when opening)
+  // This ensures messages received while viewing are marked as read
+  if (activeMobilePanel.value === 'chat') {
+    saveLastSeenChatMessage()
+  }
   activeMobilePanel.value = 'none'
 }
 
