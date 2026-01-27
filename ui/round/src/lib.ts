@@ -14,6 +14,7 @@ import type { ConnectionState, IGameCommandSender } from './services/interfaces'
 export interface WordifyOptions {
   initialState: GameState
   websocketUrl?: string
+  gameId?: string
 }
 
 export interface WordifyInstance {
@@ -54,6 +55,11 @@ export function createWordify(
   // Initialize the store with the provided state
   const store = useGameStore()
   store.initializeGame(opts.initialState)
+
+  // Set the game ID if provided (used for localStorage scoping)
+  if (opts.gameId) {
+    store.setGameId(opts.gameId)
+  }
 
   // Use the shared singleton controller from the composable
   const { controller, connectionState, connect, disconnect } = useGameController()

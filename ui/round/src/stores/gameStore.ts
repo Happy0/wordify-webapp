@@ -89,6 +89,7 @@ export const useGameStore = defineStore('game', () => {
   const board = ref<BoardSquare[][]>(createEmptyBoard())
   const gameEnded = ref<boolean>(false)
   const lastError = ref<string | null>(null)
+  const gameId = ref<string | null>(null)
 
   // Getters
   const isMyTurn = computed(() => myPlayerNumber.value === playerToMove.value)
@@ -299,6 +300,10 @@ export const useGameStore = defineStore('game', () => {
     lastError.value = null
   }
 
+  function setGameId(id: string) {
+    gameId.value = id
+  }
+
   // Get candidate tiles positioned for a move
   function getCandidateTilePositions(): { pos: Position; tile: Tile }[] {
     const positions: { pos: Position; tile: Tile }[] = []
@@ -332,6 +337,7 @@ export const useGameStore = defineStore('game', () => {
     board,
     gameEnded,
     lastError,
+    gameId,
 
     // Getters
     isMyTurn,
@@ -363,6 +369,7 @@ export const useGameStore = defineStore('game', () => {
     setGameEnded,
     setError,
     clearError,
+    setGameId,
     getCandidateTilePositions
   }
 })

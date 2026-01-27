@@ -168,7 +168,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               
               const game = Wordify.createWordify('#wordifyround', {
                 initialState: initialState,
-                websocketUrl: webSocketUrl
+                websocketUrl: webSocketUrl,
+                gameId: #{toJSON gameId}
               });
              
           |]

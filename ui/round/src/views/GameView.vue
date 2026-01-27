@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, provide } from 'vue'
+import { ref, watch, onMounted, provide, computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 import { useGameController } from '@/composables/useGameController'
@@ -27,9 +27,47 @@ const props = defineProps<{
 }>()
 
 const store = useGameStore()
-const { lastError, candidateTilesOnBoard } = storeToRefs(store)
+const { lastError, candidateTilesOnBoard, lastChatMessageReceived, gameId } = storeToRefs(store)
 const { controller, connect } = useGameController()
 const toast = useToast()
+
+// Unread chat message tracking (mobile only)
+const lastSeenChatMessage = ref<number>(0)
+
+function getStorageKey(): string | null {
+  if (!gameId.value) return null
+  return `wordify_lastSeenChat_${gameId.value}`
+}
+
+function loadLastSeenChatMessage() {
+  const key = getStorageKey()
+  if (!key) return
+  try {
+    const stored = localStorage.getItem(key)
+    if (stored) {
+      lastSeenChatMessage.value = parseInt(stored, 10) || 0
+    }
+  } catch {
+    // localStorage may not be available
+  }
+}
+
+function saveLastSeenChatMessage() {
+  const key = getStorageKey()
+  if (!key) return
+  try {
+    localStorage.setItem(key, lastChatMessageReceived.value.toString())
+    lastSeenChatMessage.value = lastChatMessageReceived.value
+  } catch {
+    // localStorage may not be available
+  }
+}
+
+const hasUnreadMessages = computed(() => {
+  // Only show unread indicator if we have a gameId for proper tracking
+  if (!gameId.value) return false
+  return lastChatMessageReceived.value > lastSeenChatMessage.value
+})
 
 // Mobile panel state
 const activeMobilePanel = ref<'none' | 'scores' | 'history' | 'chat'>('none')
@@ -64,6 +102,14 @@ onMounted(() => {
   if (props.websocketUrl) {
     connect(props.websocketUrl)
   }
+
+  // Load last seen chat message from localStorage
+  loadLastSeenChatMessage()
+})
+
+// Watch for gameId changes to load the correct last seen value
+watch(gameId, () => {
+  loadLastSeenChatMessage()
 })
 
 // Watch for tile placements and request potential score
@@ -135,6 +181,10 @@ function handleRequestDefinition(word: string) {
 // Mobile panel handlers
 function openMobilePanel(panel: 'scores' | 'history' | 'chat') {
   activeMobilePanel.value = panel
+  // Mark chat as read when opening the chat panel
+  if (panel === 'chat') {
+    saveLastSeenChatMessage()
+  }
 }
 
 function closeMobilePanel() {
@@ -401,13 +451,19 @@ provide('onRackDrop', handleRackDrop)
             rounded
             @click="openMobilePanel('history')"
           />
-          <Button
-            icon="pi pi-comments"
-            severity="secondary"
-            size="small"
-            rounded
-            @click="openMobilePanel('chat')"
-          />
+          <div class="relative">
+            <Button
+              icon="pi pi-comments"
+              :severity="hasUnreadMessages ? 'warn' : 'secondary'"
+              size="small"
+              rounded
+              @click="openMobilePanel('chat')"
+            />
+            <span
+              v-if="hasUnreadMessages"
+              class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"
+            />
+          </div>
         </div>
       </div>
 

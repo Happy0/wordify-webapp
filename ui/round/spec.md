@@ -134,6 +134,16 @@ Tiles are displayed differently depending on their context:
 * Can also display definitions of words played when they are requested. Only the first 2 definitions are displayed for each word to avoid flooding the chat.
 * Messages and definitions are displayed in chronological order based on their server timestamps. Definitions appear interspersed with chat messages at the correct time they were received.
 
+##### Unread Message Indicator (Mobile Only)
+
+On mobile devices, the chat button in the toolbar should be highlighted when there are unread messages. This helps users know when new messages have arrived without having to open the chat panel.
+
+* The unread indicator compares the `lastChatMessageReceived` from the game state against the last message number the user has viewed
+* The last viewed message number is stored in browser localStorage, allowing the unread status to persist across page refreshes and browser sessions
+* When the user opens the chat panel on mobile, the last viewed message number is updated to the current `lastChatMessageReceived` value
+* The localStorage key is scoped per game using the `gameId` option (e.g., `wordify_lastSeenChat_{gameId}`)
+* On desktop, the chat is always visible so there is no need for an unread indicator
+
 ##### Interactions
 * Can submit messages pressing enter
 * On the mobile view should be able to use native keyboard to submit messages
@@ -359,6 +369,7 @@ The game view must be packaged as a standalone library that can be used in any w
       * `placedTiles` - A sparse array of tiles already on the board, each with a `position` (using 1-based coordinates) and `tile` field
       * The initialization code constructs the internal board state by combining these two fields
     * `websocketUrl` - URL to connect to the game websocket (optional)
+    * `gameId` - Unique identifier for the game, used to scope browser localStorage keys for features like unread chat tracking (optional, but recommended)
   * For backwards compatibility, a plain `GameState` object can also be passed as the second argument instead of an options object
   * Returns an object with:
     * `app` - The Vue app instance
@@ -419,7 +430,8 @@ Running `npm run build` should produce:
     // Option 1: Initialize with websocket connection
     const game = Wordify.createWordify('#game-container', {
       initialState: initialState,
-      websocketUrl: 'wss://example.com/game/123'
+      websocketUrl: 'wss://example.com/game/123',
+      gameId: 'game-123'  // Used for localStorage scoping (e.g., unread chat tracking)
     });
 
     // Option 2: Initialize without websocket (backwards compatible)
