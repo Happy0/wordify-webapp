@@ -262,7 +262,13 @@ function handleBoardDrop(row: number, col: number) {
     const destRow = store.board[row]
     const destSquare = destRow?.[col]
 
-    if (destSquare?.tile?.candidate) {
+    if (destSquare?.tile && !destSquare.tile.candidate) {
+      // Square has a permanent tile - can't drop here, return tile to rack
+      const tile = store.removeTileFromBoard(fromRow, fromCol)
+      if (tile) {
+        store.addTileToRack(tile)
+      }
+    } else if (destSquare?.tile?.candidate) {
       // Swap tiles
       const destTile = store.removeTileFromBoard(row, col)
       const srcTile = store.removeTileFromBoard(fromRow, fromCol)
@@ -282,9 +288,30 @@ function handleBoardDrop(row: number, col: number) {
     }
   } else {
     // Moving from rack to board
+    // Check if destination square is available before removing from rack
+    const destRow = store.board[row]
+    const destSquare = destRow?.[col]
+
+    if (destSquare?.tile && !destSquare.tile.candidate) {
+      // Square has a permanent tile - can't drop here, cancel the drop
+      draggingTileId.value = null
+      draggingFromBoard.value = null
+      return
+    }
+
     const tile = store.removeTileFromRack(draggingTileId.value)
     if (tile) {
-      store.placeTileOnBoard(tile, row, col)
+      if (destSquare?.tile?.candidate) {
+        // Swap with existing candidate tile
+        const existingTile = store.removeTileFromBoard(row, col)
+        store.placeTileOnBoard(tile, row, col)
+        if (existingTile) {
+          store.addTileToRack(existingTile)
+        }
+      } else {
+        // Place on empty square
+        store.placeTileOnBoard(tile, row, col)
+      }
     }
   }
 
@@ -309,7 +336,13 @@ function handleTouchTileDrop(row: number, col: number, tileId: string) {
     const destRow = store.board[row]
     const destSquare = destRow?.[col]
 
-    if (destSquare?.tile?.candidate) {
+    if (destSquare?.tile && !destSquare.tile.candidate) {
+      // Square has a permanent tile - can't drop here, return tile to rack
+      const tile = store.removeTileFromBoard(fromRow, fromCol)
+      if (tile) {
+        store.addTileToRack(tile)
+      }
+    } else if (destSquare?.tile?.candidate) {
       // Swap tiles
       const destTile = store.removeTileFromBoard(row, col)
       const srcTile = store.removeTileFromBoard(fromRow, fromCol)
@@ -329,9 +362,30 @@ function handleTouchTileDrop(row: number, col: number, tileId: string) {
     }
   } else {
     // Moving from rack to board
+    // Check if destination square is available before removing from rack
+    const destRow = store.board[row]
+    const destSquare = destRow?.[col]
+
+    if (destSquare?.tile && !destSquare.tile.candidate) {
+      // Square has a permanent tile - can't drop here, cancel the drop
+      draggingTileId.value = null
+      draggingFromBoard.value = null
+      return
+    }
+
     const tile = store.removeTileFromRack(tileId)
     if (tile) {
-      store.placeTileOnBoard(tile, row, col)
+      if (destSquare?.tile?.candidate) {
+        // Swap with existing candidate tile
+        const existingTile = store.removeTileFromBoard(row, col)
+        store.placeTileOnBoard(tile, row, col)
+        if (existingTile) {
+          store.addTileToRack(existingTile)
+        }
+      } else {
+        // Place on empty square
+        store.placeTileOnBoard(tile, row, col)
+      }
     }
   }
 

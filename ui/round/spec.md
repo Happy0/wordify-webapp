@@ -106,11 +106,33 @@ Tiles are displayed differently depending on their context:
 
 ##### Interactions
 
-* When a tile is part of a move that's in the history and has already been played, it should not be possible to drag and drop the tile around
+* When a tile is part of a move that's in the history and has already been played (a "permanent tile"), it should not be possible to drag and drop the tile around
 * When the tile is one of the user's own tiles that hasn't yet been played AND it is currently the user's move it should be possible to drag and drop the tiles between the squares and the user's tile rack below the board.
 * Candidate tiles (tiles placed on the board but not yet submitted) can be picked up and moved to other board squares or dragged back to the tile rack. This allows the user to rearrange their placement before submitting their move.
 * When a tile is dropped anywhere other than a valid square on the board (e.g., dropped outside the board area), the tile should automatically return to the player's tile rack.
 * Once the user has submitted their move and the server has accepted it, the user should no longer be able to move those tiles.
+
+##### Drag and Drop Behaviour
+
+The following rules apply to drag and drop for both mouse (desktop) and touch (mobile) interactions. The behaviour must be identical regardless of input method.
+
+**Dropping a tile from the rack onto the board:**
+* If the destination square is empty: place the tile on the square
+* If the destination square has a candidate tile: swap the tiles (the candidate tile returns to the rack, the dragged tile takes its place)
+* If the destination square has a permanent tile: cancel the drop (the tile remains on the rack as if the drag never happened)
+
+**Dropping a candidate tile from one board square to another:**
+* If the destination square is empty: move the tile to the new square
+* If the destination square has another candidate tile: swap the two tiles
+* If the destination square has a permanent tile: cancel the drop and return the tile to the rack
+
+**Cancellation behaviour:**
+* Dropping a tile outside the board area returns it to the rack
+* Tiles must never "disappear" - every drag operation must result in the tile being either placed on a valid square or returned to the rack
+
+**Touch-specific requirements:**
+* Touch drag and drop must use isolated state per drag operation to prevent interference between consecutive drags
+* The tile being dragged must always correspond to the tile the user touched, regardless of any previous drag operations
 
 #### Score Board
 
