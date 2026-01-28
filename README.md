@@ -1,6 +1,6 @@
 # Wordify
 
-![Wordify board game](screenshot.png "Wordify")
+![Wordify board game](screenshot.jpeg "Wordify")
 
 A side project for me to learn stuff with but contributions welcome ':D.
 
