@@ -3,6 +3,7 @@ import { ref, onUnmounted } from 'vue'
 
 export type DragState = {
   isDragging: boolean
+  isPending: boolean // Touch started but not yet moved enough to drag
   tileId: string | null
   startX: number
   startY: number
@@ -12,8 +13,12 @@ export type DragState = {
   clone: HTMLElement | null
 }
 
+// Movement threshold in pixels before drag starts
+const DRAG_THRESHOLD = 10
+
 const dragState = ref<DragState>({
   isDragging: false,
+  isPending: false,
   tileId: null,
   startX: 0,
   startY: 0,
@@ -25,6 +30,7 @@ const dragState = ref<DragState>({
 
 let dropCallback: ((row: number, col: number) => void) | null = null
 let cancelCallback: (() => void) | null = null
+let tapCallback: ((tileId: string) => void) | null = null
 
 function createDragClone(element: HTMLElement, x: number, y: number): HTMLElement {
   const clone = element.cloneNode(true) as HTMLElement
@@ -71,9 +77,26 @@ function findDropTarget(x: number, y: number): { row: number; col: number } | nu
 }
 
 export function useTouchDragDrop() {
+  // Start pending drag - records intent to drag but doesn't create visual clone yet
+  function startPendingDrag(tileId: string, element: HTMLElement, clientX: number, clientY: number) {
+    dragState.value = {
+      isDragging: false,
+      isPending: true,
+      tileId,
+      startX: clientX,
+      startY: clientY,
+      currentX: clientX,
+      currentY: clientY,
+      element,
+      clone: null
+    }
+  }
+
+  // Actually start the visual drag (called when movement threshold exceeded)
   function startDrag(tileId: string, element: HTMLElement, clientX: number, clientY: number) {
     dragState.value = {
       isDragging: true,
+      isPending: false,
       tileId,
       startX: clientX,
       startY: clientY,
@@ -119,6 +142,7 @@ export function useTouchDragDrop() {
 
     dragState.value = {
       isDragging: false,
+      isPending: false,
       tileId: null,
       startX: 0,
       startY: 0,
@@ -130,7 +154,7 @@ export function useTouchDragDrop() {
   }
 
   function cancelDrag() {
-    if (!dragState.value.isDragging) return
+    if (!dragState.value.isDragging && !dragState.value.isPending) return
 
     const { clone, element } = dragState.value
 
@@ -146,6 +170,7 @@ export function useTouchDragDrop() {
 
     dragState.value = {
       isDragging: false,
+      isPending: false,
       tileId: null,
       startX: 0,
       startY: 0,
@@ -164,6 +189,10 @@ export function useTouchDragDrop() {
     cancelCallback = callback
   }
 
+  function setTapCallback(callback: (tileId: string) => void) {
+    tapCallback = callback
+  }
+
   // Touch event handlers
   function handleTouchStart(e: TouchEvent, tileId: string) {
     if (e.touches.length !== 1) return
@@ -176,21 +205,63 @@ export function useTouchDragDrop() {
     // Prevent default to avoid scrolling
     e.preventDefault()
 
-    startDrag(tileId, element, touch.clientX, touch.clientY)
+    // Start in pending state - actual drag starts when movement threshold exceeded
+    startPendingDrag(tileId, element, touch.clientX, touch.clientY)
   }
 
   function handleTouchMove(e: TouchEvent) {
-    if (!dragState.value.isDragging) return
+    if (!dragState.value.isDragging && !dragState.value.isPending) return
     if (e.touches.length !== 1) return
 
     e.preventDefault()
 
     const touch = e.touches[0]
     if (!touch) return
+
+    // If in pending state, check if movement exceeds threshold to start drag
+    if (dragState.value.isPending && !dragState.value.isDragging) {
+      const dx = touch.clientX - dragState.value.startX
+      const dy = touch.clientY - dragState.value.startY
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      if (distance >= DRAG_THRESHOLD) {
+        // Movement exceeded threshold - start actual drag
+        const { tileId, element } = dragState.value
+        if (tileId && element) {
+          startDrag(tileId, element, touch.clientX, touch.clientY)
+        }
+      }
+      return
+    }
+
     updateDrag(touch.clientX, touch.clientY)
   }
 
   function handleTouchEnd(e: TouchEvent) {
+    // If still in pending state (not moved enough to drag), treat as a tap
+    if (dragState.value.isPending && !dragState.value.isDragging) {
+      const tileId = dragState.value.tileId
+
+      // Reset state
+      dragState.value = {
+        isDragging: false,
+        isPending: false,
+        tileId: null,
+        startX: 0,
+        startY: 0,
+        currentX: 0,
+        currentY: 0,
+        element: null,
+        clone: null
+      }
+
+      // Call tap callback
+      if (tileId && tapCallback) {
+        tapCallback(tileId)
+      }
+      return
+    }
+
     if (!dragState.value.isDragging) return
 
     e.preventDefault()
@@ -198,6 +269,21 @@ export function useTouchDragDrop() {
   }
 
   function handleTouchCancel() {
+    // Reset pending state if active
+    if (dragState.value.isPending && !dragState.value.isDragging) {
+      dragState.value = {
+        isDragging: false,
+        isPending: false,
+        tileId: null,
+        startX: 0,
+        startY: 0,
+        currentX: 0,
+        currentY: 0,
+        element: null,
+        clone: null
+      }
+      return
+    }
     cancelDrag()
   }
 
@@ -238,6 +324,7 @@ export function useTouchDragDrop() {
     cancelDrag,
     setDropCallback,
     setCancelCallback,
+    setTapCallback,
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,

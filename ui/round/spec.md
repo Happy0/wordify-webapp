@@ -133,6 +133,7 @@ The following rules apply to drag and drop for both mouse (desktop) and touch (m
 **Touch-specific requirements:**
 * Touch drag and drop must use isolated state per drag operation to prevent interference between consecutive drags
 * The tile being dragged must always correspond to the tile the user touched, regardless of any previous drag operations
+* Touch interactions must distinguish between taps and drags using a movement threshold (10 pixels). A touch that ends without exceeding the threshold is treated as a tap, enabling blank tile letter assignment on touch devices. A touch that moves beyond the threshold initiates a drag operation.
 
 #### Score Board
 
@@ -180,7 +181,7 @@ On mobile devices, the chat button in the toolbar should be highlighted when the
 ##### Interactions
 
 * When it's the player's own move, they can drag tiles between their rack and the board. This should work with both a touch screen and a mouse
-* When a user has a blank tile on their rack they can interact with it to bring up a view where they can assign it a letter. The view disappears once they've chosen the letter and the blank tile is assigned that letter on the rack. It remains clear it's a blank letter and the user can click it again to assign a new letter. The view should display all the legal values the user can assign the blank tile with each option being in the style of the app's tiles
+* When a user has a blank tile on their rack or on the board (as a candidate tile), they can tap/click it to bring up a view where they can assign it a letter. The view disappears once they've chosen the letter and the blank tile is assigned that letter. It remains clear it's a blank letter and the user can tap/click it again to assign a new letter. The view should display all the legal values the user can assign the blank tile with each option being in the style of the app's tiles. On touch devices, this tap interaction works during the player's own turn thanks to the movement threshold that distinguishes taps from drags (see Touch-specific requirements under Board Interactions).
 
 ##### Move Controls
 

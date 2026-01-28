@@ -221,7 +221,7 @@ function handleBoardTileTouchStart(event: TouchEvent, tileId: string, fromRow: n
 
   // Use the touch drag composable from TileRack
   // Since we're using the same composable instance, the drop callback will be called
-  const { handleTouchStart, setDropCallback, setCancelCallback } = useTouchDragDrop()
+  const { handleTouchStart, setDropCallback, setCancelCallback, setTapCallback } = useTouchDragDrop()
 
   setDropCallback((row: number, col: number) => {
     handleTouchTileDrop(row, col, tileId)
@@ -235,6 +235,17 @@ function handleBoardTileTouchStart(event: TouchEvent, tileId: string, fromRow: n
       if (tile) {
         store.addTileToRack(tile)
       }
+    }
+    draggingTileId.value = null
+    draggingFromBoard.value = null
+  })
+
+  // Handle tap on blank tile on board - open letter selector
+  setTapCallback((tappedTileId: string) => {
+    // Check if this is a blank tile that can be assigned
+    const square = store.board.flat().find(sq => sq.tile?.id === tappedTileId)
+    if (square?.tile?.type === 'blank' && square.tile.candidate) {
+      handleBlankTileClick(tappedTileId)
     }
     draggingTileId.value = null
     draggingFromBoard.value = null

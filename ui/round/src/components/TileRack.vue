@@ -25,6 +25,7 @@ const {
   handleTouchCancel,
   setDropCallback,
   setCancelCallback,
+  setTapCallback,
   dragState
 } = useTouchDragDrop()
 
@@ -37,6 +38,11 @@ onMounted(() => {
     handleTouchEnd,
     handleTouchCancel
   )
+
+  // Set up tap callback to handle blank tile clicks on touch devices
+  setTapCallback((tileId: string) => {
+    handleTileClick(tileId)
+  })
 })
 
 onUnmounted(() => {
