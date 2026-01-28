@@ -1,6 +1,6 @@
 module Handler.Model.ClientGame where
 
-import ClassyPrelude (Text, Maybe (..), Int, Bool, (>), const, UTCTime (UTCTime), RealFrac (..), (.), map, undefined)
+import ClassyPrelude (Text, Maybe (..), Int, Bool, (>), const, UTCTime (UTCTime), RealFrac (..), (.), map, undefined, (*))
 import Data.Aeson
 import Controllers.Game.Model.ServerPlayer
 import Data.Time.Clock.POSIX
@@ -21,4 +21,4 @@ fromServerPlayer (ServerPlayer name _ _ numConnections lastActive) =
         playerName (Just n) = n
 
         toMillisecondsSinceUnixEpoch :: UTCTime -> Int
-        toMillisecondsSinceUnixEpoch = round . utcTimeToPOSIXSeconds
+        toMillisecondsSinceUnixEpoch utcTime = 1000 * (round (utcTimeToPOSIXSeconds utcTime))

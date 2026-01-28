@@ -233,7 +233,9 @@ persistPlayers gameId players =
             M.Player gameId identifier playerNumber lastActive
 
 updatePlayerLastSeen :: Pool SqlBackend -> T.Text -> T.Text -> UTCTime -> IO ()
-updatePlayerLastSeen pool gameId playerId now = return ()
+updatePlayerLastSeen pool gameId playerId now = do
+  withPool pool (updateWhere [M.PlayerGameId ==. gameId, M.PlayerPlayerId ==. playerId] [M.PlayerLastActive =. Just now])
+  return ()
 
 persistGameUpdate :: Pool SqlBackend -> T.Text -> Game -> GameMessage -> IO ()
 persistGameUpdate pool gameId _ (PlayerChat chatMessage) = pure ()
