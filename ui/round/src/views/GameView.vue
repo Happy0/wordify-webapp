@@ -445,7 +445,7 @@ provide('onRackDrop', handleRackDrop)
 </script>
 
 <template>
-  <div class="game-view flex flex-col bg-stone-100 overflow-hidden">
+  <div class="game-view h-screen flex flex-col bg-stone-100 overflow-hidden">
     <Toast />
 
     <!-- Desktop Layout -->
@@ -605,11 +605,6 @@ provide('onRackDrop', handleRackDrop)
 </template>
 
 <style scoped>
-.game-view {
-  height: 100vh;
-  height: 100dvh;
-}
-
 .shadow-up {
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
