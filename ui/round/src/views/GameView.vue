@@ -445,7 +445,7 @@ provide('onRackDrop', handleRackDrop)
 </script>
 
 <template>
-  <div class="game-view h-screen flex flex-col bg-stone-100 overflow-hidden">
+  <div class="game-view h-dvh flex flex-col bg-stone-100 overflow-hidden">
     <Toast />
 
     <!-- Desktop Layout -->
