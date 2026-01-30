@@ -139,6 +139,7 @@ The following rules apply to drag and drop for both mouse (desktop) and touch (m
 #### Score Board
 
 * Displays all players (between 2 - 4) and their current scores as well as an icon displaying if they are active or inactive (are on the game screen.)
+* Players are displayed in static game order (player 1 at the top, followed by players 2, 3, 4) rather than sorted by score. This provides a consistent layout throughout the game.
 * If the game is over, the player's end game bonus (based on how many tiles they have left) or penalty is displayed
 * Displays the number of tiles left in the letter bag
 * Makes it clear which player is currently the player to move

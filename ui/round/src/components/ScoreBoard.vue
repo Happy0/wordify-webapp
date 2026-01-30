@@ -25,15 +25,10 @@ onUnmounted(() => {
 
 // Sort players by score for display (highest first)
 // Note: playerNumber is 1-based (player 1, player 2, etc.) to match the server protocol
+// Players displayed in static order (player 1, 2, 3, etc.)
+// Note: playerNumber is 1-based to match the server protocol
 const sortedPlayers = computed(() => {
-  return [...players.value]
-    .map((player, index) => ({ ...player, playerNumber: index + 1 }))
-    .sort((a, b) => {
-      // Calculate final score including end bonus
-      const scoreA = a.score + (a.endBonus ?? 0)
-      const scoreB = b.score + (b.endBonus ?? 0)
-      return scoreB - scoreA
-    })
+  return players.value.map((player, index) => ({ ...player, playerNumber: index + 1 }))
 })
 
 function formatLastSeen(lastSeen: number | undefined): string {
