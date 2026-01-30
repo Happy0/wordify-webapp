@@ -14,10 +14,16 @@ RUN apt-get update && \
         xz-utils \
         zlib1g-dev \
         git \
-        gnupg \
-        npm && \
+        gnupg && \
     curl -sSL https://get.haskellstack.org/ | sh && \
     rm -rf /var/lib/apt/lists/*
+
+# Install nvm and Node.js
+ENV NVM_DIR=/root/.nvm
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash && \
+    . "$NVM_DIR/nvm.sh" && \
+    nvm install --lts && \
+    nvm use --lts
 
 
 # Without this haddock crashes for modules containing
@@ -38,7 +44,7 @@ COPY . .
 # Build the application
 RUN stack build --copy-bins --local-bin-path "bin"
 
-RUN bash build-ui.sh
+RUN . "$NVM_DIR/nvm.sh" && bash build-ui.sh
 
 # Runtime stage - use slim image for smaller size
 FROM debian:bookworm-slim as app

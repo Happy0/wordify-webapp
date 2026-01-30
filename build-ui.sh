@@ -3,6 +3,7 @@
 cd ui/round
 
 npm install
+npm install --only=dev
 npm run build
 
 cd ../..
