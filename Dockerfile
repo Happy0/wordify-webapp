@@ -14,9 +14,11 @@ RUN apt-get update && \
         xz-utils \
         zlib1g-dev \
         git \
-        gnupg && \
+        gnupg \
+        npm && \
     curl -sSL https://get.haskellstack.org/ | sh && \
     rm -rf /var/lib/apt/lists/*
+
 
 # Without this haddock crashes for modules containing
 # non-ASCII characters.
@@ -35,6 +37,8 @@ COPY . .
 
 # Build the application
 RUN stack build --copy-bins --local-bin-path "bin"
+
+RUN bash build-ui.sh
 
 # Runtime stage - use slim image for smaller size
 FROM debian:bookworm-slim as app

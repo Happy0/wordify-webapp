@@ -52,6 +52,12 @@ function handleSubmit() {
   }
 
   messageInput.value = ''
+
+  // Explicitly scroll to bottom after sending a message
+  // This ensures scrolling works on mobile when using the send button
+  // (the watch on chatMessages.length handles incoming messages, but
+  // there can be a delay before the server echoes our message back)
+  scrollToBottom()
 }
 
 function handleKeyDown(e: KeyboardEvent) {

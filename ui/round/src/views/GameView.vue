@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, provide, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, provide, computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 import { useGameController } from '@/composables/useGameController'
@@ -181,6 +181,8 @@ function handleRequestDefinition(word: string) {
 // Mobile panel handlers
 function openMobilePanel(panel: 'scores' | 'history' | 'chat') {
   activeMobilePanel.value = panel
+  // Push history state so browser back button closes the panel
+  history.pushState({ mobilePanel: panel }, '')
 }
 
 function closeMobilePanel() {
@@ -191,6 +193,22 @@ function closeMobilePanel() {
   }
   activeMobilePanel.value = 'none'
 }
+
+// Handle browser back button for mobile panels
+function handlePopState(_: PopStateEvent) {
+  // If any mobile panel is open, close it instead of navigating back
+  if (activeMobilePanel.value !== 'none') {
+    closeMobilePanel()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('popstate', handlePopState)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', handlePopState)
+})
 
 // Handle board tile drag start
 function handleBoardTileDragStart(tileId: string, fromRow: number, fromCol: number) {

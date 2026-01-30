@@ -42,7 +42,8 @@ This view should be responsive - it should be pleasant to use on both mobile/tab
 3. The other components specified above should be viewable by clicking a small button with an appropriate symbol on it to expand them
 4. No scrolling left or right or up or down should be required while on the main view but the move history and chat can be scrolled when they're being viewed
 5. It should be easy to get back to the main view from the 'expanded view' of the individual components using the back button or a button on the component
-6. It should be possible to drag and drop tiles on the rack and board on a touch screen. Touch-based drag and drop should show a visual clone of the tile being dragged that follows the user's finger.
+6. When any mobile panel (scores, chat, or move history) is open, pressing the browser back button should close the panel and return to the main view instead of navigating to the previous page in browser history. This is achieved by pushing a history state when opening these panels and handling the `popstate` event to close them.
+7. It should be possible to drag and drop tiles on the rack and board on a touch screen. Touch-based drag and drop should show a visual clone of the tile being dragged that follows the user's finger.
 
 #### Larger devices
 
@@ -172,6 +173,7 @@ On mobile devices, the chat button in the toolbar should be highlighted when the
 * On the mobile view should be able to use native keyboard to submit messages
 * The user can type "!define <word>" to request a definition of a word
 * The chat should always scroll to the bottom to show the most recent messages, including when the chat panel is first opened on mobile
+* After sending a message, the chat automatically scrolls to the bottom. This happens both when pressing enter on the keyboard and when pressing the send button on mobile.
 
 #### User Tile Rack
 
