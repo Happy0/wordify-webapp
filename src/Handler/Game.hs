@@ -47,7 +47,7 @@ import Wordify.Rules.Move
 import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.WebSockets
-import Handler.Model.ClientGame (fromServerPlayer)
+import Handler.Model.ClientGame (fromServerPlayer, fromServerTile)
 import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
 
@@ -118,13 +118,13 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
   gameSoFar <- liftIO (readTVarIO (game serverGame))
 
-  let rack = P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
+  let rack = map fromServerTile . P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
   let playersGameState = G.players gameSoFar
   let playing = G.playerNumber gameSoFar
   let numTilesRemaining = bagSize (G.bag gameSoFar)
   let gameMoveSummaries = gameToMoveSummaries gameSoFar
 
-  let gameOver = G.gameStatus gameSoFar == G.Finished 
+  let gameOver = G.gameStatus gameSoFar == G.Finished
 
   serverPlayers <- atomically $ getServerPlayers serverGame
   let clientPlayers = zipWith (fromServerPlayer gameOver) serverPlayers playersGameState
@@ -160,7 +160,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 lastDefinitionReceived: 0,
 
                 // TODO
-                rack: [],
+                rack: #{toJSON rack},
                 boardLayout: Wordify.BOARD_LAYOUT,
 
                 // Let the websocket deal with this

@@ -19,6 +19,13 @@ You are free to introduce other libraries, etc but please ask permission before 
 
 # Specification
 
+## Page Title
+
+The browser page title should indicate when it's the player's turn to help them notice (e.g., when the tab is in the background):
+
+* When it's the player's move, the title should be "Wordify | Your move"
+* When it's not the player's move, the title should be "Wordify"
+
 ## Game View Components
 
 The game view will have the following top level components which I will specify further in this section:
