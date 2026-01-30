@@ -97,7 +97,8 @@ export type WireMoveSummary = {
 
 export type InitialisePayload = {
   moveCommands: ServerMessage[]
-  rack: WireTile[]
+  // The player's tile rack, or null if the player is an observer (not a participant in the game)
+  rack: WireTile[] | null
   players: WirePlayer[]
   playerNumber: number
   playerMove: number

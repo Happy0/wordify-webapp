@@ -148,7 +148,7 @@ Sent when a player first connects, containing the full game state.
     "rack": [
       {"letter": "A", "value": 1},
       {"letter": "E", "value": 1}
-    ],
+    ],  // null for observers
     "players": [
       {
         "name": "Player1",
@@ -174,6 +174,7 @@ Sent when a player first connects, containing the full game state.
 **Notes:**
 - The `moveCommands` array contains the game history. Each item in this array is a complete server message with its own `command` and `payload` fields, representing moves that have already occurred (e.g., `playerBoardMove`, `playerPassMove`, `playerExchangeMove`, etc.).
 - `playerNumber`, `playerMove`, and `connectionStatuses[].playerNumber` are all 1-based (see [Player Number](#player-number) data type).
+- The `rack` field will be `null` if the connected user is an observer (not a participant in the game). Observers can view the game but do not have their own tiles.
 
 #### 2. Board Move Success
 Confirms a successful board move and returns updated rack.

@@ -127,7 +127,8 @@ export const useGameStore = defineStore('game', () => {
     lastChatMessageReceived.value = state.lastChatMessageReceived
     lastDefinitionReceived.value = state.lastDefinitionReceived
     // Convert input tiles to internal tiles (rack tiles are candidates)
-    rack.value = state.rack.map(tile => toInternalTile(tile, true))
+    // Rack will be null for observers who are not participants in the game
+    rack.value = state.rack ? state.rack.map(tile => toInternalTile(tile, true)) : []
     gameEnded.value = state.gameEnded
 
     // Construct the board from boardLayout and placedTiles

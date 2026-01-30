@@ -131,7 +131,8 @@ export type GameState = {
   // The sequence number of the last definition received
   lastDefinitionReceived: number
   // The user's tile rack - up to 7 letters (tile IDs are optional - generated internally if not provided)
-  rack: TileInput[]
+  // Will be null if the user is an observer (not a participant in the game)
+  rack: TileInput[] | null
   // The layout of the board defining the type of each square
   // A 15x15 2D array where each entry is a SquareType
   boardLayout: SquareType[][]

@@ -240,7 +240,7 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     playerNumber: number
     playerMove: number
     players: { name: string; score: number; endBonus?: number }[]
-    rack: WireTile[]
+    rack: WireTile[] | null
     tilesRemaining: number
     connectionStatuses: { playerNumber: number; active: boolean; lastSeen: string | null }[]
     moveHistory: unknown[]
@@ -276,8 +276,8 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
       }
     }
 
-    // Convert rack
-    const rack = data.rack.map(t => wireTileToTile(t, true))
+    // Convert rack (null for observers who are not participants in the game)
+    const rack = data.rack ? data.rack.map(t => wireTileToTile(t, true)) : null
 
     // Preserve existing chat state on reconnect - the server only sends new messages
     // since the sequence numbers provided in the reconnection query parameters

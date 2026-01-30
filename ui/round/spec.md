@@ -318,8 +318,9 @@ type GameState = {
     lastDefinitionReceived: number,
 
     // The user's tile rack - up to 7 letters, updated as the user shuffles the rack or drags and drops tiles on to the board
-    // or when the server sends the latest tile state
-    rack: Tile[],
+    // or when the server sends the latest tile state.
+    // Will be null if the user is an observer (not a participant in the game).
+    rack: Tile[] | null,
 
     // The layout of the board defining the type of each square (DoubleWord, TripleLetter, etc.)
     // A 15x15 2D array where each entry is a SquareType ("DoubleWord" | "TripleWord" | "TripleLetter" | "DoubleLetter" | "Normal")
