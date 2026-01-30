@@ -46,10 +46,10 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
 import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
-import Yesod.Core
 import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer)
-import qualified Text.Show as T
+import qualified Foundation as G
+import qualified Wordify.Rules.Move as G
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -119,13 +119,15 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   gameSoFar <- liftIO (readTVarIO (game serverGame))
 
   let rack = P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)
-  let players = G.players gameSoFar
+  let playersGameState = G.players gameSoFar
   let playing = G.playerNumber gameSoFar
   let numTilesRemaining = bagSize (G.bag gameSoFar)
   let gameMoveSummaries = gameToMoveSummaries gameSoFar
 
+  let gameOver = G.gameStatus gameSoFar == G.Finished 
+
   serverPlayers <- atomically $ getServerPlayers serverGame
-  let clientPlayers = map fromServerPlayer serverPlayers
+  let clientPlayers = zipWith (fromServerPlayer gameOver) serverPlayers playersGameState
 
   case gameMoveSummaries of
     Left err -> invalidArgs [err]

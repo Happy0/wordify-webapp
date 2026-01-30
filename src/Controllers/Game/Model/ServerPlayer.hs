@@ -18,7 +18,13 @@ import System.Random
 import qualified Wordify.Rules.Player as G
 import Prelude
 
-data ServerPlayer = ServerPlayer {name :: Maybe Text, playerId :: Text, gameId :: Text, numConnections :: Int, lastActive :: Maybe UTCTime}
+data ServerPlayer = ServerPlayer {
+  name :: Maybe Text,
+  playerId :: Text,
+  gameId :: Text,
+  numConnections :: Int,
+  lastActive :: Maybe UTCTime
+}
 
 makeNewPlayer :: Maybe Text -> Text -> Text -> Int -> Maybe UTCTime -> ServerPlayer
 makeNewPlayer playerName gameId playerId connections lastActive = ServerPlayer playerName playerId gameId connections lastActive
