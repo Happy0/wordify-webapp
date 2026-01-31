@@ -136,8 +136,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let summaries = fromRight [] gameMoveSummaries
 
   gamePagelayout $ do
-    addStylesheet $ StaticR css_round_css
-    addScript $ StaticR js_round_js
+    addStylesheet $ StaticR css_wordify_css
+    addScript $ StaticR js_wordify_js
     toWidget
       [julius|
 
@@ -168,7 +168,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 gameEnded: false
               }
               
-              const game = Wordify.createWordify('#wordifyround', {
+              const game = Wordify.createRound('#wordifyround', {
                 initialState: initialState,
                 websocketUrl: webSocketUrl,
                 gameId: #{toJSON gameId}

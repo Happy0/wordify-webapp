@@ -1,23 +1,8 @@
-# High Level Summary
+# Round View Specification
 
-I'm looking to build a front end of a multiplayer scrabble app. Specifically, we're going to build a component / view that displays an interactive game of scrabble that is in progress - not surrounding scaffolding like starting a game or viewing current games in progress nor the server code for the app as these have already been implemented.
+The Round view displays an interactive game of scrabble that is in progress. It shows the user's view of the game including information about the game state (score, move history) as well as the user's private tile rack.
 
-It will be used as part of a multiplayer webapp where 2-4 players can compete against each other, and will be the user's own view of the game including information about the game in progress (Such as the score and move history) as well as the user's private tile rack.
-
-We do not have to concern ourselves with the scrabble logic (around scoring, legal moves, etc) as the server will take care of this. We are concerned only with the display and interactions (such as dragging and dropping tiles on to the board.)
-
-# Stack
-
-1. Typescript
-2. npm
-3. The latest version of the Vue framework
-4. Tailwind CSS
-5. The Primevue component library 
-6. Use Vue Pinia for a global state store.
-
-You are free to introduce other libraries, etc but please ask permission before installing them.
-
-# Specification
+The scrabble logic (scoring, legal moves, etc) is handled by the server. This view is concerned only with display and interactions (such as dragging and dropping tiles onto the board).
 
 ## Page Title
 
@@ -31,7 +16,7 @@ The browser page title should indicate when it's the player's turn to help them 
 The game view will have the following top level components which I will specify further in this section:
 
 1. The board with the tiles that have been played
-2. A tile rack with the user's current tiles that they can play when it is their turn along with some controls for the tile rack. 
+2. A tile rack with the user's current tiles that they can play when it is their turn along with some controls for the tile rack.
 3. Buttons that the user can use to take their turn: submit, exchange and pass
 4. A chat box where players can communicate
 5. A score board with the player's names and their current scores
@@ -215,7 +200,7 @@ The UI must provide visual feedback about the WebSocket connection status to inf
 * When the connection is restored after being disconnected or in an error state, a brief toast notification appears confirming "Connection restored"
 * This notification automatically disappears after a few seconds
 
-# State
+## State
 
 The following 'GameState' model should be used to represent the overall state of the game UI.
 
@@ -311,7 +296,7 @@ type PlacedTile = {
 }
 
 type GameState = {
-    
+
     // The player number of the user
     myPlayerNumber: number,
 
@@ -359,7 +344,7 @@ type GameState = {
 }
 ```
 
-# Websocket Protocol 
+## Websocket Protocol
 
 The UI communicates with the server via a websocket protocol. The following specifies the messages that can be sent to the server from the client, and sent to the client from the server.
 
@@ -367,7 +352,7 @@ The UI should be updated as appropriate when messages are received from the serv
 
 The protocol for the websocket messages is defined in websocket-protocol-spec.md
 
-## WebSocket Reconnection
+### WebSocket Reconnection
 
 When the websocket disconnects, the client must attempt to reconnect indefinitely until successful. Reconnection attempts should be made every 5 seconds (fixed delay, no exponential backoff). Reconnection only stops when the client explicitly calls disconnect.
 
@@ -393,124 +378,18 @@ When the websocket reconnects and the server sends a new `initialise` message, t
 
 This ensures a seamless experience for the user where chat history is not lost during brief disconnections.
 
-# Code Architecture Concerns
+## Entry Point
 
-* As an entry point, it should be possible to initialise the overall Vue component for the 'game view' with a model of the 'GameState' type as a prop or whatever vue concpet is appropriate here. Assume that there is some server side rendering that will define a HTML document and initialise this vue page with the game state (but don't try to produce this - assume it will happen later.)
+The Round view is mounted using the `createRound` function:
 
-* The code to process messages received on the websocket and parse them should be kept seperate from the controller logic that updates the state or UI. The controller logic should be behind an interface that is agnostic of websockets, etc.
+```typescript
+import { createRound } from 'wordify-views'
 
-* Similarly, the code to send messages on the websocket should be kept separate. It should be behind an interface that doesn't know anything about websockets, etc.
-
-* These interfaces should make it possible to swap out the websockets for another technology or to perform local unit testing without a real socket connection, etc.
-
-* Use Vue Pinia for a global state store.
-
-# Library Packaging & Distribution
-
-The game view must be packaged as a standalone library that can be used in any web project, including non-Vue projects. It should be usable from a plain HTML document via a `<script>` tag without requiring a build system.
-
-## Requirements
-
-* The library must be built as a UMD bundle that exposes a global `Wordify` object when loaded via a script tag
-* All dependencies (Vue, Pinia, PrimeVue, etc.) must be bundled into the library so it works standalone
-* The library must export a `createWordify(element, options)` function that:
-  * Takes a CSS selector string or DOM element as the first argument
-  * Takes an options object as the second argument with:
-    * `initialState` - A `GameState` object to initialize the game (required). The `GameState` includes:
-      * `boardLayout` - A 2D array defining the type of each square (same format as `BOARD_LAYOUT`)
-      * `placedTiles` - A sparse array of tiles already on the board, each with a `position` (using 1-based coordinates) and `tile` field
-      * The initialization code constructs the internal board state by combining these two fields
-    * `websocketUrl` - URL to connect to the game websocket (optional)
-    * `gameId` - Unique identifier for the game, used to scope browser localStorage keys for features like unread chat tracking (optional, but recommended)
-  * For backwards compatibility, a plain `GameState` object can also be passed as the second argument instead of an options object
-  * Returns an object with:
-    * `app` - The Vue app instance
-    * `unmount()` - Function to unmount and clean up the game (also disconnects websocket)
-    * `updateState(state)` - Function to update the game state after initialization
-    * `controller` - The game controller for sending commands (null if no websocket connected)
-    * `connectionState` - A Vue ref containing the current connection state ('disconnected', 'connecting', 'connected', 'error')
-    * `connect(url)` - Function to connect to a websocket URL
-    * `disconnect()` - Function to disconnect from the websocket
-* CSS must be bundled into a separate file that can be loaded via a `<link>` tag
-* The library should also be available as an ES module for use with modern bundlers
-
-## Build Output
-
-Running `npm run build` should produce:
-* `dist/wordify.umd.js` - UMD bundle for script tag usage
-* `dist/wordify.es.js` - ES module for bundlers
-* `dist/wordify-ui.css` - Bundled styles
-
-## Example Usage (Plain HTML)
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <link rel="stylesheet" href="./dist/wordify-ui.css">
-</head>
-<body>
-  <div id="game-container"></div>
-
-  <script src="./dist/wordify.umd.js"></script>
-  <script>
-    const initialState = {
-      myPlayerNumber: 0,
-      playerToMove: 0,
-      players: [...],
-      moveHistory: [],
-      tilesRemaining: 100,
-      potentialScore: null,
-      lastMoveReceived: Date.now(),
-      chatMessages: [],
-      lastChatMessageReceived: 0,
-      lastDefinitionReceived: 0,
-      rack: [...],
-      // Use the standard board layout (or a custom one)
-      boardLayout: Wordify.BOARD_LAYOUT,
-      // Sparse array of tiles already placed on the board (positions are 1-based)
-      placedTiles: [
-        { position: { x: 8, y: 8 }, tile: { type: 'letter', letter: 'H', value: 4 } },
-        { position: { x: 9, y: 8 }, tile: { type: 'letter', letter: 'E', value: 1 } },
-        { position: { x: 10, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
-        { position: { x: 11, y: 8 }, tile: { type: 'letter', letter: 'L', value: 1 } },
-        { position: { x: 12, y: 8 }, tile: { type: 'letter', letter: 'O', value: 1 } }
-      ],
-      gameEnded: false
-    };
-
-    // Option 1: Initialize with websocket connection
-    const game = Wordify.createWordify('#game-container', {
-      initialState: initialState,
-      websocketUrl: 'wss://example.com/game/123',
-      gameId: 'game-123'  // Used for localStorage scoping (e.g., unread chat tracking)
-    });
-
-    // Option 2: Initialize without websocket (backwards compatible)
-    // const game = Wordify.createWordify('#game-container', initialState);
-
-    // Monitor connection state:
-    // game.connectionState.value // 'disconnected', 'connecting', 'connected', or 'error'
-
-    // Connect to websocket later (if not provided in options):
-    // game.connect('wss://example.com/game/123');
-
-    // Disconnect from websocket:
-    // game.disconnect();
-
-    // Update state manually (e.g., for testing without websocket):
-    // game.updateState(newState);
-
-    // Clean up when done (also disconnects websocket):
-    // game.unmount();
-  </script>
-</body>
-</html>
+const round = createRound('#game-container', {
+  initialState: gameState,
+  websocketUrl: 'wss://example.com/game/123',
+  gameId: 'game-123'
+})
 ```
 
-## Additional Exports
-
-The library should also export:
-* `BOARD_LAYOUT` - The standard board layout constant
-* `BOARD_SIZE` - The board size (15)
-* TypeScript types for `GameState`, `TileInput`, `BlankTileInput`, `LetterTileInput`, `PlacedTile`, `SquareType`, `PlayerSummary`, `MoveSummary`, `ChatMessage`, `ConnectionState`, `IGameCommandSender`
+See the main library spec for full API documentation.
