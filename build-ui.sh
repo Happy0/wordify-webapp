@@ -8,5 +8,5 @@ npm run build
 
 cd ../..
 
-cp ui/round/dist/wordify.umd.js static/js/round.js
-cp ui/round/dist/wordify-ui.css static/css/round.css
+cp ui/wordify-views/dist/wordify.umd.js static/js/round.js
+cp ui/wordify-views/dist/wordify-ui.css static/css/round.css
