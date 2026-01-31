@@ -500,7 +500,7 @@ provide('onRackDrop', handleRackDrop)
     <Transition name="banner">
       <div
         v-if="hasBeenConnected && connectionState !== 'connected'"
-        class="connection-banner flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium"
+        class="connection-banner fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium"
         :class="{
           'bg-yellow-100 text-yellow-800': connectionState === 'connecting',
           'bg-red-100 text-red-800': connectionState === 'disconnected' || connectionState === 'error'
@@ -698,9 +698,5 @@ provide('onRackDrop', handleRackDrop)
 .banner-leave-to {
   opacity: 0;
   transform: translateY(-100%);
-}
-
-.connection-banner {
-  flex-shrink: 0;
 }
 </style>
