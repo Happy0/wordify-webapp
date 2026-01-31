@@ -45,7 +45,7 @@ packages:
 extra-deps:
   - suspend-0.2.0.0@sha256:0d98526558b773c3ff792664bc45d7a083a32eedb6206d4101a7570869c75a28
   - timers-0.2.0.3@sha256:ec91266e5ed73e958857fd07332ed547ea01205133769fba51cc40577549ffe9
-  - wordify-0.5.0.0
+  - wordify-0.6.0.0
   - stm-containers-1.2.1.1
 # Override default flag values for local packages and extra-deps
 # flags: {}

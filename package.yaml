@@ -62,7 +62,7 @@ dependencies:
   - cookie
   - errors
   - stm
-  - monad-loops
+  - monad-loops >= 0.4.3 && < 0.5
   - resource-pool
   - resourcet
   - mtl
