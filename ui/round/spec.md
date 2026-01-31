@@ -185,7 +185,7 @@ On mobile devices, the chat button in the toolbar should be highlighted when the
 
 #### User Tile Rack
 
-* There is a 'shuffle' button with an icon on it to shuffle the letters on the user's tile rack to help them come up with words. This button is positioned to the right of the tile rack.
+* There is a 'shuffle' button with an icon on it to shuffle the letters on the user's tile rack to help them come up with words. This button is positioned to the right of the tile rack. The shuffle button is always enabled (even when it's not the player's turn) since it only affects the local display of the rack.
 * There is a 'recall' button with a down arrow icon on it to help the user quickly bring back all their candidate tiles from the board back on to their rack while they're making their move so they don't have to drag tile by tile on to the rack manually. This button is positioned to the left of the tile rack.
 
 ##### Interactions
@@ -196,6 +196,24 @@ On mobile devices, the chat button in the toolbar should be highlighted when the
 ##### Move Controls
 
 * There should be 'submit', 'shuffle' and 'pass' buttons that the user can click when it's their move. They should be greyed out when it is not their move
+
+#### Connection Status Indicator
+
+The UI must provide visual feedback about the WebSocket connection status to inform users when the connection is lost and when it is restored.
+
+##### Display
+
+* A banner appears at the top of the screen when the connection is not in the 'connected' state
+* The banner has two visual states:
+  * **Connecting/Reconnecting**: Yellow background with a spinning indicator and the text "Reconnecting..."
+  * **Disconnected/Error**: Red background with a warning icon and the text "Connection lost. Reconnecting..."
+* The banner smoothly animates in (slides down from top) when the connection is lost and animates out when restored
+* The banner does not take up space when hidden (no layout shift when connection is healthy)
+
+##### Reconnection Notification
+
+* When the connection is restored after being disconnected or in an error state, a brief toast notification appears confirming "Connection restored"
+* This notification automatically disappears after a few seconds
 
 # State
 

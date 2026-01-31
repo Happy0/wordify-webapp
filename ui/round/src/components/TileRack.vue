@@ -168,7 +168,6 @@ function handleDrop(e: DragEvent) {
       icon="pi pi-refresh"
       severity="secondary"
       size="small"
-      :disabled="!isMyTurn"
       title="Shuffle tiles"
       aria-label="Shuffle tiles"
       @click="handleShuffle"

@@ -28,7 +28,7 @@ const props = defineProps<{
 
 const store = useGameStore()
 const { lastError, candidateTilesOnBoard, lastChatMessageReceived, gameId, isMyTurn } = storeToRefs(store)
-const { controller, connect } = useGameController()
+const { controller, connect, connectionState } = useGameController()
 const toast = useToast()
 
 // Unread chat message tracking (mobile only)
@@ -90,6 +90,30 @@ watch(lastError, (error) => {
       life: 5000
     })
     store.clearError()
+  }
+})
+
+// Watch for reconnection success (only show toast after a genuine disconnection, not on initial load)
+const hasBeenConnected = ref(false)
+const wasDisconnected = ref(false)
+
+watch(connectionState, (newState) => {
+  if (newState === 'connected') {
+    if (wasDisconnected.value) {
+      toast.add({
+        severity: 'success',
+        summary: 'Connected',
+        detail: 'Connection restored',
+        life: 3000
+      })
+    }
+    hasBeenConnected.value = true
+    wasDisconnected.value = false
+  }
+
+  // Only mark as disconnected if we were previously connected
+  if (hasBeenConnected.value && (newState === 'disconnected' || newState === 'error')) {
+    wasDisconnected.value = true
   }
 })
 
@@ -472,6 +496,28 @@ provide('onRackDrop', handleRackDrop)
   <div class="game-view h-dvh flex flex-col bg-stone-100 overflow-hidden">
     <Toast />
 
+    <!-- Connection status banner (only show after initial connection) -->
+    <Transition name="banner">
+      <div
+        v-if="hasBeenConnected && connectionState !== 'connected'"
+        class="connection-banner flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium"
+        :class="{
+          'bg-yellow-100 text-yellow-800': connectionState === 'connecting',
+          'bg-red-100 text-red-800': connectionState === 'disconnected' || connectionState === 'error'
+        }"
+      >
+        <i
+          class="pi"
+          :class="{
+            'pi-spin pi-spinner': connectionState === 'connecting',
+            'pi-exclamation-triangle': connectionState === 'disconnected' || connectionState === 'error'
+          }"
+        />
+        <span v-if="connectionState === 'connecting'">Reconnecting...</span>
+        <span v-else>Connection lost. Reconnecting...</span>
+      </div>
+    </Transition>
+
     <!-- Desktop Layout -->
     <div class="hidden lg:flex flex-1 gap-4 p-4 min-h-0">
       <!-- Left sidebar: Scores + Potential Score + History -->
@@ -641,5 +687,20 @@ provide('onRackDrop', handleRackDrop)
 .slide-enter-from,
 .slide-leave-to {
   transform: translateY(100%);
+}
+
+.banner-enter-active,
+.banner-leave-active {
+  transition: all 0.3s ease;
+}
+
+.banner-enter-from,
+.banner-leave-to {
+  opacity: 0;
+  transform: translateY(-100%);
+}
+
+.connection-banner {
+  flex-shrink: 0;
 }
 </style>
