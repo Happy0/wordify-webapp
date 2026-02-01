@@ -11,6 +11,9 @@ import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositor
 import Yesod.Auth
 import Import.NoFoundation (css_wordify_css)
 import Import.NoFoundation (js_wordify_js)
+import Wordify.Rules.LetterBag (LetterBag(..))
+import Model.GameSetup (LocalisedGameSetup(..))
+import Wordify.Rules.Tile (tileValue)
 
 type TileValues = Map Text Int
 
@@ -25,11 +28,21 @@ instance ToJSON ActiveGameSummary where
     "tileValues" .= tileValues
      ]
 
-getTileValues :: App -> Text -> TileValues
-getTileValues app locale = M.empty
+getTileValues :: App -> Text -> Maybe TileValues
+getTileValues app locale = do
+  let setups = localisedGameSetups app
+  setup <- M.lookup locale setups
+  let letterBag = localisedLetterBag setup
+  let letters = validLetters letterBag
+  let values = M.map tileValue letters
+  let valuesWithText = M.mapKeys T.pack values
+  Just valuesWithText
+   
 
 mapGameSummary :: App -> GameSummary -> ActiveGameSummary
-mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale) = ActiveGameSummary gameId boardString myMove latestActivity (getTileValues app locale)
+mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale) =
+  let tileValues = fromMaybe M.empty (getTileValues app locale)
+  in ActiveGameSummary gameId boardString myMove latestActivity tileValues
 
 renderNotLoggedInPage :: Handler Html
 renderNotLoggedInPage =
