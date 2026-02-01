@@ -33,7 +33,6 @@ import System.Random
 import Web.Cookie
 import Yesod.Core
 import Yesod.WebSockets
-import Handler.ActiveGames (renderNotLoggedInPage)
 
 getCreateGamePageR :: Handler Html
 getCreateGamePageR = do

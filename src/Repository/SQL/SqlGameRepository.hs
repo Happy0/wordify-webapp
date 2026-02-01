@@ -62,9 +62,9 @@ toGameSummaries playerGameSummaries =
     extractValue (E.Entity _ x) = x
 
     toSummary :: (M.Player, M.Game, [M.Player]) -> GameSummary
-    toSummary ((M.Player _ _ playerNumber _), (M.Game gameId _ _ _ _ _ lastMoveMade currentMoveNumber _), allPlayers) =
+    toSummary ((M.Player _ _ playerNumber _), (M.Game gameId _ _ _ _ _ lastMoveMade currentMoveNumber board), allPlayers) =
       let playable = isPlayerMove currentMoveNumber (length allPlayers) playerNumber
-       in GameSummary gameId lastMoveMade playable
+       in GameSummary gameId lastMoveMade playable board
 
     isNotFinished :: M.Game -> Bool
     isNotFinished (M.Game gameId _ _ _ _ finishedAt lastMoveMade currentMoveNumber _) = isNothing finishedAt

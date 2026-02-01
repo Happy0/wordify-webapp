@@ -97,20 +97,20 @@
       {
         gameId: 'game-abc-123',
         boardString: game1Board,
-        players: ['Alice', 'Bob'],
-        yourMove: true
+        yourMove: true,
+        lastActivity: new Date(Date.now() - 5 * 60000).toISOString() // 5 minutes ago
       },
       {
         gameId: 'game-def-456',
         boardString: game2Board,
-        players: ['Charlie'],
-        yourMove: false
+        yourMove: false,
+        lastActivity: new Date(Date.now() - 3 * 3600000).toISOString() // 3 hours ago
       },
       {
         gameId: 'game-ghi-789',
         boardString: game3Board,
-        players: ['Diana', 'Eve'],
-        yourMove: true
+        yourMove: true,
+        lastActivity: new Date(Date.now() - 2 * 86400000).toISOString() // 2 days ago
       }
     ];
 

@@ -13,7 +13,9 @@ type LatestActivity = Maybe UTCTime
 
 type MyMove = Bool
 
-data GameSummary = GameSummary GameId LatestActivity MyMove
+type BoardString = T.Text
+
+data GameSummary = GameSummary GameId LatestActivity MyMove BoardString
 
 class GameRepository a where
   getActiveUserGames :: a -> UserId -> IO [GameSummary]

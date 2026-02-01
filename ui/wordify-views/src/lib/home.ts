@@ -22,14 +22,14 @@ export interface GameSummary {
   boardString: string
 
   /**
-   * Array of player names in the game
-   */
-  players: string[]
-
-  /**
    * Whether it's currently the user's turn in this game
    */
   yourMove: boolean
+
+  /**
+   * ISO 8601 timestamp of the last activity in the game
+   */
+  lastActivity: string
 }
 
 export interface HomeOptions {

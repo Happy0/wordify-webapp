@@ -5,8 +5,8 @@ import { fromBoardTextRepresentation, type TileValueMap } from '@/common/board-t
 
 const props = defineProps<{
   boardString: string
-  players: string[]
   yourMove: boolean
+  lastActivity: string
   gameId: string
   tileValues: TileValueMap
 }>()
@@ -77,9 +77,20 @@ function getTileLetter(row: number, col: number): string {
   return tile.letter
 }
 
-// Display other players (exclude empty strings and limit to 2)
-const displayPlayers = computed(() => {
-  return props.players.filter(p => p.length > 0).slice(0, 2)
+// Format last activity as relative time
+const formattedLastActivity = computed(() => {
+  const date = new Date(props.lastActivity)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
 })
 
 function navigateToGame() {
@@ -100,8 +111,8 @@ function navigateToGame() {
       >
         {{ yourMove ? 'Your turn' : 'Waiting...' }}
       </div>
-      <div class="text-xs text-gray-500 truncate max-w-24">
-        vs {{ displayPlayers.join(', ') }}
+      <div class="text-xs text-gray-500">
+        {{ formattedLastActivity }}
       </div>
     </div>
 

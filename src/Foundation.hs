@@ -104,72 +104,6 @@ mkYesodData "App" $(parseRoutesFile "config/routes")
 -- | A convenient synonym for creating forms.
 type Form x = Html -> MForm (HandlerFor App) (FormResult x, Widget)
 
-appHeader :: WidgetFor App ()
-appHeader =
-  do
-    maid <- maybeAuthId
-    toWidget
-      [whamlet|
-        <div style="padding: 5px 0px 15px 10px;border-bottom: 1px solid #e0e0e0;height: 30px;width: 100%;background: white;z-index: 1000;">
-          <span>
-            <a href=@{HomeR}> Home |
-          ^{createMyGamesButton}
-          ^{createGameButton}
-          <span>
-            <a href="http://www.github.com/happy0/wordify-webapp"> Source Code
-          ^{loginLogout}
-        |]
-    toWidget
-      [julius|
-          var gameGameLinkClicked = function() {
-              $("#create-game-lobby").modal();
-          };
-        |]
-    $(widgetFile "game-dialog")
-  where
-    numPlayerOptions = [2 .. 4]
-    gameLanguages :: [String]
-    gameLanguages = ["en", "es_fise"]
-
--- For now just don't show 'create game' button if the user isn't logged in.
--- Todo: Prompt the user to log in
-createGameButton :: Widget
-createGameButton = do
-  maid <- maybeAuthId
-  [whamlet|
-    $maybe _ <- maid
-        <span>
-            <a href="javascript:gameGameLinkClicked()"> Create Game |
-    $nothing
-        <span>
-    |]
-
-createMyGamesButton :: Widget
-createMyGamesButton = do
-  maid <- maybeAuthId
-  [whamlet|
-    $maybe _ <- maid
-        <span>
-            <a href=@{ActiveGamesR}> My Games |
-    $nothing
-        <span>
-    |]
-
-loginLogout :: Widget
-loginLogout =
-  do
-    maid <- maybeAuthId
-
-    toWidget
-      [hamlet|
-            $maybe _ <- maid
-                <span style="float: right; margin-right: 10px;">
-                    <a href=@{AuthR LogoutR}>Logout
-            $nothing
-                <span style="float: right; margin-right: 10px;">
-                    <a href=@{AuthR LoginR}>Login
-        |]
-
 -- | A convenient synonym for database access functions.
 type DB a =
   forall (m :: * -> *).
@@ -208,24 +142,6 @@ instance Yesod App where
   -- For details, see the CSRF documentation in the Yesod.Core.Handler module of the yesod-core package.
   yesodMiddleware :: (ToTypedContent res) => Handler res -> Handler res
   yesodMiddleware = defaultYesodMiddleware
-
-  defaultLayout :: Widget -> Handler Html
-  defaultLayout widget = do
-    master <- getYesod
-    mmsg <- getMessage
-
-    mcurrentRoute <- getCurrentRoute
-
-    pc <- widgetToPageContent $ do
-      addScriptRemote "//code.jquery.com/jquery-1.10.2.js"
-      addScriptRemote "//code.jquery.com/ui/1.11.4/jquery-ui.js"
-      addScriptRemote "//maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"
-      addStylesheetRemote "//maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css"
-      addStylesheet $ StaticR css_bootstrap_css
-      addStylesheet $ StaticR css_common_css
-      appHeader
-      $(widgetFile "default-layout")
-    withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet")
 
   -- The page to be redirected to when authentication is required.
   authRoute ::
@@ -361,3 +277,4 @@ unsafeHandler = Unsafe.fakeHandlerGetLogger appLogger
 -- https://github.com/yesodweb/yesod/wiki/Sending-email
 -- https://github.com/yesodweb/yesod/wiki/Serve-static-files-from-a-separate-domain
 -- https://github.com/yesodweb/yesod/wiki/i18n-messages-in-the-scaffolding
+

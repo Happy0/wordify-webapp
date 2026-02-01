@@ -9,8 +9,8 @@ import type { TileValueMap } from '@/common/board-text-presentation'
 export interface GameSummary {
   gameId: string
   boardString: string
-  players: string[]
   yourMove: boolean
+  lastActivity: string
 }
 
 const props = defineProps<{
@@ -49,8 +49,8 @@ function navigateToLogin() {
               :key="game.gameId"
               :game-id="game.gameId"
               :board-string="game.boardString"
-              :players="game.players"
               :your-move="game.yourMove"
+              :last-activity="game.lastActivity"
               :tile-values="tileValues"
             />
           </div>
