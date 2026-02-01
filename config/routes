@@ -11,6 +11,8 @@
 
 /test LoginTestPageR GET
 
+/create-lobby CreateGamePageR GET
+
 /games CreateGameR POST
 /games/#Text/lobby GameLobbyR GET
 /games/#Text GameR GET

@@ -33,6 +33,33 @@ import System.Random
 import Web.Cookie
 import Yesod.Core
 import Yesod.WebSockets
+import Handler.ActiveGames (renderNotLoggedInPage)
+
+getCreateGamePageR :: Handler Html
+getCreateGamePageR = do
+    app <- getYesod
+    liftIO $ trackRequestReceivedActivity (inactivityTracker app)
+    maid <- maybeAuthId
+    case maid of
+      Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
+      Just _ -> gamePagelayout $ do
+        addStylesheet $ (StaticR css_wordify_css)
+        addScript $ StaticR js_wordify_js
+        [whamlet|
+          <div #createlobby>
+              
+            |]
+        toWidget
+          [julius|
+            
+            const lobby = Wordify.createCreateGame('#createlobby', {
+              locales: {
+                "English": "en",
+                "Spanish (FISE)": "es_fise"
+              },
+              isLoggedIn: true
+            });
+          |]
 
 {-
   Creates a new game lobby for inviting players to a game via a link.
@@ -51,7 +78,8 @@ postCreateGameR =
       Left err -> invalidArgs [err]
       Right gameId -> return gameId
 
-renderNotLoggedInLobbyPage gameId = do
+renderNotLoggedInLobbyPage :: Text -> WidgetFor App ()
+renderNotLoggedInLobbyPage message = do
   addStylesheet $ (StaticR css_wordify_css)
   addScript $ StaticR js_wordify_js
   [whamlet|
@@ -64,9 +92,10 @@ renderNotLoggedInLobbyPage gameId = do
       var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
       
       const login = Wordify.createLogin('#lobbylogin', {
-        message: "Login / Sign Up to join the game lobby."
+        message: #{message}
       });
     |]
+
 
 {-
   Joins an existing lobby.
@@ -82,7 +111,7 @@ getGameLobbyR gameId =
     maid <- maybeAuthId
     case maid of
       Just userId -> handlerLobbyAuthenticated gameId userId
-      Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage gameId
+      Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
 
 handlerLobbyAuthenticated :: Text -> Text -> Handler Html
 handlerLobbyAuthenticated gameId userId =
