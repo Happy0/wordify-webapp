@@ -102,7 +102,8 @@ onUnmounted(onUnmountedHandler)
               @click="navigate(item.route)"
             />
             <span
-              class="nav-item-label bg-white px-3 py-1.5 rounded-lg shadow-md text-sm font-medium text-gray-700 whitespace-nowrap"
+              class="nav-item-label bg-white px-3 py-1.5 rounded-lg shadow-md text-sm font-medium text-gray-700 whitespace-nowrap cursor-pointer hover:bg-gray-100"
+              @click="navigate(item.route)"
             >
               {{ item.label }}
             </span>
