@@ -8,15 +8,19 @@ export {
   type RoundInstance
 } from './lib/round'
 
-// Backwards compatibility: createWordify is an alias for createRound
-export { createRound as createWordify } from './lib/round'
-
 // Create Game view
 export {
   createCreateGame,
   type CreateGameOptions,
   type CreateGameInstance
 } from './lib/create-game'
+
+// Game Lobby view
+export {
+  createGameLobby,
+  type GameLobbyOptions,
+  type GameLobbyInstance
+} from './lib/game-lobby'
 
 // Re-export types for TypeScript users
 export type {

@@ -18,9 +18,13 @@ You are free to introduce other libraries, but please ask permission before inst
 ```
 src/
 ├── lib/
-│   └── round.ts            # Round view mounting function
+│   ├── round.ts            # Round view mounting function
+│   ├── create-game.ts      # Create Game view mounting function
+│   └── game-lobby.ts       # Game Lobby view mounting function
 ├── views/
-│   └── GameView.vue        # Round view - game in progress
+│   ├── GameView.vue        # Round view - game in progress
+│   ├── CreateGameView.vue  # Create Game view - game setup
+│   └── GameLobbyView.vue   # Game Lobby view - invite players
 ├── components/
 │   ├── round/              # Components specific to the Round view
 │   │   ├── GameBoard.vue
@@ -46,7 +50,8 @@ src/
 The `views/` folder contains top-level view components, each representing a distinct page or screen in the Wordify webapp:
 
 - **Round** (`GameView.vue`): Displays an in-progress game of scrabble. See `specs/round.md` for detailed specification.
-- *(Future views will be added here)*
+- **Create Game** (`CreateGameView.vue`): Game setup screen for configuring and creating a new game.
+- **Game Lobby** (`GameLobbyView.vue`): Lobby screen for sharing invitation links and waiting for players to join.
 
 ### Components
 
@@ -93,9 +98,76 @@ const round = createRound('#game-container', {
 round.unmount()
 ```
 
-### Backwards Compatibility
+### `createCreateGame(element, options)`
 
-`createWordify` is available as an alias for `createRound` to support existing code.
+Mounts the Create Game view (game setup screen) to a DOM element.
+
+**Parameters:**
+- `element` - CSS selector string or DOM element
+- `options` - Configuration object:
+  - `locales` - Map of locale display names to locale values (e.g., `{ "English (US)": "en_us" }`)
+  - `isLoggedIn` - Whether the user is currently logged in (optional, defaults to false)
+
+**Returns:** `CreateGameInstance` object with:
+- `app` - The Vue app instance
+- `unmount()` - Cleanup function
+
+**Example:**
+```typescript
+import { createCreateGame } from 'wordify-views'
+
+const createGame = createCreateGame('#create-game-container', {
+  locales: {
+    'English (US)': 'en_us',
+    'English (UK)': 'en_gb'
+  },
+  isLoggedIn: true
+})
+
+// Later: cleanup
+createGame.unmount()
+```
+
+### `createGameLobby(element, options)`
+
+Mounts the Game Lobby view (invitation/waiting screen) to a DOM element.
+
+**Parameters:**
+- `element` - CSS selector string or DOM element
+- `options` - Configuration object:
+  - `gameLobbyId` - The unique identifier for the game lobby (required)
+  - `websocketUrl` - WebSocket URL to connect to for lobby state updates (required)
+  - `isLoggedIn` - Whether the user is currently logged in (optional, defaults to false)
+
+**Returns:** `GameLobbyInstance` object with:
+- `app` - The Vue app instance
+- `unmount()` - Cleanup function
+
+**WebSocket Protocol:**
+The view listens for websocket messages. When a `startGame` message is received:
+```json
+{
+  "command": "startGame",
+  "payload": {
+    "gameId": "<gameId>"
+  }
+}
+```
+The user is automatically redirected to `/games/{gameId}`.
+
+**Example:**
+```typescript
+import { createGameLobby } from 'wordify-views'
+
+const lobby = createGameLobby('#lobby-container', {
+  gameLobbyId: 'abc123',
+  websocketUrl: 'wss://example.com/lobby/abc123',
+  isLoggedIn: true
+})
+
+// Later: cleanup
+lobby.unmount()
+```
 
 ## Build Output
 
@@ -152,6 +224,10 @@ Running `npm run build` produces:
 - `GameState` - Complete game state
 - `RoundOptions` - Options for createRound
 - `RoundInstance` - Return type of createRound
+- `CreateGameOptions` - Options for createCreateGame
+- `CreateGameInstance` - Return type of createCreateGame
+- `GameLobbyOptions` - Options for createGameLobby
+- `GameLobbyInstance` - Return type of createGameLobby
 - `TileInput`, `BlankTileInput`, `LetterTileInput` - Tile types
 - `PlacedTile` - Tile with position
 - `SquareType` - Board square types
@@ -173,3 +249,5 @@ Running `npm run build` produces:
 Detailed specifications for each view are in separate files:
 
 - [Round View](./round.md) - Game in progress
+- [Create Game View](./create-game.md) - Game setup
+- [Game Lobby View](./game-lobby.md) - Invitation and waiting room
