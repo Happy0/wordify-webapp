@@ -27,7 +27,7 @@ function navigateToCreateGame() {
 }
 
 function navigateToLogin() {
-  window.location.href = '/auth/login'
+  window.location.href = '/auth/page/oauth0/forward'
 }
 </script>
 

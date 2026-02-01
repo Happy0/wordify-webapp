@@ -26,7 +26,7 @@ const navItems = computed<NavItem[]>(() => {
   if (props.isLoggedIn) {
     items.push({ label: 'Logout', icon: 'pi-sign-out', route: '/auth/logout' })
   } else {
-    items.push({ label: 'Login', icon: 'pi-sign-in', route: '/auth/login' })
+    items.push({ label: 'Login', icon: 'pi-sign-in', route: '/auth/page/oauth0/forward' })
   }
 
   return items

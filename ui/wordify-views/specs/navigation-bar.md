@@ -23,7 +23,7 @@ The FAB expands to reveal the following navigation options:
 |-------|------|-------|-----------|
 | Home | `pi-home` | `/` | Always visible |
 | Create Game | `pi-plus` | `/create-lobby` | Always visible |
-| Login | `pi-sign-in` | `/auth/login` | When `isLoggedIn` is `false` |
+| Login | `pi-sign-in` | `/auth/page/oauth0/forward ` | When `isLoggedIn` is `false` |
 | Logout | `pi-sign-out` | `/auth/logout` | When `isLoggedIn` is `true` |
 
 ## Behavior
