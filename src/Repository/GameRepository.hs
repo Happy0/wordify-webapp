@@ -15,7 +15,9 @@ type MyMove = Bool
 
 type BoardString = T.Text
 
-data GameSummary = GameSummary GameId LatestActivity MyMove BoardString
+type LocaleString = T.Text
+
+data GameSummary = GameSummary GameId LatestActivity MyMove BoardString LocaleString
 
 class GameRepository a where
   getActiveUserGames :: a -> UserId -> IO [GameSummary]

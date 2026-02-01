@@ -24,12 +24,12 @@ The view will accept an array of games with the following schema:
     "gameId": string,
     "boardString": string,
     "yourMove": boolean,
-    "lastActivity": string (ISO 8601 timestamp)
+    "lastActivity": string (ISO 8601 timestamp),
+    "tileValues": Record<string, number> - mapping of letters to point values (per-game to support different locales)
 }
 
 Additionally, the view accepts:
 * `isLoggedIn`: boolean - whether the user is logged in
-* `tileValues`: TileValueMap - mapping of letters to point values for rendering tiles
 
 # Code Structure Concerns
 

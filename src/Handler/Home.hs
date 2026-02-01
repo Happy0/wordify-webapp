@@ -1,5 +1,6 @@
 module Handler.Home where
 
+import qualified Data.Map as M
 import ClassyPrelude.Yesod
 import qualified Data.Text as T
 import Foundation
@@ -11,20 +12,26 @@ import Yesod.Auth
 import Import.NoFoundation (css_wordify_css)
 import Import.NoFoundation (js_wordify_js)
 
-data ActiveGameSummary = ActiveGameSummary {gameId :: Text, boardString:: Text,yourMove :: Bool, lastActivity :: Maybe UTCTime}
+type TileValues = Map Text Int
+
+data ActiveGameSummary = ActiveGameSummary {gameId :: Text, boardString:: Text,yourMove :: Bool, lastActivity :: Maybe UTCTime, tileValues :: TileValues}
 
 instance ToJSON ActiveGameSummary where
-  toJSON (ActiveGameSummary gameId boardString yourMove lastActivity) = object [ 
+  toJSON (ActiveGameSummary gameId boardString yourMove lastActivity tileValues) = object [ 
     "gameId" .= gameId,
     "boardString" .= boardString,
     "yourMove" .= yourMove,
-    "lastActivity" .= lastActivity
+    "lastActivity" .= lastActivity,
+    "tileValues" .= tileValues
      ]
 
-mapGameSummary :: GameSummary -> ActiveGameSummary
-mapGameSummary (GameSummary gameId latestActivity myMove boardString) = ActiveGameSummary gameId boardString myMove latestActivity
+getTileValues :: App -> Text -> TileValues
+getTileValues app locale = M.empty
 
+mapGameSummary :: App -> GameSummary -> ActiveGameSummary
+mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale) = ActiveGameSummary gameId boardString myMove latestActivity (getTileValues app locale)
 
+renderNotLoggedInPage :: Handler Html
 renderNotLoggedInPage =
   gamePagelayout $ do
     addStylesheet $ (StaticR css_wordify_css)
@@ -46,8 +53,8 @@ renderPlayerMoveNote :: Bool -> Widget
 renderPlayerMoveNote False = [whamlet| <span> |]
 renderPlayerMoveNote True = [whamlet| <span> (Your move) |]
 
-renderActiveGamePage :: (GameRepository a) => a -> T.Text -> Handler Html
-renderActiveGamePage gameRepository userId = do
+renderActiveGamePage :: (GameRepository a) => App -> a -> T.Text -> Handler Html
+renderActiveGamePage app gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
   gamePagelayout $ do
     addStylesheet $ (StaticR css_wordify_css)
@@ -60,7 +67,7 @@ renderActiveGamePage gameRepository userId = do
       [julius|
         const lobby = Wordify.createHome('#home', {
           isLoggedIn: true,
-          games: #{toJSON (map mapGameSummary activeGames)},
+          games: #{toJSON (map (mapGameSummary app) activeGames)},
           tileValues: {}
         });
       |]
@@ -74,7 +81,7 @@ getHomeR = do
 
   case maybePlayerId of
     Nothing -> renderNotLoggedInPage
-    Just userId -> renderActiveGamePage gameRepositorySQLBackend userId
+    Just userId -> renderActiveGamePage app gameRepositorySQLBackend userId
 
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html

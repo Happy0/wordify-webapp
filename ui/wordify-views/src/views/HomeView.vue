@@ -11,11 +11,11 @@ export interface GameSummary {
   boardString: string
   yourMove: boolean
   lastActivity: string
+  tileValues: TileValueMap
 }
 
 const props = defineProps<{
   games: GameSummary[]
-  tileValues: TileValueMap
 }>()
 
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
@@ -51,7 +51,7 @@ function navigateToLogin() {
               :board-string="game.boardString"
               :your-move="game.yourMove"
               :last-activity="game.lastActivity"
-              :tile-values="tileValues"
+              :tile-values="game.tileValues"
             />
           </div>
         </template>

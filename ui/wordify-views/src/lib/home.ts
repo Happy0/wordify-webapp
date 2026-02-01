@@ -30,6 +30,13 @@ export interface GameSummary {
    * ISO 8601 timestamp of the last activity in the game
    */
   lastActivity: string
+
+  /**
+   * A map of letter strings to their point values
+   * Required to properly render tiles on the miniboard
+   * Different locales can have different tiles with different values
+   */
+  tileValues: TileValueMap
 }
 
 export interface HomeOptions {
@@ -44,12 +51,6 @@ export interface HomeOptions {
    * Controls whether to show games/create-game or login prompt
    */
   isLoggedIn: boolean
-
-  /**
-   * A map of letter strings to their point values
-   * Required to properly render tiles on the miniboards
-   */
-  tileValues: TileValueMap
 }
 
 export interface HomeInstance {
@@ -62,8 +63,7 @@ export function createHome(
   options: HomeOptions
 ): HomeInstance {
   const app = createApp(HomeView, {
-    games: options.games,
-    tileValues: options.tileValues
+    games: options.games
   })
 
   const pinia = createPinia()
