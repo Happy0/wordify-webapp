@@ -15,6 +15,7 @@ export interface RoundOptions {
   initialState: GameState
   websocketUrl?: string
   gameId?: string
+  isLoggedIn?: boolean
 }
 
 export interface RoundInstance {
@@ -49,6 +50,9 @@ export function createRound(
     }
   })
   app.use(ToastService)
+
+  // Provide isLoggedIn to all components
+  app.provide('isLoggedIn', opts.isLoggedIn ?? false)
 
   app.mount(element)
 

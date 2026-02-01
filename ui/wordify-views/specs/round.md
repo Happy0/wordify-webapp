@@ -22,6 +22,7 @@ The game view will have the following top level components which I will specify 
 5. A score board with the player's names and their current scores
 6. A move history showing the result of the previous moves that were played (the tiles, words formed, their score.)
 7. A 'potential score' label that dynamically updates when the user places tiles to let them know what they could score if the words they play are valid
+8. A navigation button (FAB) that provides access to navigation links (Home, Create Game, Login/Logout)
 
 ### High Level Layout
 
@@ -30,7 +31,7 @@ This view should be responsive - it should be pleasant to use on both mobile/tab
 #### Mobile / Smaller devices
 
 1. The board and player's tile rack and move controls and potential score should be visible. The board should be large enough to easily view and drag and drop tiles from the rack onto the board easily.
-2. The potential score should be displayed at the top of the screen in the mobile toolbar, alongside the navigation buttons for scores, history, and chat.
+2. The mobile toolbar at the top of the screen contains (from left to right): the navigation button, the potential score, and the navigation buttons for scores, history, and chat. The navigation button uses "inline" positioning so its menu expands downward when tapped.
 3. The other components specified above should be viewable by clicking a small button with an appropriate symbol on it to expand them
 4. No scrolling left or right or up or down should be required while on the main view but the move history and chat can be scrolled when they're being viewed
 5. It should be easy to get back to the main view from the 'expanded view' of the individual components using the back button or a button on the component
@@ -47,6 +48,7 @@ This view should be responsive - it should be pleasant to use on both mobile/tab
 6. If the move history or chat would expand beyond the current page, they can be scrolled within in their 'box' without needing a scrollbar for the entire page
 7. It should be possible to drag and drop tiles on the rack and board using a mouse
 8. The 'potential score' should be displayed under the scoreboard in the left sidebar. It should always be visible (even when no tiles are placed) to prevent layout shift when tiles are placed. When no tiles are placed, it should show placeholder text like "Place tiles to see score". The widget should have a fixed width to prevent size changes when the content changes.
+9. The navigation button is displayed as a fixed FAB (Floating Action Button) in the bottom-left corner of the screen. Its menu expands upward when clicked.
 
 ### More Detailed Component Specifications
 
@@ -199,6 +201,21 @@ The UI must provide visual feedback about the WebSocket connection status to inf
 
 * When the connection is restored after being disconnected or in an error state, a brief toast notification appears confirming "Connection restored"
 * This notification automatically disappears after a few seconds
+
+#### Navigation Button
+
+A Floating Action Button (FAB) that provides navigation across the application while preserving screen real estate for the main game view.
+
+##### Positioning
+
+* **Desktop**: Fixed position in the bottom-left corner. Menu expands upward.
+* **Mobile**: Inline in the top toolbar (left side, before PotentialScore). Menu expands downward.
+
+##### Configuration
+
+The navigation button requires an `isLoggedIn` prop to determine whether to show the Login or Logout option. This value is passed through the `createRound` entry point.
+
+See [navigation-bar.md](navigation-bar.md) for full component specification including navigation items, behavior, and interactions.
 
 ## State
 
@@ -388,8 +405,18 @@ import { createRound } from 'wordify-views'
 const round = createRound('#game-container', {
   initialState: gameState,
   websocketUrl: 'wss://example.com/game/123',
-  gameId: 'game-123'
+  gameId: 'game-123',
+  isLoggedIn: true  // Controls Login/Logout display in navigation button
 })
 ```
+
+### Options
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `initialState` | `GameState` | Yes | The initial game state to render |
+| `websocketUrl` | `string` | No | WebSocket URL for real-time updates |
+| `gameId` | `string` | No | Game ID for localStorage scoping (e.g., unread chat tracking) |
+| `isLoggedIn` | `boolean` | No | Whether the user is logged in (controls Login/Logout in navigation) |
 
 See the main library spec for full API documentation.

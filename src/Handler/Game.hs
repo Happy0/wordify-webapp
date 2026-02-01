@@ -114,6 +114,8 @@ gamePagelayout widget = do
 renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
 renderGamePage app gameId maybeUser (Right serverGame) = do
+  let isLoggedIn = isJust maybeUser
+
   let maybePlayerNumber = maybeUser >>= getPlayerNumber serverGame
 
   gameSoFar <- liftIO (readTVarIO (game serverGame))
@@ -171,7 +173,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
               const game = Wordify.createRound('#wordifyround', {
                 initialState: initialState,
                 websocketUrl: webSocketUrl,
-                gameId: #{toJSON gameId}
+                gameId: #{toJSON gameId},
+                isLoggedIn: #{toJSON isLoggedIn}
               });
              
           |]

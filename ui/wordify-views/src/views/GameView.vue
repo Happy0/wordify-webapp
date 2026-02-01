@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, provide, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, provide, computed, inject } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 import { useGameController } from '@/composables/useGameController'
@@ -19,6 +19,7 @@ import PotentialScore from '@/components/round/PotentialScore.vue'
 import Button from 'primevue/button'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
+import NavigationButton from '@/components/common/NavigationButton.vue'
 
 // Props for SSR initialization
 const props = defineProps<{
@@ -30,6 +31,9 @@ const store = useGameStore()
 const { lastError, candidateTilesOnBoard, lastChatMessageReceived, gameId, isMyTurn } = storeToRefs(store)
 const { controller, connect, connectionState } = useGameController()
 const toast = useToast()
+
+// Inject isLoggedIn from the app-level provider
+const isLoggedIn = inject<boolean>('isLoggedIn', false)
 
 // Unread chat message tracking (mobile only)
 const lastSeenChatMessage = ref<number>(0)
@@ -495,6 +499,8 @@ provide('onRackDrop', handleRackDrop)
 <template>
   <div class="game-view h-dvh flex flex-col bg-stone-100 overflow-hidden">
     <Toast />
+    <!-- Desktop: Fixed FAB navigation -->
+    <NavigationButton :is-logged-in="isLoggedIn" class="hidden lg:block" />
 
     <!-- Connection status banner (only show after initial connection) -->
     <Transition name="banner">
@@ -570,8 +576,11 @@ provide('onRackDrop', handleRackDrop)
     <!-- Mobile Layout -->
     <div class="lg:hidden flex flex-col flex-1 min-h-0">
       <!-- Mobile toolbar -->
-      <div class="flex justify-between items-center px-4 py-2 bg-white shadow-sm">
-        <PotentialScore />
+      <div class="flex justify-between items-center px-2 py-2 bg-white shadow-sm">
+        <div class="flex items-center gap-2">
+          <NavigationButton :is-logged-in="isLoggedIn" position="inline" />
+          <PotentialScore />
+        </div>
         <div class="flex gap-2">
           <Button
             icon="pi pi-users"
