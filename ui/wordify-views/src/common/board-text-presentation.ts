@@ -5,7 +5,7 @@ import { BOARD_SIZE } from '../types/game'
  * A map of letter strings to their tile values.
  * Used to construct LetterTile objects with the appropriate values.
  */
-export type TileValueMap = Map<string, number>
+export type TileValueMap = Record<string, number>
 
 /**
  * Parses a tile string from the board text representation.
@@ -35,7 +35,7 @@ function parseTileString(tileString: string, tileValues: TileValueMap): TileInpu
   }
 
   // It's a regular letter tile - look up its value
-  const value = tileValues.get(tileString)
+  const value = tileValues[tileString]
   if (value === undefined) {
     return undefined // Invalid: unrecognized letter
   }
