@@ -29,6 +29,14 @@ export {
   type LoginInstance
 } from './lib/login'
 
+// Home view
+export {
+  createHome,
+  type HomeOptions,
+  type HomeInstance,
+  type GameSummary
+} from './lib/home'
+
 // Re-export types for TypeScript users
 export type {
   GameState,
@@ -46,3 +54,6 @@ export type { ConnectionState, IGameCommandSender } from './services/interfaces'
 
 // Export constants
 export { BOARD_LAYOUT, BOARD_SIZE } from './types/game'
+
+// Export board text representation utilities
+export type { TileValueMap } from './common/board-text-presentation'

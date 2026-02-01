@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify Home Example</title>
+  <!-- Load the bundled CSS -->
+  <link rel="stylesheet" href="../dist/wordify-ui.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Load the UMD bundle -->
+  <script src="../dist/wordify.umd.js"></script>
+  <script>
+    // Check if Wordify loaded correctly
+    if (typeof Wordify === 'undefined') {
+      console.error('Wordify failed to load - check that dist/wordify.umd.js exists');
+      document.body.innerHTML = '<h1>Error: Wordify library not loaded</h1><p>Run "npm run build" first, then serve this file with a local server (e.g., "npx serve .")</p>';
+      throw new Error('Wordify not loaded');
+    }
+    console.log('Wordify loaded:', Object.keys(Wordify));
+  </script>
+  <script>
+    // Standard Scrabble tile values
+    const tileValues = new Map([
+      ['A', 1], ['B', 3], ['C', 3], ['D', 2], ['E', 1],
+      ['F', 4], ['G', 2], ['H', 4], ['I', 1], ['J', 8],
+      ['K', 5], ['L', 1], ['M', 3], ['N', 1], ['O', 1],
+      ['P', 3], ['Q', 10], ['R', 1], ['S', 1], ['T', 1],
+      ['U', 1], ['V', 4], ['W', 4], ['X', 8], ['Y', 4],
+      ['Z', 10]
+    ]);
+
+    // Helper to create an empty board string (225 empty values)
+    function createEmptyBoard() {
+      return new Array(225).fill('').join(',');
+    }
+
+    // Helper to place tiles on a board string
+    // Position is { x: 1-15 (column), y: 1-15 (row) }
+    function placeTiles(tiles) {
+      const board = new Array(225).fill('');
+      for (const { x, y, letter } of tiles) {
+        // Convert to index: column-major order
+        const index = (x - 1) * 15 + (y - 1);
+        board[index] = letter;
+      }
+      return board.join(',');
+    }
+
+    // Sample game 1: "HELLO" placed horizontally at center
+    const game1Board = placeTiles([
+      { x: 6, y: 8, letter: 'H' },
+      { x: 7, y: 8, letter: 'E' },
+      { x: 8, y: 8, letter: 'L' },
+      { x: 9, y: 8, letter: 'L' },
+      { x: 10, y: 8, letter: 'O' }
+    ]);
+
+    // Sample game 2: "WORLD" crossing with another word
+    const game2Board = placeTiles([
+      { x: 8, y: 6, letter: 'W' },
+      { x: 8, y: 7, letter: 'O' },
+      { x: 8, y: 8, letter: 'R' },
+      { x: 8, y: 9, letter: 'L' },
+      { x: 8, y: 10, letter: 'D' },
+      { x: 6, y: 8, letter: 'C' },
+      { x: 7, y: 8, letter: 'O' },
+      { x: 9, y: 8, letter: 'E' }
+    ]);
+
+    // Sample game 3: A more complex board
+    const game3Board = placeTiles([
+      // PLAY horizontally
+      { x: 5, y: 8, letter: 'P' },
+      { x: 6, y: 8, letter: 'L' },
+      { x: 7, y: 8, letter: 'A' },
+      { x: 8, y: 8, letter: 'Y' },
+      // GAME vertically from A
+      { x: 7, y: 6, letter: 'G' },
+      { x: 7, y: 7, letter: 'A' },
+      { x: 7, y: 9, letter: 'M' },
+      { x: 7, y: 10, letter: 'E' },
+      // WORDS from W
+      { x: 9, y: 6, letter: 'W' },
+      { x: 9, y: 7, letter: 'O' },
+      { x: 9, y: 8, letter: 'R' },
+      { x: 9, y: 9, letter: 'D' },
+      { x: 9, y: 10, letter: 'S' },
+      // Connect with blank tile
+      { x: 8, y: 6, letter: '[A]' }
+    ]);
+
+    // Sample games data
+    const sampleGames = [
+      {
+        gameId: 'game-abc-123',
+        boardString: game1Board,
+        players: ['Alice', 'Bob'],
+        yourMove: true
+      },
+      {
+        gameId: 'game-def-456',
+        boardString: game2Board,
+        players: ['Charlie'],
+        yourMove: false
+      },
+      {
+        gameId: 'game-ghi-789',
+        boardString: game3Board,
+        players: ['Diana', 'Eve'],
+        yourMove: true
+      }
+    ];
+
+    // Mount the Home view
+    // Try different configurations by uncommenting the desired options:
+
+    // Configuration 1: Logged in with games
+    const home = Wordify.createHome('#app', {
+      games: sampleGames,
+      isLoggedIn: true,
+      tileValues: tileValues
+    });
+
+    // Configuration 2: Logged in but no games (shows Create Game button)
+    // const home = Wordify.createHome('#app', {
+    //   games: [],
+    //   isLoggedIn: true,
+    //   tileValues: tileValues
+    // });
+
+    // Configuration 3: Not logged in (shows Login prompt)
+    // const home = Wordify.createHome('#app', {
+    //   games: [],
+    //   isLoggedIn: false,
+    //   tileValues: tileValues
+    // });
+
+    // Clean up when done:
+    // home.unmount();
+
+    console.log('Home view mounted successfully!');
+  </script>
+</body>
+</html>
