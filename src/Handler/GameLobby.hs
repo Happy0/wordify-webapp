@@ -52,11 +52,21 @@ postCreateGameR =
       Right gameId -> return gameId
 
 renderNotLoggedInLobbyPage gameId = do
-  addStylesheet $ (StaticR css_lobby_css)
+  addStylesheet $ (StaticR css_wordify_css)
+  addScript $ StaticR js_wordify_js
   [whamlet|
-            <p> You must log in to join this game
-            <a href=@{AuthR LoginR}>Login
-        |]
+    <div #lobbylogin>
+        
+      |]
+  toWidget
+    [julius|
+      var url = document.URL;
+      var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
+      
+      const login = Wordify.createLogin('#lobbylogin', {
+        message: "Login / Sign Up to join the game lobby."
+      });
+    |]
 
 {-
   Joins an existing lobby.
@@ -72,7 +82,7 @@ getGameLobbyR gameId =
     maid <- maybeAuthId
     case maid of
       Just userId -> handlerLobbyAuthenticated gameId userId
-      Nothing -> defaultLayout $ renderNotLoggedInLobbyPage gameId
+      Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage gameId
 
 handlerLobbyAuthenticated :: Text -> Text -> Handler Html
 handlerLobbyAuthenticated gameId userId =
