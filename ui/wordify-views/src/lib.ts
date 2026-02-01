@@ -22,6 +22,13 @@ export {
   type GameLobbyInstance
 } from './lib/game-lobby'
 
+// Login view
+export {
+  createLogin,
+  type LoginOptions,
+  type LoginInstance
+} from './lib/login'
+
 // Re-export types for TypeScript users
 export type {
   GameState,
