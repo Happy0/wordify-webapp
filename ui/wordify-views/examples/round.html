@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wordify Library Example</title>
+  <title>Wordify Round Example</title>
   <!-- Load the bundled CSS -->
-  <link rel="stylesheet" href="./dist/wordify-ui.css">
+  <link rel="stylesheet" href="../dist/wordify-ui.css">
 </head>
 <body>
   <div id="game-container"></div>
 
   <!-- Load the UMD bundle -->
-  <script src="./dist/wordify.umd.js"></script>
+  <script src="../dist/wordify.umd.js"></script>
   <script>
     // Check if Wordify loaded correctly
     if (typeof Wordify === 'undefined') {
@@ -76,8 +76,9 @@
     };
 
     // Mount the Wordify game using the options object format
-    const game = Wordify.createWordify('#game-container', {
-      initialState: initialState
+    const game = Wordify.createRound('#game-container', {
+      initialState: initialState,
+      isLoggedIn: true
       // websocketUrl: 'wss://example.com/game/123'  // Uncomment to connect to a websocket
     });
 
@@ -96,7 +97,7 @@
     // Clean up when done (also disconnects websocket):
     // game.unmount();
 
-    console.log('Wordify game mounted successfully!');
+    console.log('Wordify round mounted successfully!');
   </script>
 </body>
 </html>

@@ -11,6 +11,13 @@ export {
 // Backwards compatibility: createWordify is an alias for createRound
 export { createRound as createWordify } from './lib/round'
 
+// Create Game view
+export {
+  createCreateGame,
+  type CreateGameOptions,
+  type CreateGameInstance
+} from './lib/create-game'
+
 // Re-export types for TypeScript users
 export type {
   GameState,

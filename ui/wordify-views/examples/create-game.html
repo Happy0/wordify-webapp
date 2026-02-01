@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify Create Game Example</title>
+  <!-- Load the bundled CSS -->
+  <link rel="stylesheet" href="../dist/wordify-ui.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Load the UMD bundle -->
+  <script src="../dist/wordify.umd.js"></script>
+  <script>
+    // Check if Wordify loaded correctly
+    if (typeof Wordify === 'undefined') {
+      console.error('Wordify failed to load - check that dist/wordify.umd.js exists');
+      document.body.innerHTML = '<h1>Error: Wordify library not loaded</h1><p>Run "npm run build" first, then serve this file with a local server (e.g., "npx serve .")</p>';
+      throw new Error('Wordify not loaded');
+    }
+    console.log('Wordify loaded:', Object.keys(Wordify));
+  </script>
+  <script>
+    // Mount the Create Game view
+    const createGame = Wordify.createCreateGame('#app', {
+      // Map of display names to locale codes
+      // The key is shown to the user, the value is sent to the server
+      locales: {
+        'English (US)': 'en_us',
+        'English (UK)': 'en_gb',
+        'Spanish (FISE)': 'es_fise',
+        'French': 'fr_fr'
+      },
+      // Controls whether Login or Logout is shown in navigation
+      isLoggedIn: true
+    });
+
+    // Clean up when done:
+    // createGame.unmount();
+
+    console.log('Create Game view mounted successfully!');
+  </script>
+</body>
+</html>
