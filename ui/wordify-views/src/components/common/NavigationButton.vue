@@ -28,7 +28,7 @@ const navItems = computed<NavItem[]>(() => {
   if (props.isLoggedIn) {
     items.push({ label: 'Logout', icon: 'pi-sign-out', route: '/auth/logout' })
   } else {
-    items.push({ label: 'Login', icon: 'pi-sign-in', route: '/auth/page/oauth0/forward' })
+    items.push({ label: 'Login', icon: 'pi-sign-in', route: '/login' })
   }
 
   return items
@@ -50,7 +50,12 @@ function toggleMenu() {
 
 function navigate(route: string) {
   isExpanded.value = false
-  window.location.href = route
+  if (route === '/login') {
+    const returnUrl = encodeURIComponent(window.location.pathname + window.location.search)
+    window.location.href = `/login?returnUrl=${returnUrl}`
+  } else {
+    window.location.href = route
+  }
 }
 
 function handleClickOutside(event: MouseEvent) {

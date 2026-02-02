@@ -60,6 +60,7 @@ import Handler.Common
 import Handler.Game
 import Handler.GameLobby
 import Handler.Home
+import Handler.Login
 import Import
 import InactivityTracker
 import Language.Haskell.TH.Syntax (qLocation)

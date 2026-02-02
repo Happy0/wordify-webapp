@@ -9,6 +9,8 @@
 
 / HomeR GET
 
+/login LoginR' GET
+
 /test LoginTestPageR GET
 
 /create-lobby CreateGamePageR GET

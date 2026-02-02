@@ -7,7 +7,8 @@ const props = defineProps<{
 }>()
 
 function handleLogin() {
-  window.location.href = '/auth/page/oauth0/forward'
+  const returnUrl = encodeURIComponent(window.location.pathname + window.location.search)
+  window.location.href = `/login?returnUrl=${returnUrl}`
 }
 </script>
 
