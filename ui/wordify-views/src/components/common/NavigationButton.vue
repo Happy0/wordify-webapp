@@ -10,6 +10,7 @@ const props = withDefaults(defineProps<{
 })
 
 const isExpanded = ref(false)
+const isHovered = ref(false)
 
 interface NavItem {
   label: string
@@ -34,6 +35,13 @@ const navItems = computed<NavItem[]>(() => {
 
 const isFixed = computed(() => props.position === 'fixed')
 const isInline = computed(() => props.position === 'inline')
+
+// Make fixed FAB semi-transparent when not hovered/expanded
+const fabOpacity = computed(() => {
+  if (!isFixed.value) return 1
+  if (isExpanded.value || isHovered.value) return 1
+  return 0.4
+})
 
 function toggleMenu() {
   isExpanded.value = !isExpanded.value
@@ -117,13 +125,16 @@ onUnmounted(onUnmountedHandler)
       :icon="isExpanded ? 'pi pi-times' : 'pi pi-bars'"
       rounded
       severity="secondary"
-      class="main-fab transition-transform duration-200"
+      class="main-fab transition-all duration-200"
       :class="[
         { 'rotate-90': isExpanded },
         isFixed ? 'shadow-lg' : ''
       ]"
+      :style="{ opacity: fabOpacity }"
       aria-label="Navigation menu"
       @click.stop="toggleMenu"
+      @mouseenter="isHovered = true"
+      @mouseleave="isHovered = false"
     />
   </div>
 </template>
