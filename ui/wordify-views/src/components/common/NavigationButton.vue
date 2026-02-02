@@ -21,7 +21,8 @@ interface NavItem {
 const navItems = computed<NavItem[]>(() => {
   const items: NavItem[] = [
     { label: 'Home', icon: 'pi-home', route: '/' },
-    { label: 'Create Game', icon: 'pi-plus', route: '/create-lobby' }
+    { label: 'Create Game', icon: 'pi-plus', route: '/create-lobby' },
+    { label: 'Source Code', icon: 'pi-github', route: 'https://github.com/Happy0/wordify-webapp/' }
   ]
 
   if (props.isLoggedIn) {

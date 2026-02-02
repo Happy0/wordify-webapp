@@ -23,6 +23,7 @@ The FAB expands to reveal the following navigation options:
 |-------|------|-------|-----------|
 | Home | `pi-home` | `/` | Always visible |
 | Create Game | `pi-plus` | `/create-lobby` | Always visible |
+| Source Code | `pi-github` | `https://github.com/Happy0/wordify-webapp/` | Always visible |
 | Login | `pi-sign-in` | `/auth/page/oauth0/forward ` | When `isLoggedIn` is `false` |
 | Logout | `pi-sign-out` | `/auth/logout` | When `isLoggedIn` is `true` |
 
