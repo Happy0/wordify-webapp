@@ -39,7 +39,11 @@ getActiveUserGamesEntities userId =
     E.from $ \(player `E.InnerJoin` game) -> do
       E.on (player ^. M.PlayerGameId E.==. game ^. M.GameGameId)
       E.where_ (player ^. M.PlayerPlayerId E.==. E.val userId)
-      E.orderBy [E.desc (game ^. M.GameLastMoveMadeAt)]
+      E.orderBy         [ E.desc
+            (E.coalesce
+              [ game ^. M.GameLastMoveMadeAt, E.just (game ^. M.GameCreatedAt)
+              ])
+        ]
       return (player, game)
 
 getAllPlayers :: (Monad m, MonadIO m) => T.Text -> E.SqlPersistT m [E.Entity M.Player]
