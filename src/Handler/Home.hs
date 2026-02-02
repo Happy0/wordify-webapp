@@ -4,18 +4,12 @@ import qualified Data.Map as M
 import ClassyPrelude.Yesod
 import qualified Data.Text as T
 import Foundation
-import Foundation (App (appConnPool), Handler)
-import Import (whamlet)
 import Repository.GameRepository
 import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend))
 import Yesod.Auth
-import Import.NoFoundation (css_wordify_css)
-import Import.NoFoundation (js_wordify_js)
-import Wordify.Rules.LetterBag (LetterBag(..))
-import Model.GameSetup (LocalisedGameSetup(..))
-import Wordify.Rules.Tile (tileValue)
+import Import.NoFoundation (js_wordify_js, css_wordify_css)
+import Model.GameSetup (LocalisedGameSetup(..), TileValues)
 
-type TileValues = Map Text Int
 
 data ActiveGameSummary = ActiveGameSummary {gameId :: Text, boardString:: Text,yourMove :: Bool, lastActivity :: Maybe UTCTime, tileValues :: TileValues}
 
@@ -28,20 +22,16 @@ instance ToJSON ActiveGameSummary where
     "tileValues" .= tileValues
      ]
 
-getTileValues :: App -> Text -> Maybe TileValues
-getTileValues app locale = do
+getLocaleTileValues :: App -> Text -> Maybe TileValues
+getLocaleTileValues app locale = do
   let setups = localisedGameSetups app
   setup <- M.lookup locale setups
-  let letterBag = localisedLetterBag setup
-  let letters = validLetters letterBag
-  let values = M.map tileValue letters
-  let valuesWithText = M.mapKeys T.pack values
-  Just valuesWithText
+  return (tileLettersToValueMap setup)
    
 
 mapGameSummary :: App -> GameSummary -> ActiveGameSummary
 mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale) =
-  let tileValues = fromMaybe M.empty (getTileValues app locale)
+  let tileValues = fromMaybe M.empty (getLocaleTileValues app locale)
   in ActiveGameSummary gameId boardString myMove latestActivity tileValues
 
 renderNotLoggedInPage :: Handler Html

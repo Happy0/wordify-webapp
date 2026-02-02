@@ -1,8 +1,8 @@
 # Round View Specification
 
-The Round view displays an interactive game of scrabble that is in progress. It shows the user's view of the game including information about the game state (score, move history) as well as the user's private tile rack.
+The Round view displays an interactive game of a board word game that is in progress. It shows the user's view of the game including information about the game state (score, move history) as well as the user's private tile rack.
 
-The scrabble logic (scoring, legal moves, etc) is handled by the server. This view is concerned only with display and interactions (such as dragging and dropping tiles onto the board).
+The logic (scoring, legal moves, etc) is handled by the server. This view is concerned only with display and interactions (such as dragging and dropping tiles onto the board).
 
 ## Page Title
 
@@ -96,7 +96,7 @@ Just like the physical board game, there are 'blank' tiles. When displayed on th
 Tiles are displayed differently depending on their context:
 
 * **On the board**: Tiles fill the entire square with a simple background (e.g. light amber) showing the letter and value. They do not have borders, shadows, or rounded corners - they blend seamlessly into the board grid.
-* **On the tile rack**: Tiles have the traditional Scrabble tile appearance with a visible border, subtle shadow, and rounded corners to give them a physical tile-like appearance.
+* **On the tile rack**: Tiles have the a tile appearance with a visible border, subtle shadow, and rounded corners to give them a physical tile-like appearance.
 * **Candidate tiles** (tiles placed but not yet submitted): These have a highlight ring to indicate they can still be moved.
 
 ##### Interactions

@@ -148,7 +148,7 @@ export type InternalGameState = Omit<GameState, 'boardLayout' | 'placedTiles'> &
   board: BoardSquare[][]
 }
 
-// Board layout constant - the classic Scrabble board layout
+// Board layout constant
 export const BOARD_LAYOUT: SquareType[][] = [
   ['TripleWord', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'Normal', 'TripleWord', 'Normal', 'Normal', 'Normal', 'DoubleLetter', 'Normal', 'Normal', 'TripleWord'],
   ['Normal', 'DoubleWord', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'TripleLetter', 'Normal', 'Normal', 'Normal', 'DoubleWord', 'Normal'],

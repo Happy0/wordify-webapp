@@ -67,7 +67,6 @@ data App = App
     appHttpManager :: Manager,
     appLogger :: Logger,
     localisedGameSetups :: LocalisedGameSetups,
-    -- TODO: https://hackage.haskell.org/package/stm-containers
     gameLobbies :: ResourceCache Text GameLobby,
     games :: ResourceCache Text ServerGame,
     chatRooms :: ResourceCache Text Chatroom,

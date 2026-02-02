@@ -77,6 +77,53 @@ function getTileLetter(row: number, col: number): string {
   return tile.letter
 }
 
+function getTileValue(row: number, col: number): number | null {
+  const tile = getTile(row, col)
+  if (!tile) return null
+  // Blank tiles have no point value
+  if (tile.type === 'blank') return null
+  return tile.value
+}
+
+function getSquareLabel(row: number, col: number): string {
+  // Don't show label if there's a tile on the square
+  if (getTile(row, col)) return ''
+
+  const type = getSquareType(row, col)
+  switch (type) {
+    case 'TripleWord':
+      return 'TW'
+    case 'DoubleWord':
+      // Center star
+      if (row === 7 && col === 7) {
+        return '\u2605'
+      }
+      return 'DW'
+    case 'TripleLetter':
+      return 'TL'
+    case 'DoubleLetter':
+      return 'DL'
+    default:
+      return ''
+  }
+}
+
+function getSquareLabelColorClass(row: number, col: number): string {
+  const type = getSquareType(row, col)
+  switch (type) {
+    case 'TripleWord':
+      return 'text-white'
+    case 'DoubleWord':
+      return 'text-pink-800'
+    case 'TripleLetter':
+      return 'text-white'
+    case 'DoubleLetter':
+      return 'text-sky-800'
+    default:
+      return ''
+  }
+}
+
 // Format last activity as relative time
 const formattedLastActivity = computed(() => {
   const date = new Date(props.lastActivity)
@@ -124,15 +171,30 @@ function navigateToGame() {
       <template v-for="row in rows" :key="row">
         <template v-for="col in cols" :key="`${row}-${col}`">
           <div
-            class="mini-square aspect-square flex items-center justify-center"
+            class="mini-square aspect-square flex items-center justify-center relative"
             :class="getSquareColorClass(row, col)"
           >
+            <!-- Tile letter and value -->
+            <template v-if="getTileLetter(row, col)">
+              <span
+                class="tile-letter text-amber-900 uppercase leading-none"
+              >
+                {{ getTileLetter(row, col) }}
+              </span>
+              <span
+                v-if="getTileValue(row, col) !== null"
+                class="tile-value absolute text-amber-900"
+              >
+                {{ getTileValue(row, col) }}
+              </span>
+            </template>
+            <!-- Bonus square label -->
             <span
-              v-if="getTileLetter(row, col)"
-              class="text-amber-900 uppercase leading-none"
-              style="font-size: 0.35rem;"
+              v-else-if="getSquareLabel(row, col)"
+              class="square-label leading-none font-semibold"
+              :class="getSquareLabelColorClass(row, col)"
             >
-              {{ getTileLetter(row, col) }}
+              {{ getSquareLabel(row, col) }}
             </span>
           </div>
         </template>
@@ -152,13 +214,36 @@ function navigateToGame() {
   min-height: 0;
 }
 
+.tile-letter {
+  font-size: 0.35rem;
+}
+
+.tile-value {
+  font-size: 0.15rem;
+  bottom: 0;
+  right: 1px;
+  line-height: 1;
+}
+
+.square-label {
+  font-size: 0.2rem;
+}
+
 @media (min-width: 640px) {
   .mini-board-card {
     max-width: 220px;
   }
 
-  .mini-square span {
+  .tile-letter {
     font-size: 0.4rem;
+  }
+
+  .tile-value {
+    font-size: 0.18rem;
+  }
+
+  .square-label {
+    font-size: 0.25rem;
   }
 }
 </style>

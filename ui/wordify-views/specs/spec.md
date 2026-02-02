@@ -1,6 +1,6 @@
 # Wordify Views Library
 
-A library of views and components for the Wordify multiplayer scrabble webapp. Each view represents a different page or screen in the application and can be mounted independently into any web project.
+A library of views and components for the Wordify multiplayer webapp. Each view represents a different page or screen in the application and can be mounted independently into any web project.
 
 ## Stack
 
@@ -49,7 +49,7 @@ src/
 
 The `views/` folder contains top-level view components, each representing a distinct page or screen in the Wordify webapp:
 
-- **Round** (`GameView.vue`): Displays an in-progress game of scrabble. See `specs/round.md` for detailed specification.
+- **Round** (`GameView.vue`): Displays an in-progress game. See `specs/round.md` for detailed specification.
 - **Create Game** (`CreateGameView.vue`): Game setup screen for configuring and creating a new game.
 - **Game Lobby** (`GameLobbyView.vue`): Lobby screen for sharing invitation links and waiting for players to join.
 
@@ -216,7 +216,7 @@ Running `npm run build` produces:
 
 ## Exported Constants
 
-- `BOARD_LAYOUT` - Standard 15x15 scrabble board layout
+- `BOARD_LAYOUT` - Standard 15x15 board layout
 - `BOARD_SIZE` - Board dimension (15)
 
 ## Exported Types

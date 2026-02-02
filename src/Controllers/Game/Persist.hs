@@ -67,7 +67,7 @@ getLobby pool localisedGameSetups gameId = do
         let locale = maybe "en" id maybeLocale
         -- This could be more efficient than individual fetches, but it doesn't matter for now
         let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
-        setup@(GameSetup _ dictionary bag _) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
+        setup@(GameSetup _ dictionary bag _ _) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         lobbyPlayers <- hoistEither $ makeGameStatePlayers numPlayers
         tiles <- hoistEither $ dbTileRepresentationToTiles bag originalLetterBag
         let bag = makeBagUsingGenerator tiles (stdGenFromText letterBagSeed :: StdGen)
@@ -126,7 +126,7 @@ getGame pool localisedGameSetups gameId = do
       runExceptT $ do
         let locale = maybe "en" id maybeLocale
         let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
-        setup@(GameSetup _ dictionary bag extraRules) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
+        setup@(GameSetup _ dictionary bag extraRules _) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
         tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
         let letterBag = makeBagUsingGenerator tiles (stdGenFromText bagSeed :: StdGen)

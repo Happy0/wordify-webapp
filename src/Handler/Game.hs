@@ -254,7 +254,7 @@ gameToMoveSummaries game =
     else return []
   where
     -- TODO: Add function to make a new empty game from a game history to
-    -- haskellscrabble
+    -- wordify
     Right playersState = makeGameStatePlayers (L.length $ G.players game)
     Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
     (G.History originalBag moves) = G.history game

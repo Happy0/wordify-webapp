@@ -60,7 +60,7 @@ setupGame localisedGameSetup numPlayers =
     -- Randomise the order of the letters in the letter bag
     shuffledLetterbag <- lift $ shuffleWithNewGenerator (localisedLetterBag localisedGameSetup)
 
-    -- Convert a ScrabbleError into a string to return to the client if we failed to create the game
+    -- Convert a error into a string to return to the client if we failed to create the game
     -- This should never happen when setting up a new game
     hoistEither $ first (T.pack . show) $ makeGame players shuffledLetterbag (localisedDictionary localisedGameSetup)
 

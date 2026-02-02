@@ -1,7 +1,7 @@
 # WebSocket Protocol Specification
 
 ## Overview
-This document describes the WebSocket message protocol for a Scrabble-style game. Messages are JSON-encoded and fall into two categories: client-to-server messages and server-to-client messages.
+This document describes the WebSocket message protocol for the wordify server. Messages are JSON-encoded and fall into two categories: client-to-server messages and server-to-client messages.
 
 **Important:** Player numbers are 1-based throughout this protocol. In a 2-player game, players are numbered 1 and 2. In a 4-player game, players are numbered 1, 2, 3, and 4.
 

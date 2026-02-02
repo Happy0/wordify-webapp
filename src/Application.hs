@@ -100,8 +100,10 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Extra.SpanishExtraRule (spanishGameExtraRules)
 import qualified Prelude as P
 import Migrations.DatabaseTileListFormatMigration (runTileListMigration)
-import Model.GameSetup (LocalisedGameSetup (GameSetup))
+import Model.GameSetup (LocalisedGameSetup (GameSetup), TileValues)
 import Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService)
+import Wordify.Rules.Tile (tileValue)
+import qualified Data.Text as T
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -189,15 +191,23 @@ loadGameBundles =
     gameBundles <- mapM loadGameBundle $ filter (not . all isSpace) $ splitOn ("\n" :: String) localisations
     return $ M.fromList gameBundles
 
+getTileValues :: ValidTiles -> TileValues
+getTileValues letters =
+  let values = M.map tileValue letters
+  in let valuesWithText = M.mapKeys T.pack values
+  in valuesWithText
+
 loadGameBundle :: String -> IO (Text, LocalisedGameSetup)
 loadGameBundle locale =
   do
     bag <- loadBag $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "bag"
     dictionary <- loadDictionary $ "config/localised_setups" ++ "/" ++ locale ++ "/" ++ "dict"
 
+    let tileValues = getTileValues (validLetters bag)
+
     case locale of
-      "es_fise" -> return $ (pack locale, GameSetup "es" dictionary bag spanishGameExtraRules)
-      _ -> return $ (pack locale, GameSetup (pack locale) dictionary bag [])
+      "es_fise" -> return $ (pack locale, GameSetup "es" dictionary bag spanishGameExtraRules tileValues)
+      _ -> return $ (pack locale, GameSetup (pack locale) dictionary bag [] tileValues)
     
 
 loadBag :: String -> IO LetterBag
