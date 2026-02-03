@@ -10,12 +10,20 @@ import { useGameStore } from '../stores/gameStore'
 import { useGameController } from '../composables/useGameController'
 import type { GameState } from '../types/game'
 import type { ConnectionState, IGameCommandSender } from '../services/interfaces'
+import type { TileValueMap } from '../common/tile-value-map'
 
 export interface RoundOptions {
   initialState: GameState
   websocketUrl?: string
   gameId?: string
   isLoggedIn?: boolean
+  /**
+   * A map of letter strings to their point values.
+   * Used to determine available letters for blank tile assignment.
+   * Different locales can have different tiles (e.g., Spanish has "CH", "RR", "LL").
+   * If not provided, defaults to standard English A-Z.
+   */
+  tileValues?: TileValueMap
 }
 
 export interface RoundInstance {
@@ -53,6 +61,9 @@ export function createRound(
 
   // Provide isLoggedIn to all components
   app.provide('isLoggedIn', opts.isLoggedIn ?? false)
+
+  // Provide tileValues for locale-specific letter sets (used by BlankTileSelector)
+  app.provide('tileValues', opts.tileValues ?? null)
 
   app.mount(element)
 
@@ -102,6 +113,8 @@ export type {
 } from '../types/game'
 
 export type { ConnectionState, IGameCommandSender } from '../services/interfaces'
+
+export type { TileValueMap } from '../common/tile-value-map'
 
 // Export constants
 export { BOARD_LAYOUT, BOARD_SIZE } from '../types/game'

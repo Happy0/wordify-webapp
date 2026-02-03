@@ -15,12 +15,32 @@ import { createRound, createCreateGame, createGameLobby, createLogin, createHome
 The main game view displaying the board, tile rack, and game controls.
 
 ```typescript
-import { createRound, type RoundOptions } from 'wordify-views'
+import { createRound, type RoundOptions, type TileValueMap } from 'wordify-views'
+
+// Define tile values for your game variant/locale
+const tileValues: TileValueMap = {
+  'A': 1, 'B': 3, 'C': 3, 'D': 2, 'E': 1,
+  'F': 4, 'G': 2, 'H': 4, 'I': 1, 'J': 8,
+  'K': 5, 'L': 1, 'M': 3, 'N': 1, 'O': 1,
+  'P': 3, 'Q': 10, 'R': 1, 'S': 1, 'T': 1,
+  'U': 1, 'V': 4, 'W': 4, 'X': 8, 'Y': 4,
+  'Z': 10
+}
+
+// Spanish locale example with multi-character tiles
+const spanishTileValues: TileValueMap = {
+  'A': 1, 'B': 3, 'C': 3, 'CH': 5, 'D': 2, 'E': 1,
+  'F': 4, 'G': 2, 'H': 4, 'I': 1, 'J': 8,
+  'L': 1, 'LL': 8, 'M': 3, 'N': 1, 'Ñ': 8, 'O': 1,
+  'P': 3, 'Q': 5, 'R': 1, 'RR': 8, 'S': 1, 'T': 1,
+  'U': 1, 'V': 4, 'X': 8, 'Y': 4, 'Z': 10
+}
 
 const options: RoundOptions = {
-  gameState: { /* GameState object */ },
+  initialState: { /* GameState object */ },
   websocketUrl: 'wss://example.com/game/123',
-  isLoggedIn: true
+  isLoggedIn: true,
+  tileValues: tileValues  // or spanishTileValues for Spanish games
 }
 
 const instance = createRound('#app', options)
@@ -30,9 +50,20 @@ instance.unmount()
 ```
 
 **Options:**
-- `gameState`: The initial game state
+- `initialState`: The initial game state
 - `websocketUrl`: WebSocket URL for real-time game updates
 - `isLoggedIn`: Whether the user is logged in (affects navigation)
+- `tileValues`: Map of letter strings to their point values (for locale support)
+
+**Locale Support:**
+
+The `tileValues` option enables support for different game locales. The keys of this map determine which letters are available for blank tile assignment. This supports:
+
+- Standard single-character letters (A, B, C, etc.)
+- Multi-character tiles used in some languages (CH, RR, LL for Spanish)
+- Custom alphabets with locale-specific characters (Ñ for Spanish)
+
+If `tileValues` is not provided, the blank tile selector defaults to the standard English alphabet (A-Z).
 
 ---
 
@@ -173,6 +204,8 @@ import type {
 
   // Home view types
   GameSummary,
+
+  // Shared types (used by both home and round views)
   TileValueMap
 } from 'wordify-views'
 ```

@@ -1,11 +1,9 @@
 import type { TileInput, PlacedTile } from '../types/game'
 import { BOARD_SIZE } from '../types/game'
+import type { TileValueMap } from './tile-value-map'
 
-/**
- * A map of letter strings to their tile values.
- * Used to construct LetterTile objects with the appropriate values.
- */
-export type TileValueMap = Record<string, number>
+// Re-export for backwards compatibility
+export type { TileValueMap } from './tile-value-map'
 
 /**
  * Parses a tile string from the board text representation.

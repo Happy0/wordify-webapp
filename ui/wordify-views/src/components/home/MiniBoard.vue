@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { BOARD_SIZE, BOARD_LAYOUT, type TileInput, type SquareType } from '@/types/game'
-import { fromBoardTextRepresentation, type TileValueMap } from '@/common/board-text-presentation'
+import { fromBoardTextRepresentation } from '@/common/board-text-presentation'
+import type { TileValueMap } from '@/common/tile-value-map'
 
 const props = defineProps<{
   boardString: string

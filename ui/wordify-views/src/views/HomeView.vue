@@ -4,7 +4,7 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import NavigationButton from '@/components/common/NavigationButton.vue'
 import MiniBoard from '@/components/home/MiniBoard.vue'
-import type { TileValueMap } from '@/common/board-text-presentation'
+import type { TileValueMap } from '@/common/tile-value-map'
 
 export interface GameSummary {
   gameId: string

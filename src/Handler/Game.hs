@@ -50,6 +50,7 @@ import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer, fromServerTile)
 import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
+import Model.GameSetup (LocalisedGameSetup(..))
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -131,6 +132,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   serverPlayers <- atomically $ getServerPlayers serverGame
   let clientPlayers = zipWith (fromServerPlayer gameOver) serverPlayers playersGameState
 
+  let tileValues = (tileLettersToValueMap . gameSetup) serverGame
+
   case gameMoveSummaries of
     Left err -> invalidArgs [err]
     Right _ -> liftIO (return ())
@@ -174,7 +177,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 initialState: initialState,
                 websocketUrl: webSocketUrl,
                 gameId: #{toJSON gameId},
-                isLoggedIn: #{toJSON isLoggedIn}
+                isLoggedIn: #{toJSON isLoggedIn},
+                tileValues: #{toJSON tileValues}
               });
              
           |]

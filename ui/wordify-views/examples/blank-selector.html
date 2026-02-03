@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify Blank Tile Selector Example</title>
+  <!-- Load the bundled CSS -->
+  <link rel="stylesheet" href="../dist/wordify-ui.css">
+  <style>
+    .locale-selector {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    .locale-selector label {
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    .locale-selector select {
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="locale-selector">
+    <label for="locale">Locale:</label>
+    <select id="locale" onchange="switchLocale(this.value)">
+      <option value="english">English (A-Z)</option>
+      <option value="spanish">Spanish (with CH, LL, RR)</option>
+    </select>
+  </div>
+  <div id="game-container"></div>
+
+  <!-- Load the UMD bundle -->
+  <script src="../dist/wordify.umd.js"></script>
+  <script>
+    // Check if Wordify loaded correctly
+    if (typeof Wordify === 'undefined') {
+      console.error('Wordify failed to load - check that dist/wordify.umd.js exists');
+      document.body.innerHTML = '<h1>Error: Wordify library not loaded</h1><p>Run "npm run build" first, then serve this file with a local server (e.g., "npx serve .")</p>';
+      throw new Error('Wordify not loaded');
+    }
+    console.log('Wordify loaded:', Object.keys(Wordify));
+  </script>
+  <script>
+    // English tile values (standard Scrabble)
+    const englishTileValues = {
+      'A': 1, 'B': 3, 'C': 3, 'D': 2, 'E': 1,
+      'F': 4, 'G': 2, 'H': 4, 'I': 1, 'J': 8,
+      'K': 5, 'L': 1, 'M': 3, 'N': 1, 'O': 1,
+      'P': 3, 'Q': 10, 'R': 1, 'S': 1, 'T': 1,
+      'U': 1, 'V': 4, 'W': 4, 'X': 8, 'Y': 4,
+      'Z': 10
+    };
+
+    // Spanish tile values (with digraphs CH, LL, RR)
+    const spanishTileValues = {
+      'A': 1, 'B': 3, 'C': 3, 'CH': 5, 'D': 2, 'E': 1,
+      'F': 4, 'G': 2, 'H': 4, 'I': 1, 'J': 8,
+      'L': 1, 'LL': 8, 'M': 3, 'N': 1, 'O': 1,
+      'P': 3, 'Q': 5, 'R': 1, 'RR': 8, 'S': 1, 'T': 1,
+      'U': 1, 'V': 4, 'X': 8, 'Y': 4, 'Z': 10
+    };
+
+    // Create the initial game state with blank tiles for testing
+    function createInitialState(tileValues) {
+      return {
+        myPlayerNumber: 0,
+        playerToMove: 0,
+        players: [
+          { name: 'You', score: 0, endBonus: undefined, connected: true, lastSeen: undefined },
+          { name: 'Opponent', score: 0, endBonus: undefined, connected: true, lastSeen: undefined }
+        ],
+        moveHistory: [],
+        tilesRemaining: 86,
+        potentialScore: null,
+        lastMoveReceived: Date.now(),
+        chatMessages: [],
+        lastChatMessageReceived: 0,
+        lastDefinitionReceived: 0,
+        // Rack with multiple blank tiles for testing
+        rack: [
+          { type: 'blank', assigned: null },  // Unassigned blank tile
+          { type: 'letter', letter: 'H', value: tileValues['H'] || 4 },
+          { type: 'letter', letter: 'O', value: tileValues['O'] || 1 },
+          { type: 'letter', letter: 'L', value: tileValues['L'] || 1 },
+          { type: 'letter', letter: 'A', value: tileValues['A'] || 1 },
+          { type: 'blank', assigned: null },  // Another blank tile
+          { type: 'letter', letter: 'E', value: tileValues['E'] || 1 }
+        ],
+        boardLayout: Wordify.BOARD_LAYOUT,
+        placedTiles: [],
+        gameEnded: false
+      };
+    }
+
+    let currentGame = null;
+
+    function mountGame(locale) {
+      // Unmount existing game if any
+      if (currentGame) {
+        currentGame.unmount();
+      }
+
+      const tileValues = locale === 'spanish' ? spanishTileValues : englishTileValues;
+      const initialState = createInitialState(tileValues);
+
+      // Mount the Wordify game with tileValues for locale support
+      currentGame = Wordify.createRound('#game-container', {
+        initialState: initialState,
+        isLoggedIn: true,
+        tileValues: tileValues  // This determines available letters in blank tile selector
+      });
+
+      console.log(`Wordify round mounted with ${locale} locale!`);
+      console.log('Click on a blank tile (the ones with no letter) to open the blank tile selector.');
+      console.log('Available letters:', Object.keys(tileValues).sort().join(', '));
+    }
+
+    function switchLocale(locale) {
+      mountGame(locale);
+    }
+
+    // Initial mount with English
+    mountGame('english');
+  </script>
+</body>
+</html>

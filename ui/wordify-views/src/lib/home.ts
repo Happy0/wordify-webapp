@@ -5,7 +5,7 @@ import Aura from '@primeuix/themes/aura'
 import 'primeicons/primeicons.css'
 import '../style.css'
 import HomeView from '../views/HomeView.vue'
-import type { TileValueMap } from '../common/board-text-presentation'
+import type { TileValueMap } from '../common/tile-value-map'
 
 export interface GameSummary {
   /**
