@@ -7,6 +7,9 @@ import NavigationButton from '@/components/common/NavigationButton.vue'
 const props = defineProps<{
   gameLobbyId: string
   websocketUrl: string
+  playerCount: number
+  joinedPlayers: string[]
+  language: string
 }>()
 
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
@@ -14,6 +17,12 @@ const isLoggedIn = inject<boolean>('isLoggedIn', false)
 // Websocket state
 const ws = ref<WebSocket | null>(null)
 const connectionState = ref<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
+
+// Player state - tracks players who have joined (starts with initial joined players)
+const players = ref<string[]>([...props.joinedPlayers])
+
+// Computed values for display
+const playersNeeded = computed(() => props.playerCount - players.value.length)
 
 // UI state
 const copied = ref(false)
@@ -29,10 +38,18 @@ function handleMessage(event: MessageEvent) {
   try {
     const data = JSON.parse(event.data)
 
-    if (data.command === 'startGame' && data.payload?.gameId) {
-      window.location.href = `/games/${data.payload.gameId}`
+    switch (data.command) {
+      case 'startGame':
+        if (data.payload?.gameId) {
+          window.location.href = `/games/${data.payload.gameId}`
+        }
+        break
+      case 'joined':
+        if (data.payload?.name) {
+          players.value.push(data.payload.name)
+        }
+        break
     }
-    // Future: handle other message types like player joins
   } catch (err) {
     console.error('Failed to parse websocket message:', err)
   }
@@ -120,9 +137,39 @@ onUnmounted(() => {
 
         <template #content>
           <div class="flex flex-col gap-6">
+            <!-- Game info -->
+            <div class="text-center text-gray-600">
+              <p class="font-medium">Language: <span class="text-gray-800">{{ language }}</span></p>
+            </div>
+
+            <!-- Players section -->
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h3 class="font-medium text-gray-700 mb-3">Players ({{ players.length }}/{{ playerCount }})</h3>
+
+              <!-- Joined players list -->
+              <ul v-if="players.length > 0" class="space-y-2 mb-3">
+                <li
+                  v-for="(player, index) in players"
+                  :key="index"
+                  class="flex items-center gap-2 text-gray-700"
+                >
+                  <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                  {{ player }}
+                </li>
+              </ul>
+
+              <!-- Waiting message -->
+              <p v-if="playersNeeded > 0" class="text-sm text-gray-500">
+                Waiting for {{ playersNeeded }} more player{{ playersNeeded !== 1 ? 's' : '' }} to join...
+              </p>
+              <p v-else class="text-sm text-green-600 font-medium">
+                All players have joined! Starting game...
+              </p>
+            </div>
+
             <!-- Instructions -->
             <p class="text-gray-600 text-center">
-              Share this link with your friend to invite them to play:
+              Share this link to invite additional players:
             </p>
 
             <!-- Link display -->

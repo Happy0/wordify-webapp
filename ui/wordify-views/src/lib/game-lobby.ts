@@ -23,6 +23,21 @@ export interface GameLobbyOptions {
    * Controls the Login/Logout option in navigation
    */
   isLoggedIn?: boolean
+
+  /**
+   * The total number of players the game has been set up with
+   */
+  playerCount: number
+
+  /**
+   * Array of display names of players who have already joined the lobby
+   */
+  joinedPlayers: string[]
+
+  /**
+   * The language the game is set up with
+   */
+  language: string
 }
 
 export interface GameLobbyInstance {
@@ -36,7 +51,10 @@ export function createGameLobby(
 ): GameLobbyInstance {
   const app = createApp(GameLobbyView, {
     gameLobbyId: options.gameLobbyId,
-    websocketUrl: options.websocketUrl
+    websocketUrl: options.websocketUrl,
+    playerCount: options.playerCount,
+    joinedPlayers: options.joinedPlayers,
+    language: options.language
   })
 
   const pinia = createPinia()

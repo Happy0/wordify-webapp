@@ -1,6 +1,7 @@
 module Controllers.GameLobby.Model.GameLobby
   ( GameLobby (GameLobby),
     ClientLobbyJoinResult (ClientLobbyJoinResult, broadcastChannel),
+    GameLobbySnapshot (..),
     gameStarted,
     addPlayer,
     pendingGame,
@@ -13,14 +14,14 @@ module Controllers.GameLobby.Model.GameLobby
     inLobby,
     lobbyIsFull,
     gameLanguage,
-    pendingGameSetup
+    pendingGameSetup,
+    takeLobbySnapshot
   )
 where
 
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
-import Controllers.Common.CacheableSharedResource
 import qualified Controllers.Game.Model.ServerGame as S
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Controllers.GameLobby.Api
@@ -34,11 +35,13 @@ import Prelude
 import Model.GameSetup (LocalisedGameSetup)
 
 data ClientLobbyJoinResult = ClientLobbyJoinResult
-  { -- For listening and sending events to the game lobby from the client
+  {
     broadcastChannel :: TChan LobbyMessage,
     -- If the lobby was made full as a result of the client join, the newly created server game
     createdGame :: Maybe S.ServerGame,
-    previouslyJoined :: Bool
+    previouslyJoined :: Bool,
+
+    lobby :: GameLobbySnapshot
   }
 
 data GameLobby = GameLobby
@@ -52,6 +55,27 @@ data GameLobby = GameLobby
     gameLanguage :: T.Text,
     pendingGameSetup :: LocalisedGameSetup
   }
+
+data GameLobbySnapshot = GameLobbySnapshot {
+  snapshotLobbyPlayers :: [SP.ServerPlayer],
+  snapshotAwaiting :: Int,
+  snapshotOpenedAt :: UTCTime,
+  snapShotgameLanguage :: T.Text
+}
+
+takeLobbySnapshot :: GameLobby -> STM GameLobbySnapshot
+takeLobbySnapshot lobby = do
+  players <- readTVar (lobbyPlayers lobby)
+  let waitingForTotal = awaiting lobby
+  let opened = openedAt lobby
+  let language = toDisplayLanguage (gameLanguage lobby)
+  pure (GameLobbySnapshot players waitingForTotal opened language)
+  where
+    -- TODO - share this somewhere
+    toDisplayLanguage :: T.Text -> T.Text
+    toDisplayLanguage "es_fise" = "Spanish"
+    toDisplayLanguage _ = "English"
+
 
 gameStarted :: ClientLobbyJoinResult -> Bool
 gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)

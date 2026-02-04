@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify Game Lobby Example</title>
+  <!-- Load the bundled CSS -->
+  <link rel="stylesheet" href="../dist/wordify-ui.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Load the UMD bundle -->
+  <script src="../dist/wordify.umd.js"></script>
+  <script>
+    // Check if Wordify loaded correctly
+    if (typeof Wordify === 'undefined') {
+      console.error('Wordify failed to load - check that dist/wordify.umd.js exists');
+      document.body.innerHTML = '<h1>Error: Wordify library not loaded</h1><p>Run "npm run build" first, then serve this file with a local server (e.g., "npx serve .")</p>';
+      throw new Error('Wordify not loaded');
+    }
+    console.log('Wordify loaded:', Object.keys(Wordify));
+  </script>
+  <script>
+    // Mount the Game Lobby view
+    const gameLobby = Wordify.createGameLobby('#app', {
+      // The unique lobby ID (used in the shareable link)
+      gameLobbyId: 'abc123-example-lobby',
+      // WebSocket URL for lobby updates (using a mock URL for this example)
+      websocketUrl: 'wss://example.com/lobby/abc123-example-lobby',
+      // Total number of players the game requires
+      playerCount: 3,
+      // Players who have already joined the lobby
+      joinedPlayers: ['Alice'],
+      // The language the game will be played in
+      language: 'English (US)',
+      // Controls whether Login or Logout is shown in navigation
+      isLoggedIn: true
+    });
+
+    // Clean up when done:
+    // gameLobby.unmount();
+
+    console.log('Game Lobby view mounted successfully!');
+  </script>
+</body>
+</html>

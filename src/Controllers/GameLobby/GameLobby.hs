@@ -35,11 +35,11 @@ joinClient app gameLobby gameId userId =
 
     case result of
       Left errorMessage -> return $ Left errorMessage
-      Right (ClientLobbyJoinResult broadcastChannel (Just createdGame) _) ->
+      Right (ClientLobbyJoinResult broadcastChannel (Just createdGame) _ lobby) ->
         do
           _ <- startGame app gameId language broadcastChannel createdGame
           return result
-      Right (ClientLobbyJoinResult broadcastChannel _ previouslyJoined) ->
+      Right (ClientLobbyJoinResult broadcastChannel _ previouslyJoined lobby) ->
         unless
           previouslyJoined
           ( persistNewLobbyPlayer
@@ -62,7 +62,6 @@ makeLobbyServerPlayer app gameId userId =
 updateLobbyState :: App -> GameLobby -> ServerPlayer -> T.Text -> UTCTime -> STM (Either LobbyInputError ClientLobbyJoinResult)
 updateLobbyState app lobby serverPlayer gameId now = do
   lobbyFull <- lobbyIsFull lobby
-
   if lobbyFull then pure $ Left LobbyAlreadyFull else Right <$> handleJoinClient app gameId lobby serverPlayer now
 
 startGame :: App -> T.Text -> T.Text -> TChan LobbyMessage -> ServerGame -> IO ()
@@ -85,7 +84,9 @@ handleJoinClient app gameId gameLobby serverPlayer now =
 
     playerInLobby <- inLobby gameLobby (playerId serverPlayer)
     if playerInLobby
-      then return $ ClientLobbyJoinResult channel Nothing True
+      then do
+        lobbySnapshot <- takeLobbySnapshot gameLobby
+        pure (ClientLobbyJoinResult channel Nothing True lobbySnapshot)
       else handleJoinNewPlayer app gameId serverPlayer gameLobby now
 
 {-
@@ -99,8 +100,9 @@ handleJoinNewPlayer app gameId newPlayer gameLobby now =
     writeTChan (channel gameLobby) $ PlayerJoined newPlayer
     maybeServerGame <- createServerGameIfLobbyFull gameLobby gameId now
     channel <- duplicateBroadcastChannel gameLobby
+    lobbySnapshot <- takeLobbySnapshot gameLobby
 
-    return (ClientLobbyJoinResult channel maybeServerGame (not playerAdded))
+    return (ClientLobbyJoinResult channel maybeServerGame (not playerAdded) lobbySnapshot)
 
 createServerGameIfLobbyFull :: GameLobby -> T.Text -> UTCTime -> STM (Maybe ServerGame)
 createServerGameIfLobbyFull lobby gameId now = do

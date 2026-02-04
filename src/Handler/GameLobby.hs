@@ -133,8 +133,10 @@ redirectHandler gameId = redirect (GameR gameId)
 renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> Text -> Handler Html
 renderLobbyPage (Left InvalidPlayerID) gameId = invalidArgs ["Invalid player ID given by browser"]
 renderLobbyPage (Left _) gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _)) gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _)) gameId = gamePagelayout $ do
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) gameId = gamePagelayout $ do
+  let joinedPlayerNames = map name (snapshotLobbyPlayers lobbySnapshot)
+
   addStylesheet $ (StaticR css_wordify_css)
   addScript $ StaticR js_wordify_js
   [whamlet|
@@ -147,7 +149,10 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _)) gameId =
       var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
       
       const lobby = Wordify.createGameLobby('#lobby', {
+        playerCount: #{toJSON (snapshotAwaiting lobbySnapshot)},
         gameLobbyId: #{toJSON gameId},
+        joinedPlayers: #{toJSON joinedPlayerNames},
+        language: #{toJSON (snapShotgameLanguage lobbySnapshot) },
         websocketUrl: webSocketUrl,
         isLoggedIn: true
       });
