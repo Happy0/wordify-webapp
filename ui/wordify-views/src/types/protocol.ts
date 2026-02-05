@@ -88,7 +88,8 @@ export type WireMoveSummary = {
 } | {
   type: 'gameEnd'
   players: WirePlayer[]
-  lastMoveScore: number
+  // lastMoveScore can be null when game ends due to consecutive passes
+  lastMoveScore: number | null
   wordsMade: {
     word: string
     score: number

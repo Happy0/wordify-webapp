@@ -378,6 +378,10 @@ Notifies all players when the game ends.
 }
 ```
 
+**Notes:**
+- The `placed` field may be `null` or an empty array if the game ended without a final tile placement (e.g., when the game ends due to consecutive passes by all players).
+- When `placed` is null/empty, `lastMoveScore` will also be `null` and `wordsMade` will be an empty array.
+
 #### 5. Player Chat
 Broadcasts a chat message from a player.
 

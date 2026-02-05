@@ -107,13 +107,14 @@ export interface IGameMessageHandler {
   }): void
 
   // Called when the game ends
+  // Note: placed and lastMoveScore can be null when game ends due to consecutive passes
   onGameFinished(data: {
     moveNumber: number
-    placed: WirePositionTile[]
+    placed: WirePositionTile[] | null
     summary: {
       type: 'gameEnd'
       players: { name: string; score: number; endBonus?: number }[]
-      lastMoveScore: number
+      lastMoveScore: number | null
       wordsMade: { word: string; score: number }[]
     }
   }): void

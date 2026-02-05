@@ -141,7 +141,7 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
           summary: message.payload.summary as {
             type: 'gameEnd'
             players: { name: string; score: number; endBonus?: number }[]
-            lastMoveScore: number
+            lastMoveScore: number | null
             wordsMade: { word: string; score: number }[]
           }
         })
@@ -260,9 +260,10 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
       }
     })
 
-    // Build placedTiles from move history
+    // Build placedTiles from move history and check if game has ended
     // Wire format already uses 1-based coordinates, so we keep them as-is for placedTiles
     const placedTiles: PlacedTile[] = []
+    let gameEnded = false
     for (const moveCmd of data.moveHistory) {
       const cmd = moveCmd as ServerMessage
       if (cmd.command === 'playerBoardMove') {
@@ -272,6 +273,18 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
             position: { x: placed.pos.x, y: placed.pos.y },
             tile
           })
+        }
+      } else if (cmd.command === 'gameFinished') {
+        gameEnded = true
+        // Also place tiles from the final move (if any - placed can be null for pass-ended games)
+        if (cmd.payload.placed) {
+          for (const placed of cmd.payload.placed) {
+            const tile = wireTileToTile(placed.tile, false)
+            placedTiles.push({
+              position: { x: placed.pos.x, y: placed.pos.y },
+              tile
+            })
+          }
         }
       }
     }
@@ -299,23 +312,27 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
       rack,
       boardLayout: BOARD_LAYOUT,
       placedTiles,
-      gameEnded: false
+      gameEnded
     })
 
     // Process move history for the move history display
+    // Track the last nowPlaying value for gameFinished handling
+    let lastNowPlaying = data.playerMove
     for (const moveCmd of data.moveHistory) {
       const cmd = moveCmd as ServerMessage
-      this.processMoveForHistory(cmd)
+      if (cmd.command === 'playerBoardMove' || cmd.command === 'playerPassMove' || cmd.command === 'playerExchangeMove') {
+        lastNowPlaying = cmd.payload.nowPlaying
+      }
+      this.processMoveForHistory(cmd, lastNowPlaying, playerSummaries.length)
     }
   }
 
-  private processMoveForHistory(cmd: ServerMessage): void {
+  private processMoveForHistory(cmd: ServerMessage, lastNowPlaying: number, numPlayers: number): void {
     const store = useGameStore()
 
     // Calculate which player made this move based on nowPlaying (who plays next)
     // nowPlaying is 1-based, we need 0-based index of the player who just moved
     const getPlayerIndex = (nowPlaying: number) => {
-      const numPlayers = store.players.length
       return (nowPlaying - 2 + numPlayers) % numPlayers
     }
 
@@ -338,6 +355,15 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
       store.addMoveToHistory({
         type: 'exchange',
         playerIndex
+      })
+    } else if (cmd.command === 'gameFinished' && cmd.payload.placed?.length > 0) {
+      // The player who made the final move is the one who was next to play (lastNowPlaying)
+      const playerIndex = lastNowPlaying - 1
+      store.addMoveToHistory({
+        type: 'boardMove',
+        playerIndex,
+        overallScore: cmd.payload.summary.lastMoveScore ?? 0,
+        wordsMade: cmd.payload.summary.wordsMade
       })
     }
   }
@@ -451,20 +477,23 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
 
   onGameFinished(data: {
     moveNumber: number
-    placed: WirePositionTile[]
+    placed: WirePositionTile[] | null
     summary: {
       type: 'gameEnd'
       players: { name: string; score: number; endBonus?: number }[]
-      lastMoveScore: number
+      lastMoveScore: number | null
       wordsMade: { word: string; score: number }[]
     }
   }): void {
     const store = useGameStore()
 
-    // Place final tiles (convert from 1-based wire format to 0-based)
-    for (const placed of data.placed) {
-      const tile = wireTileToTile(placed.tile, false)
-      store.placeTileFromServerMove(placed.pos.y - 1, placed.pos.x - 1, tile)
+    // Place final tiles if any (convert from 1-based wire format to 0-based)
+    // placed can be null when game ends due to consecutive passes
+    if (data.placed) {
+      for (const placed of data.placed) {
+        const tile = wireTileToTile(placed.tile, false)
+        store.placeTileFromServerMove(placed.pos.y - 1, placed.pos.x - 1, tile)
+      }
     }
 
     // Update players with final scores and bonuses
@@ -481,14 +510,14 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     store.updatePlayers(playerSummaries)
 
     // Add final move to history if there was one
-    if (data.placed.length > 0) {
+    if (data.placed?.length > 0) {
       // The player who made the final move is the current playerToMove (1-based),
       // since it hasn't been updated yet. Convert to 0-based index.
       const playerIndex = store.playerToMove - 1
       store.addMoveToHistory({
         type: 'boardMove',
         playerIndex,
-        overallScore: data.summary.lastMoveScore,
+        overallScore: data.summary.lastMoveScore ?? 0,
         wordsMade: data.summary.wordsMade
       })
     }
