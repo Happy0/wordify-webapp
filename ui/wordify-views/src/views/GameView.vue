@@ -28,7 +28,7 @@ const props = defineProps<{
 }>()
 
 const store = useGameStore()
-const { lastError, candidateTilesOnBoard, lastChatMessageReceived, gameId, isMyTurn } = storeToRefs(store)
+const { lastError, candidateTilesOnBoard, lastChatMessageReceived, gameId, isMyTurn, gameEnded } = storeToRefs(store)
 const { controller, connect, connectionState } = useGameController()
 const toast = useToast()
 
@@ -140,10 +140,14 @@ watch(gameId, () => {
   loadLastSeenChatMessage()
 })
 
-// Update document title based on whose turn it is
+// Update document title based on game state
 const BASE_TITLE = 'Wordify'
-watch(isMyTurn, (myTurn) => {
-  document.title = myTurn ? `${BASE_TITLE} | Your Move` : BASE_TITLE
+watch([gameEnded, isMyTurn], ([ended, myTurn]) => {
+  if (ended) {
+    document.title = `${BASE_TITLE} | Game Over`
+  } else {
+    document.title = myTurn ? `${BASE_TITLE} | Your Move` : BASE_TITLE
+  }
 }, { immediate: true })
 
 // Watch for tile placements and request potential score

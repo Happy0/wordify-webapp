@@ -7,7 +7,7 @@ import Control.Concurrent
 import Control.Error (lastDef, note)
 import Controllers.Chat.Chatroom (subscribeMessagesLive)
 import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
-import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
+import Controllers.Common.CacheableSharedResource (getCacheableResource)
 import qualified Controllers.Definition.DefinitionService as D
 import Controllers.Game.Api
 import Controllers.Game.Api (initialSocketMessage)

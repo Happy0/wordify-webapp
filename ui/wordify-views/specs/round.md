@@ -8,7 +8,8 @@ The logic (scoring, legal moves, etc) is handled by the server. This view is con
 
 The browser page title should indicate when it's the player's turn to help them notice (e.g., when the tab is in the background):
 
-* When it's the player's move, the title should be "Wordify | Your move"
+* When the game has ended, the title should be "Wordify | Game Over"
+* When it's the player's move, the title should be "Wordify | Your Move"
 * When it's not the player's move, the title should be "Wordify"
 
 ## Game View Components
