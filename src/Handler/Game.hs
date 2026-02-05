@@ -242,8 +242,6 @@ gameApp app gameId maybeUser = do
   connection <- ask
   chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
   definitionsSinceParam <- lift definitionsSinceQueryParamValue
-
-  liftIO $ print chatMessagesSinceParam
   liftIO (handleWebsocket app connection gameId maybeUser chatMessagesSinceParam definitionsSinceParam)
 
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]

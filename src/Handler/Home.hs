@@ -9,12 +9,18 @@ import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositor
 import Yesod.Auth
 import Import.NoFoundation (js_wordify_js, css_wordify_css)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
+import ClassyPrelude (undefined, Maybe (Nothing))
+import Controllers.User.Model.AuthUser (AuthUser)
+import Yesod.WebSockets
+import Network.WebSockets (Connection)
+import Controllers.Game.Model.UserEventSubscription (UserEvent)
+import Controllers.Common.CacheableSharedResource
 
 
 data ActiveGameSummary = ActiveGameSummary {gameId :: Text, boardString:: Text,yourMove :: Bool, lastActivity :: Maybe UTCTime, tileValues :: TileValues}
 
 instance ToJSON ActiveGameSummary where
-  toJSON (ActiveGameSummary gameId boardString yourMove lastActivity tileValues) = object [ 
+  toJSON (ActiveGameSummary gameId boardString yourMove lastActivity tileValues) = object [
     "gameId" .= gameId,
     "boardString" .= boardString,
     "yourMove" .= yourMove,
@@ -27,7 +33,7 @@ getLocaleTileValues app locale = do
   let setups = localisedGameSetups app
   setup <- M.lookup locale setups
   return (tileLettersToValueMap setup)
-   
+
 
 mapGameSummary :: App -> GameSummary -> ActiveGameSummary
 mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale) =
@@ -103,3 +109,15 @@ gamePagelayout widget = do
                     <div .special-wrapper>
                         ^{pageBody pc}
         |]
+
+homeWebsocketHandler :: App -> Maybe AuthUser -> WebSocketsT Handler ()
+homeWebsocketHandler app Nothing = undefined
+homeWebsocketHandler app (Just authedUser) = do
+  let userChannels = userEventChannels app
+
+  undefined
+
+handleHomeWebsocket :: Connection -> Text -> ResourceCache Text (TChan UserEvent) -> IO ()
+handleHomeWebsocket connection userIdent userEventBroadcastChannels = runResourceT $ do
+    (_, userBroadcastChannel) <- getCacheableResource userEventBroadcastChannels userIdent
+    undefined
