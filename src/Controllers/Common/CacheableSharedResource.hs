@@ -1,10 +1,14 @@
-module Controllers.Common.CacheableSharedResource (makeResourceCache, makeGlobalResourceCache, withCacheableResource, getCacheableResource, ResourceCache) where
+module Controllers.Common.CacheableSharedResource (
+  makeResourceCache,
+  makeGlobalResourceCache,
+  withCacheableResource,
+  getCacheableResource,
+  ResourceCache,
+  peekCacheableResource) where
 
-import ClassyPrelude (liftIO)
+import ClassyPrelude (liftIO, (<&>))
 import Control.Concurrent
-import Control.Concurrent.STM (TVar, modifyTVar)
 import Control.Concurrent.STM.TVar
-import Control.Exception (bracket_)
 import qualified Control.Foldl as Foldl
 import Control.Monad
 import Control.Monad.STM
@@ -162,3 +166,10 @@ getCacheableResource resourceCache resourceId = do
       case resource of
         Left _ -> pure ()
         Right sharedResource -> handleSharerLeave resourceCache sharedResource resourceId
+
+{-
+  Returns the item if it's in the cache but does not load it into the cache if it is not present
+-}
+peekCacheableResource :: ResourceCache err a -> Text -> STM (Maybe a)
+peekCacheableResource resourceCache resourceId = do
+  M.lookup resourceId (cache resourceCache) <&> fmap cacheItem

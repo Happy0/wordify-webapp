@@ -105,6 +105,7 @@ import Model.GameSetup (LocalisedGameSetup (GameSetup), TileValues)
 import Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService)
 import Wordify.Rules.Tile (tileValue)
 import qualified Data.Text as T
+import Controllers.Game.Model.UserEventSubscription
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -134,14 +135,14 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms = App {..}
+  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventChannels = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool
@@ -161,12 +162,14 @@ makeFoundation appSettings inactivityTracker = do
   games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
   gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing
 
+  userEventChannels <- makeGlobalResourceCache (\_ -> fmap Right newUserEventSubcriptionChannel) Nothing
+
   let definitionService = toDefinitionServiceImpl makeWiktionaryService
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms
+  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =

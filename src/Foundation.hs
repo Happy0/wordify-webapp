@@ -43,6 +43,7 @@ import Yesod.Core.Types (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
 import Yesod.Default.Util (addStaticContentExternal)
 import Model.GameSetup (LocalisedGameSetup)
+import Controllers.Game.Model.UserEventSubscription
 
 data AuthDetails = AuthDetails
   { clientId :: Text,
@@ -70,6 +71,7 @@ data App = App
     gameLobbies :: ResourceCache Text GameLobby,
     games :: ResourceCache Text ServerGame,
     chatRooms :: ResourceCache Text Chatroom,
+    userEventChannels :: ResourceCache Text (TChan UserEvent),
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
     inactivityTracker :: TVar InactivityTracker,
