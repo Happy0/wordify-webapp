@@ -1,3 +1,5 @@
+import type { TileValueMap } from '../common/tile-value-map'
+
 // Player summary type representing a player's state in the game
 export type PlayerSummary = {
   // The player's username
@@ -136,14 +138,23 @@ export type GameState = {
   // The layout of the board defining the type of each square
   // A 15x15 2D array where each entry is a SquareType
   boardLayout: SquareType[][]
-  // The tiles that have been placed on the board (sparse array with 1-based positions)
-  placedTiles: PlacedTile[]
+  // The tiles on the board represented as a comma-delimited board string.
+  // See specs/board-text-representation.md for format details.
+  boardString: string
   // Whether the game has ended
   gameEnded: boolean
+  /**
+   * A map of letter strings to their point values.
+   * Used to determine available letters for blank tile assignment
+   * and to parse the boardString into tiles.
+   * Different locales can have different tiles (e.g., Spanish has "CH", "RR", "LL").
+   * If not provided, defaults to standard English A-Z for blank tile selection.
+   */
+  tileValues?: TileValueMap
 }
 
 // Internal game state used by the store (with constructed board)
-export type InternalGameState = Omit<GameState, 'boardLayout' | 'placedTiles'> & {
+export type InternalGameState = Omit<GameState, 'boardLayout' | 'boardString'> & {
   // The state of each square on the board (15x15 = 225 squares)
   board: BoardSquare[][]
 }

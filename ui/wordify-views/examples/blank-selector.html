@@ -95,8 +95,9 @@
           { type: 'letter', letter: 'E', value: tileValues['E'] || 1 }
         ],
         boardLayout: Wordify.BOARD_LAYOUT,
-        placedTiles: [],
-        gameEnded: false
+        boardString: new Array(225).fill('').join(','),
+        gameEnded: false,
+        tileValues: tileValues  // This determines available letters in blank tile selector
       };
     }
 
@@ -111,11 +112,10 @@
       const tileValues = locale === 'spanish' ? spanishTileValues : englishTileValues;
       const initialState = createInitialState(tileValues);
 
-      // Mount the Wordify game with tileValues for locale support
+      // Mount the Wordify game
       currentGame = Wordify.createRound('#game-container', {
         initialState: initialState,
-        isLoggedIn: true,
-        tileValues: tileValues  // This determines available letters in blank tile selector
+        isLoggedIn: true
       });
 
       console.log(`Wordify round mounted with ${locale} locale!`);

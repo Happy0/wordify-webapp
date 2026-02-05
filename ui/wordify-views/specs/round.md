@@ -304,15 +304,6 @@ type BoardSquare = {
     tile: Tile | undefined
 }
 
-// Represents a tile placed on the board at a specific position
-// Used for sparse representation of placed tiles during initialization
-type PlacedTile = {
-    // Position on the board using 1-based coordinates (1-15 for a standard 15x15 board)
-    position: { x: number, y: number }
-    // The tile at this position
-    tile: Tile
-}
-
 type GameState = {
 
     // The player number of the user
@@ -355,10 +346,11 @@ type GameState = {
     // Uses the same format as the BOARD_LAYOUT constant
     boardLayout: SquareType[][],
 
-    // The tiles that have been placed on the board. This is a sparse array - it only contains entries for
-    // occupied squares, not empty ones. Each entry specifies the position (using 1-based coordinates) and the tile.
-    // The initialization code uses this array along with boardLayout to construct the internal board state.
-    placedTiles: PlacedTile[]
+    // The tiles on the board represented as a comma-delimited board string.
+    // See the board-text-representation spec for format details.
+    // An empty board is represented as 224 commas (225 empty values).
+    // Requires tileValues to be provided in the GameState for parsing.
+    boardString: string
 }
 ```
 
@@ -415,7 +407,7 @@ const round = createRound('#game-container', {
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `initialState` | `GameState` | Yes | The initial game state to render |
+| `initialState` | `GameState` | Yes | The initial game state to render (includes optional `tileValues` for locale support and board string parsing) |
 | `websocketUrl` | `string` | No | WebSocket URL for real-time updates |
 | `gameId` | `string` | No | Game ID for localStorage scoping (e.g., unread chat tracking) |
 | `isLoggedIn` | `boolean` | No | Whether the user is logged in (controls Login/Logout in navigation) |
