@@ -510,7 +510,7 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
     store.updatePlayers(playerSummaries)
 
     // Add final move to history if there was one
-    if (data.placed?.length > 0) {
+    if ((data.placed?.length ?? 0) > 0) {
       // The player who made the final move is the current playerToMove (1-based),
       // since it hasn't been updated yet. Convert to 0-based index.
       const playerIndex = store.playerToMove - 1
