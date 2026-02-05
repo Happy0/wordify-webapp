@@ -30,6 +30,7 @@ export default defineConfig({
         exports: 'named'
       }
     },
-    cssCodeSplit: false // Bundle CSS into a single file
+    cssCodeSplit: false, // Bundle CSS into a single file
+    sourcemap: true // Generate source maps for debugging original .ts/.vue files in browser DevTools
   }
 })
