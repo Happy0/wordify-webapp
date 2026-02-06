@@ -1,6 +1,6 @@
 module Controllers.Game.Persist (getGame, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==), String, Bool, notElem)
+import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fromMaybe, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==), String, Bool, notElem)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -58,13 +58,13 @@ getLobby pool localisedGameSetups gameId = do
 
   case dbEntries of
     Right (Entity _ (M.Lobby gameId originalLetterBag letterBagSeed maybeLocale numPlayers createdAt), playerModels) -> do
-      players <- sequence $ L.map (playerFromLobbyEntity pool) playerModels
+      players <- mapM (playerFromLobbyEntity pool) playerModels
       serverPlayers <- newTVarIO players
       channel <- newBroadcastTChanIO
       playerIdGenerator <- getStdGen
       playerIdGeneratorTvar <- newTVarIO playerIdGenerator
       runExceptT $ do
-        let locale = maybe "en" id maybeLocale
+        let locale = fromMaybe "en" maybeLocale
         -- This could be more efficient than individual fetches, but it doesn't matter for now
         let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
         setup@(GameSetup _ dictionary bag _ _) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
@@ -84,7 +84,7 @@ getLobbyPlayer pool gameId playerId = do
     Just entity -> Just <$> playerFromLobbyEntity pool entity
 
 addDisplayNames :: [ServerPlayer] -> [P.Player] -> [P.Player]
-addDisplayNames serverPlayers gameStatePlayers = L.zipWith addDisplayName serverPlayers gameStatePlayers
+addDisplayNames = L.zipWith addDisplayName
   where
     -- TODO: expose function to modify name of player in game state in wordify lib
     addDisplayName serverPlayer gameStatePlayer =
@@ -124,7 +124,7 @@ getGame pool localisedGameSetups gameId = do
       serverPlayers <- mapConcurrently (playerFromEntity pool) playerModels
 
       runExceptT $ do
-        let locale = maybe "en" id maybeLocale
+        let locale = fromMaybe "en" maybeLocale
         let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
         setup@(GameSetup _ dictionary bag extraRules _) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
         internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
@@ -140,7 +140,7 @@ getGame pool localisedGameSetups gameId = do
     Left err -> return $ Left err
 
 playThroughGame :: Game -> LetterBag -> [M.Move] -> Either T.Text Game
-playThroughGame game initialBag moves = foldM playNextMove game moves
+playThroughGame game initialBag = foldM playNextMove game
   where
     playNextMove :: Game -> M.Move -> Either T.Text Game
     playNextMove game moveModel =
@@ -193,14 +193,14 @@ persistNewGame pool gameId locale serverGame = do
   _ <- persistGameState pool gameId locale serverGame
   return ()
 
-withPool pool = flip runSqlPersistMPool pool
+withPool = flip runSqlPersistMPool
 
 persistGameState :: Pool SqlBackend -> T.Text -> T.Text -> ServerGame -> IO (Key M.Game)
 persistGameState pool gameId locale serverGame = do
   ServerGameSnapshot gameId gameState gamePlayers created lastMove finished <- atomically $ makeServerGameSnapshot serverGame
   let History letterBag _ = history gameState
   let currentMove = L.length (movesMade gameState) + 1
-  let boardRepresentation = T.pack (L.take 255 (L.repeat ','))
+  let boardRepresentation = T.pack (L.replicate 255 ',')
   withPool pool $ do
     gameDbId <-
       insert $
@@ -220,15 +220,15 @@ persistGameState pool gameId locale serverGame = do
 
 persistLobbyPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
-   in flip mapM_ playersWithNumbers $ do
-        \(playerNumber, (ServerPlayer playerName identifier gameId active lastActive)) ->
+   in forM_ playersWithNumbers $ do
+        \(playerNumber, ServerPlayer playerName identifier gameId active lastActive) ->
           insert $
             M.LobbyPlayer gameId identifier playerNumber lastActive
 
 persistPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
-   in flip mapM_ playersWithNumbers $ do
-        \(playerNumber, (ServerPlayer _ identifier gameId _ lastActive)) ->
+   in forM_ playersWithNumbers $ do
+        \(playerNumber, ServerPlayer _ identifier gameId _ lastActive) ->
           insert $
             M.Player gameId identifier playerNumber lastActive
 
@@ -343,11 +343,11 @@ moveFromEntity
       let startPos = posAt (startx, starty)
 
       positions <- case startPos of
-        Nothing -> Left $ "u dun goofed. Start position stored for the move is invalid "
+        Nothing -> Left "u dun goofed. Start position stored for the move is invalid "
         Just pos -> Right $ emptySquaresFrom board pos (T.length tiles) direction
       tiles <- dbTileRepresentationToTiles letterBag tiles
       return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
-moveFromEntity _ _ (m@M.Move {}) = error $ "you've dun goofed, see database logs (hopefully) "
+moveFromEntity _ _ m@M.Move {} = error "you've dun goofed, see database logs (hopefully) "
 
 playerFromEntity :: ConnectionPool -> Entity M.Player -> IO ServerPlayer
 playerFromEntity pool (Entity _ (M.Player gameId playerId _ lastActive)) =
@@ -388,7 +388,7 @@ stdGenToText stdGen =
 stdGenFromText :: T.Text -> StdGen
 stdGenFromText stdGenText =
   let [a, b] = T.split (== ' ') stdGenText
-   in fromSeedStdGen (read (T.unpack a), (read (T.unpack b)))
+   in fromSeedStdGen (read (T.unpack a), read (T.unpack b))
 
 toSeedStdGen :: StdGen -> (Word64, Word64)
 toSeedStdGen = unseedSMGen . unStdGen

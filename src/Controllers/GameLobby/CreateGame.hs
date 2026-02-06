@@ -71,6 +71,6 @@ getLocaleSetup locale setups =
 createPlayers :: Int -> Either Text (Player, Player, Maybe (Player, Maybe Player))
 createPlayers numPlayers
   | numPlayers == 2 = Right (makePlayer "player1", makePlayer "player2", Nothing)
-  | numPlayers == 3 = Right (makePlayer "player1", makePlayer "player2", Just ((makePlayer "player3"), Nothing))
-  | numPlayers == 4 = Right (makePlayer "player1", makePlayer "player2", Just ((makePlayer "player3"), Just (makePlayer "player4")))
-  | otherwise = Left $ T.concat (["Invalid number of players: ", pack (show numPlayers)])
+  | numPlayers == 3 = Right (makePlayer "player1", makePlayer "player2", Just (makePlayer "player3", Nothing))
+  | numPlayers == 4 = Right (makePlayer "player1", makePlayer "player2", Just (makePlayer "player3", Just (makePlayer "player4")))
+  | otherwise = Left $ T.concat ["Invalid number of players: ", pack (show numPlayers)]

@@ -61,7 +61,9 @@ storeGameDefinitions worker@(GameDefinitionController definitionService _ workQu
     atomically (writeTQueue workQueue (GameDefinitionWorkItem gameId word defs withStoredResultAsync))
 
 getStoredDefinitions :: GameDefinitionController -> Text -> ConduitT () GameWordItem IO ()
-getStoredDefinitions (GameDefinitionController _ definitionRepository _ _) word = getGameDefinitionsImpl definitionRepository word
+getStoredDefinitions
+  (GameDefinitionController _ definitionRepository _ _)
+  = getGameDefinitionsImpl definitionRepository
 
 killWorkerThread :: GameDefinitionController -> IO ()
 killWorkerThread (GameDefinitionController _ _ _ workerThread) = do

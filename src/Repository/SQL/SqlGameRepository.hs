@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications #-}
+
 
 module Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend), GameRepository (getActiveUserGames)) where
 
@@ -13,7 +13,7 @@ import qualified Model as M
 import Repository.GameRepository (GameRepository, GameSummary (GameSummary), UserId, getActiveUserGames)
 import Prelude
 
-data GameRepositorySQLBackend = GameRepositorySQLBackend (Pool SqlBackend)
+newtype GameRepositorySQLBackend = GameRepositorySQLBackend (Pool SqlBackend)
 
 instance GameRepository GameRepositorySQLBackend where
   getActiveUserGames (GameRepositorySQLBackend pool) userId = withPool pool (activeUserGames userId)
@@ -26,7 +26,7 @@ activeUserGames userId = do
 
 -- TODO - find out how to do 'ARRAY_AGG' or similar to be able to do this within the SQL query rather than doing a 1-to-m fetch
 addAllPlayerGames :: (Monad m, MonadIO m) => [(E.Entity M.Player, E.Entity M.Game)] -> E.SqlPersistT m [((E.Entity M.Player, E.Entity M.Game), [E.Entity M.Player])]
-addAllPlayerGames playerGames = mapM (uncurry getPlayers) playerGames
+addAllPlayerGames = mapM (uncurry getPlayers)
   where
     getPlayers :: (Monad m, MonadIO m) => E.Entity M.Player -> E.Entity M.Game -> E.SqlPersistT m ((E.Entity M.Player, E.Entity M.Game), [E.Entity M.Player])
     getPlayers player game@(E.Entity _ (M.Game gameId _ _ _ _ _ _ _ _)) = do
@@ -48,7 +48,7 @@ getActiveUserGamesEntities userId =
 
 getAllPlayers :: (Monad m, MonadIO m) => T.Text -> E.SqlPersistT m [E.Entity M.Player]
 getAllPlayers gameId = E.select $
-  E.from $ \(player) -> do
+  E.from $ \player -> do
     E.where_ (player ^. M.PlayerGameId E.==. E.val gameId)
     return player
 
@@ -60,13 +60,13 @@ toGameSummaries playerGameSummaries =
        in map toSummary activeGames
   where
     extractValues :: ((E.Entity M.Player, E.Entity M.Game), [E.Entity M.Player]) -> (M.Player, M.Game, [M.Player])
-    extractValues (((E.Entity _ player, E.Entity _ game), allPlayers)) = (player, game, map extractValue allPlayers)
+    extractValues ((E.Entity _ player, E.Entity _ game), allPlayers) = (player, game, map extractValue allPlayers)
 
     extractValue :: Entity a -> a
     extractValue (E.Entity _ x) = x
 
     toSummary :: (M.Player, M.Game, [M.Player]) -> GameSummary
-    toSummary ((M.Player _ _ playerNumber _), M.Game gameId _ _ bagLocale _ _ lastMoveMade currentMoveNumber board, allPlayers) =
+    toSummary (M.Player _ _ playerNumber _, M.Game gameId _ _ bagLocale _ _ lastMoveMade currentMoveNumber board, allPlayers) =
       let playable = isPlayerMove currentMoveNumber (length allPlayers) playerNumber
        in GameSummary gameId lastMoveMade playable board (fromMaybe "en" bagLocale)
 
@@ -75,8 +75,8 @@ toGameSummaries playerGameSummaries =
 
     isPlayerMove :: Int -> Int -> Int -> Bool
     isPlayerMove currentMoveNumber numberOfPlayers playerNumber =
-      case (currentMoveNumber `mod` numberOfPlayers) of
+      case currentMoveNumber `mod` numberOfPlayers of
         x | x > 0 -> x == playerNumber
-        x -> (playerNumber == numberOfPlayers)
+        x -> playerNumber == numberOfPlayers
 
-withPool pool = flip runSqlPersistMPool pool
+withPool = flip runSqlPersistMPool

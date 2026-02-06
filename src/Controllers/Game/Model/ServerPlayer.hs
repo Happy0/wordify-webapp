@@ -27,7 +27,7 @@ data ServerPlayer = ServerPlayer {
 }
 
 makeNewPlayer :: Maybe Text -> Text -> Text -> Int -> Maybe UTCTime -> ServerPlayer
-makeNewPlayer playerName gameId playerId connections lastActive = ServerPlayer playerName playerId gameId connections lastActive
+makeNewPlayer playerName gameId playerId = ServerPlayer playerName playerId gameId
 
 addConnection :: ServerPlayer -> UTCTime -> ServerPlayer
 addConnection player time = player {numConnections = numConnections player + 1, lastActive = Just time}
@@ -43,6 +43,6 @@ makeNewPlayerId generator =
 makeGameStatePlayers :: Int -> Either Text (G.Player, G.Player, Maybe (G.Player, Maybe G.Player))
 makeGameStatePlayers numPlayers
   | numPlayers == 2 = Right (G.makePlayer "player1", G.makePlayer "player2", Nothing)
-  | numPlayers == 3 = Right (G.makePlayer "player1", G.makePlayer "player2", Just ((G.makePlayer "player3"), Nothing))
-  | numPlayers == 4 = Right (G.makePlayer "player1", G.makePlayer "player2", Just ((G.makePlayer "player3"), Just (G.makePlayer "player4")))
-  | otherwise = Left $ T.concat (["Invalid number of players: ", pack (show numPlayers)])
+  | numPlayers == 3 = Right (G.makePlayer "player1", G.makePlayer "player2", Just (G.makePlayer "player3", Nothing))
+  | numPlayers == 4 = Right (G.makePlayer "player1", G.makePlayer "player2", Just (G.makePlayer "player3", Just (G.makePlayer "player4")))
+  | otherwise = Left $ T.concat ["Invalid number of players: ", pack (show numPlayers)]

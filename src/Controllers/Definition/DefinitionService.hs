@@ -3,6 +3,7 @@ module Controllers.Definition.DefinitionService (DefinitionService (getDefinitio
 import ClassyPrelude (Either (Left), IO, Int, Maybe, Show, either, id, pure, void, ($), (*), (.), (>>), (>>=))
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.Async (race)
+import Data.Functor ((<&>))
 import qualified Data.Text as T
 
 data Definition = Definition {partOfSpeech :: T.Text, definition :: T.Text, example :: Maybe T.Text} deriving (Show)
@@ -10,7 +11,7 @@ data Definition = Definition {partOfSpeech :: T.Text, definition :: T.Text, exam
 class DefinitionService a where
   getDefinitions :: a -> T.Text -> T.Text -> IO (Either T.Text [Definition])
 
-data DefinitionServiceImpl = DefinitionServiceImpl
+newtype DefinitionServiceImpl = DefinitionServiceImpl
   { definitions :: T.Text -> T.Text -> IO (Either T.Text [Definition])
   }
 
@@ -26,10 +27,10 @@ withDefinitionsAsync definitionService word localeShortcode timeoutSeconds withD
 
 getDefinitionOrTimeout :: DefinitionServiceImpl -> T.Text -> T.Text -> Int -> IO (Either T.Text [Definition])
 getDefinitionOrTimeout (DefinitionServiceImpl getDefinitions) word localeShortcode timeoutAfter = do
-  race (timeout timeoutAfter) (getDefinitions word localeShortcode) >>= pure . either id id
+  race (timeout timeoutAfter) (getDefinitions word localeShortcode) <&> either id id
   where
     timeout :: Int -> IO (Either T.Text [Definition])
     timeout timeoutAfter = threadDelay (1000000 * timeoutAfter) >> pure (Left "Timed out while getting definition.")
 
 getDefinitionsImpl :: DefinitionServiceImpl -> T.Text -> T.Text -> IO (Either T.Text [Definition])
-getDefinitionsImpl (DefinitionServiceImpl getDefinitions) word localeShortcode = getDefinitions word localeShortcode
+getDefinitionsImpl (DefinitionServiceImpl getDefinitions) = getDefinitions

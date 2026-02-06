@@ -12,13 +12,13 @@ import Database.Persist.Sql
 import qualified Model as M
 import Repository.DefinitionRepository (DefinitionRepository (countGameDefinitions, getDefinitions, getGameDefinitions, saveGameDefinitions), GameWordItem (GameWordItem), WordDefinitionItem (WordDefinitionItem))
 
-data DefinitionRepositorySQLBackend = DefinitionRepositorySQLBackend (Pool SqlBackend)
+newtype DefinitionRepositorySQLBackend = DefinitionRepositorySQLBackend (Pool SqlBackend)
 
 instance DefinitionRepository DefinitionRepositorySQLBackend where
-  getDefinitions (DefinitionRepositorySQLBackend pool) word = getDefinitionsImpl pool word
-  saveGameDefinitions (DefinitionRepositorySQLBackend pool) when gameId word definitions = saveGameDefinitionsImpl pool when gameId word definitions
-  getGameDefinitions (DefinitionRepositorySQLBackend pool) gameId = getGameDefinitionsImpl pool gameId
-  countGameDefinitions (DefinitionRepositorySQLBackend pool) gameId = countGameDefinitionsImpl pool gameId
+  getDefinitions (DefinitionRepositorySQLBackend pool) = getDefinitionsImpl pool
+  saveGameDefinitions (DefinitionRepositorySQLBackend pool) = saveGameDefinitionsImpl pool
+  getGameDefinitions (DefinitionRepositorySQLBackend pool) = getGameDefinitionsImpl pool
+  countGameDefinitions (DefinitionRepositorySQLBackend pool) = countGameDefinitionsImpl pool
 
 getDefinitionsImpl :: Pool SqlBackend -> T.Text -> IO [WordDefinitionItem]
 getDefinitionsImpl pool = undefined
@@ -53,7 +53,6 @@ makeGameWordDefinitions definitions =
     sortGroupsByTimestamp = sortBy (\a b -> largerCreatedAtTimestamp (snd (fst a)) (snd (fst b)))
 
     largerCreatedAtTimestamp :: UTCTime -> UTCTime -> Ordering
-    largerCreatedAtTimestamp createdAt1 createdAt2 = compare createdAt1 createdAt2
 
     makeGameWordItem :: (T.Text, UTCTime) -> [(M.GameDefinition, Maybe M.Definition)] -> Int -> GameWordItem
     makeGameWordItem (word, createdAt) defs defNo =
@@ -88,6 +87,7 @@ makeGameWordDefinitions definitions =
 
     groupByKey :: (Ord k) => (a -> k) -> [a] -> Map.Map k [a]
     groupByKey toKey xs = Map.fromListWith (++) [(toKey x, [x]) | x <- xs]
+    largerCreatedAtTimestamp = compare
 
 saveGameDefinitionsImpl :: Pool SqlBackend -> UTCTime -> T.Text -> T.Text -> [WordDefinitionItem] -> IO ()
 saveGameDefinitionsImpl pool when gameId word [] = withPool pool $ do
@@ -114,4 +114,4 @@ gameDefinitionDatabaseModel :: T.Text -> WordDefinitionItem -> M.Definition
 gameDefinitionDatabaseModel word (WordDefinitionItem partOfSpeech definition example) =
   M.Definition word partOfSpeech definition example
 
-withPool pool = flip runSqlPersistMPool pool
+withPool = flip runSqlPersistMPool

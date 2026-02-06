@@ -13,7 +13,7 @@ import Database.Persist.Sql
 import qualified Model as M
 import Repository.ChatRepository (ChatMessageEntity (ChatMessageEntity), ChatRepository (countChatMessages, getChatMessages, saveChatMessage))
 
-data SqlChatRepositoryBackend = SqlChatRepositoryBackend (Pool SqlBackend)
+newtype SqlChatRepositoryBackend = SqlChatRepositoryBackend (Pool SqlBackend)
 
 instance ChatRepository SqlChatRepositoryBackend where
   saveChatMessage (SqlChatRepositoryBackend pool) = saveChatMessageImpl pool

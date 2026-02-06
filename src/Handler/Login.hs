@@ -15,9 +15,7 @@ getLoginR' = do
     maybeReturnUrl <- lookupGetParam "returnUrl"
 
     -- Store the return URL in the session if provided
-    case maybeReturnUrl of
-        Just returnUrl -> setSession "_ULT" returnUrl
-        Nothing -> return ()
+    forM_ maybeReturnUrl (setSession "_ULT")
 
     -- Redirect to the OAuth2 forward endpoint
     redirect ("/auth/page/oauth0/forward" :: Text)
