@@ -37,7 +37,8 @@ This view should be responsive - it should be pleasant to use on both mobile/tab
 4. No scrolling left or right or up or down should be required while on the main view but the move history and chat can be scrolled when they're being viewed
 5. It should be easy to get back to the main view from the 'expanded view' of the individual components using the back button or a button on the component
 6. When any mobile panel (scores, chat, or move history) is open, pressing the browser back button should close the panel and return to the main view instead of navigating to the previous page in browser history. This is achieved by pushing a history state when opening these panels and handling the `popstate` event to close them.
-7. It should be possible to drag and drop tiles on the rack and board on a touch screen. Touch-based drag and drop should show a visual clone of the tile being dragged that follows the user's finger.
+7. When the tile exchange dialog or blank tile assignment dialog is open, pressing the browser back button should close the dialog instead of navigating to the previous page in browser history. This uses the same `pushState`/`popstate` pattern as the mobile panels.
+8. It should be possible to drag and drop tiles on the rack and board on a touch screen. Touch-based drag and drop should show a visual clone of the tile being dragged that follows the user's finger.
 
 #### Larger devices
 
@@ -146,6 +147,7 @@ The following rules apply to drag and drop for both mouse (desktop) and touch (m
 * Moves are displayed in chronological order: the first move appears at the top, and the latest move appears at the bottom.
 * Each row contains the overall move score as well as the score of each individual word formed
 * When new moves are added, the widget scrolls to the bottom to show the latest move
+* When the move history is first displayed (e.g. opening the mobile panel), it scrolls to the bottom to show the latest move
 
 #### Chat
 

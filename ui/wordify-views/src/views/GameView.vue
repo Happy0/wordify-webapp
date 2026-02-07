@@ -80,6 +80,9 @@ const activeMobilePanel = ref<'none' | 'scores' | 'history' | 'chat'>('none')
 const showBlankSelector = ref(false)
 const selectedBlankTileId = ref<string | null>(null)
 
+// Exchange dialog state (exposed from MoveControls via ref)
+const moveControlsRef = ref<InstanceType<typeof MoveControls> | null>(null)
+
 // Drag state for coordinating between rack and board
 const draggingTileId = ref<string | null>(null)
 const draggingFromBoard = ref<{ row: number; col: number } | null>(null)
@@ -150,6 +153,16 @@ watch([gameEnded, isMyTurn], ([ended, myTurn]) => {
   }
 }, { immediate: true })
 
+// Push history state when exchange dialog opens (for mobile back button)
+watch(
+  () => moveControlsRef.value?.exchangeMode,
+  (isOpen) => {
+    if (isOpen) {
+      history.pushState({ dialog: 'exchange' }, '')
+    }
+  }
+)
+
 // Watch for tile placements and request potential score
 watch(
   candidateTilesOnBoard,
@@ -178,6 +191,7 @@ function handleTileEndDrag() {
 function handleBlankTileClick(tileId: string) {
   selectedBlankTileId.value = tileId
   showBlankSelector.value = true
+  history.pushState({ dialog: 'blankSelector' }, '')
 }
 
 function handleBlankLetterSelect(letter: string) {
@@ -232,8 +246,20 @@ function closeMobilePanel() {
   activeMobilePanel.value = 'none'
 }
 
-// Handle browser back button for mobile panels
+// Handle browser back button for mobile panels and dialogs
 function handlePopState(_: PopStateEvent) {
+  // If the blank tile selector is open, close it
+  if (showBlankSelector.value) {
+    showBlankSelector.value = false
+    return
+  }
+
+  // If the exchange dialog is open, close it
+  if (moveControlsRef.value?.exchangeMode) {
+    moveControlsRef.value.exchangeMode = false
+    return
+  }
+
   // If any mobile panel is open, close it instead of navigating back
   if (activeMobilePanel.value !== 'none') {
     closeMobilePanel()
@@ -637,6 +663,7 @@ provide('onRackDrop', handleRackDrop)
           @tile-drop="handleTouchTileDrop"
         />
         <MoveControls
+          ref="moveControlsRef"
           @submit="handleSubmit"
           @exchange="handleExchange"
           @pass="handlePass"
