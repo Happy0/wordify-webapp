@@ -11,15 +11,16 @@ import Import.NoFoundation (js_wordify_js, css_wordify_css)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
 
 
-data ActiveGameSummary = ActiveGameSummary {gameId :: Text, boardString:: Text,yourMove :: Bool, lastActivity :: Maybe UTCTime, tileValues :: TileValues}
+data ActiveGameSummary = ActiveGameSummary {gameId :: Text, boardString:: Text,yourMove :: Bool, lastActivity :: Maybe UTCTime, tileValues :: TileValues, otherPlayers :: [Text]}
 
 instance ToJSON ActiveGameSummary where
-  toJSON (ActiveGameSummary gameId boardString yourMove lastActivity tileValues) = object [ 
+  toJSON (ActiveGameSummary gameId boardString yourMove lastActivity tileValues otherPlayers) = object [
     "gameId" .= gameId,
     "boardString" .= boardString,
     "yourMove" .= yourMove,
     "lastActivity" .= lastActivity,
-    "tileValues" .= tileValues
+    "tileValues" .= tileValues,
+    "otherPlayers" .= otherPlayers
      ]
 
 getLocaleTileValues :: App -> Text -> Maybe TileValues
@@ -30,9 +31,9 @@ getLocaleTileValues app locale = do
    
 
 mapGameSummary :: App -> GameSummary -> ActiveGameSummary
-mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale) =
+mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale otherPlayerNames) =
   let tileValues = fromMaybe M.empty (getLocaleTileValues app locale)
-  in ActiveGameSummary gameId boardString myMove latestActivity tileValues
+  in ActiveGameSummary gameId boardString myMove latestActivity tileValues otherPlayerNames
 
 renderNotLoggedInPage :: Handler Html
 renderNotLoggedInPage =

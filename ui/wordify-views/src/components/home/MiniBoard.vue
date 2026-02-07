@@ -10,6 +10,7 @@ const props = defineProps<{
   lastActivity: string
   gameId: string
   tileValues: TileValueMap
+  otherPlayers: string[]
 }>()
 
 // Parse the board string into placed tiles
@@ -141,6 +142,11 @@ const formattedLastActivity = computed(() => {
   return date.toLocaleDateString()
 })
 
+const otherPlayersLabel = computed(() => {
+  if (props.otherPlayers.length === 0) return ''
+  return `vs ${props.otherPlayers.join(', ')}`
+})
+
 function navigateToGame() {
   window.location.href = `/games/${props.gameId}`
 }
@@ -200,6 +206,11 @@ function navigateToGame() {
           </div>
         </template>
       </template>
+    </div>
+
+    <!-- Other players -->
+    <div v-if="otherPlayersLabel" class="mt-1.5 text-xs text-gray-600 truncate text-center" :title="otherPlayersLabel">
+      {{ otherPlayersLabel }}
     </div>
   </div>
 </template>
