@@ -3,8 +3,14 @@ import { WebSocketTransport } from '@/services/websocketTransport'
 import type { ConnectionState } from '@/services/interfaces'
 import type { GameSummary } from '@/lib/home'
 
+function sortByLastActivityDesc(gamesList: GameSummary[]): GameSummary[] {
+  return [...gamesList].sort((a, b) => {
+    return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+  })
+}
+
 export function useHomeWebSocket(initialGames: GameSummary[]) {
-  const games = ref<GameSummary[]>(initialGames)
+  const games = ref<GameSummary[]>(sortByLastActivityDesc(initialGames))
   const connectionState = ref<ConnectionState>('disconnected')
   const transport = new WebSocketTransport()
 
@@ -15,7 +21,7 @@ export function useHomeWebSocket(initialGames: GameSummary[]) {
   transport.onMessage((message) => {
     const data = JSON.parse(message)
     if (data.command === 'gamesUpdate') {
-      games.value = data.payload
+      games.value = sortByLastActivityDesc(data.payload)
     }
   })
 
