@@ -2,16 +2,7 @@
 module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService) where
     import qualified Data.Text as T
     import Controllers.Definition.DefinitionService (DefinitionService (getDefinitions), getDefinitionsImpl, Definition(Definition))
-    import ClassyPrelude ( IO, undefined,
-      Maybe,
-      ($),
-      pure,
-      (<$>),
-      traverse,
-      SomeException,
-      (.),
-      not,
-      (==), (++))
+    import ClassyPrelude (IO, undefined, Maybe, ($), pure, (<$>), traverse, SomeException, (.), not, (==), (++), Bool, Bool(False), lift, rights, head, Int, join, const, mapMaybe, mapM_, print)
     import Data.Either (Either (..))
     import qualified Data.Map as M
     import Data.Aeson
@@ -24,16 +15,10 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     import ClassyPrelude.Yesod (Maybe(..), MonadIO (liftIO))
     import Text.HTML.TagSoup (Tag, parseTags, innerText, fromAttrib, (~==), isTagOpen, isTagText, isTagOpenName, sections)
     import qualified Data.List.Safe as L
-    import ClassyPrelude (Bool)
-    import ClassyPrelude (Bool(False))
-    import ClassyPrelude (lift)
-    import ClassyPrelude (rights)
     import Control.Monad.Error.Class (liftEither)
-    import ClassyPrelude (head)
     import Text.HTML.TagSoup.Match (tagOpen)
-    import ClassyPrelude (Int, join, const, mapMaybe, mapM_, print)
     import qualified Control.Arrow as A
-    
+
     data WiktionaryService = WiktionaryService
 
     data WiktionaryDefinitionEntry = WiktionaryDefinitionEntry { definition :: T.Text, examples :: Maybe [T.Text] }

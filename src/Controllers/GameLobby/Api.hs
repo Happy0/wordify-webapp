@@ -41,7 +41,7 @@ data LobbyInputError = GameLobbyDoesNotExist | InvalidPlayerID | LobbyAlreadyFul
 instance ToJSON LobbyResponse where
   toJSON (Joined player) = object ["name" .= name player]
   toJSON (StartGame gameId) = object ["gameId" .= gameId]
-  toJSON (JoinSuccess gameId newId) = object $ ["gameId" .= gameId, "id" .= newId]
+  toJSON (JoinSuccess gameId newId) = object ["gameId" .= gameId, "id" .= newId]
 
 instance ServerMessage LobbyResponse where
   commandName (Joined _) = "joined"

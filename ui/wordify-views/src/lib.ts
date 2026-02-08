@@ -57,3 +57,4 @@ export { BOARD_LAYOUT, BOARD_SIZE } from './types/game'
 
 // Export board text representation utilities
 export type { TileValueMap } from './common/tile-value-map'
+export { fromBoardTextRepresentation } from './common/board-text-presentation'

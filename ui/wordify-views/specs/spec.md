@@ -203,7 +203,7 @@ Running `npm run build` produces:
         lastDefinitionReceived: 0,
         rack: [...],
         boardLayout: Wordify.BOARD_LAYOUT,
-        placedTiles: [],
+        boardString: new Array(225).fill('').join(','),
         gameEnded: false
       },
       websocketUrl: 'wss://example.com/game/123',

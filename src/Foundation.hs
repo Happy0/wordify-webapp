@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll #-}
+
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -51,7 +51,7 @@ data AuthDetails = AuthDetails
   }
 
 instance Show AuthDetails where
-  show (AuthDetails clientId clientSecret) = "ClientId: " ++ (unpack clientId) ++ " ClientSecret: *****"
+  show (AuthDetails clientId clientSecret) = "ClientId: " ++ unpack clientId ++ " ClientSecret: *****"
 
 type LocalisedGameSetups = Map Text LocalisedGameSetup
 

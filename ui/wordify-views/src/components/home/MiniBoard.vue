@@ -10,6 +10,7 @@ const props = defineProps<{
   lastActivity: string
   gameId: string
   tileValues: TileValueMap
+  otherPlayers: string[]
 }>()
 
 // Parse the board string into placed tiles
@@ -201,6 +202,19 @@ function navigateToGame() {
         </template>
       </template>
     </div>
+
+    <!-- Other players -->
+    <div v-if="otherPlayers.length" class="mt-2 flex flex-wrap gap-1 justify-center">
+      <span
+        v-for="name in otherPlayers"
+        :key="name"
+        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-stone-100 text-gray-700"
+        :title="name"
+      >
+        <i class="pi pi-user player-icon" />
+        <span class="player-name truncate">{{ name }}</span>
+      </span>
+    </div>
   </div>
 </template>
 
@@ -230,6 +244,15 @@ function navigateToGame() {
   font-size: 0.2rem;
 }
 
+.player-icon {
+  font-size: 0.5rem;
+}
+
+.player-name {
+  font-size: 0.6rem;
+  max-width: 10ch;
+}
+
 @media (min-width: 640px) {
   .mini-board-card {
     max-width: 220px;
@@ -245,6 +268,15 @@ function navigateToGame() {
 
   .square-label {
     font-size: 0.25rem;
+  }
+
+  .player-icon {
+    font-size: 0.55rem;
+  }
+
+  .player-name {
+    font-size: 0.65rem;
+    max-width: 12ch;
   }
 }
 </style>

@@ -9,7 +9,7 @@ import qualified Model as M
 import System.IO
 import Prelude
 
-withPool pool = flip runSqlPersistMPool pool
+withPool = flip runSqlPersistMPool
 
 storeUser :: Pool SqlBackend -> AuthUser -> IO ()
 storeUser pool (AuthUser userId maybeNick) = do

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 
@@ -7,6 +7,14 @@ const store = useGameStore()
 const { moveHistory, players } = storeToRefs(store)
 
 const historyContainer = ref<HTMLElement | null>(null)
+
+// Scroll to bottom on mount (e.g. when mobile panel opens)
+onMounted(async () => {
+  await nextTick()
+  if (historyContainer.value) {
+    historyContainer.value.scrollTop = historyContainer.value.scrollHeight
+  }
+})
 
 // Auto-scroll to bottom when new moves are added
 watch(

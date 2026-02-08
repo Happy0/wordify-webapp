@@ -12,6 +12,7 @@ export interface GameSummary {
   yourMove: boolean
   lastActivity: string
   tileValues: TileValueMap
+  otherPlayers: string[]
 }
 
 const props = defineProps<{
@@ -53,6 +54,7 @@ function navigateToLogin() {
               :your-move="game.yourMove"
               :last-activity="game.lastActivity"
               :tile-values="game.tileValues"
+              :other-players="game.otherPlayers"
             />
           </div>
         </template>

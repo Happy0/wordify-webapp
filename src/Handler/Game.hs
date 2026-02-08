@@ -51,6 +51,7 @@ import Handler.Model.ClientGame (fromServerPlayer, fromServerTile)
 import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
 import Model.GameSetup (LocalisedGameSetup(..))
+import Wordify.Rules.Game (Game(..))
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -133,6 +134,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let clientPlayers = zipWith (fromServerPlayer gameOver) serverPlayers playersGameState
 
   let tileValues = (tileLettersToValueMap . gameSetup) serverGame
+  let boardString = textRepresentation (board gameSoFar)
 
   case gameMoveSummaries of
     Left err -> invalidArgs [err]
@@ -163,13 +165,10 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 chatMessages: [],
                 lastChatMessageReceived: 0,
                 lastDefinitionReceived: 0,
-
-                // TODO
                 rack: #{toJSON rack},
                 boardLayout: Wordify.BOARD_LAYOUT,
-
-                // Let the websocket deal with this
-                placedTiles: [],
+                boardString: #{toJSON boardString},
+                tileValues: #{toJSON tileValues},
                 gameEnded: false
               }
               
@@ -177,8 +176,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 initialState: initialState,
                 websocketUrl: webSocketUrl,
                 gameId: #{toJSON gameId},
-                isLoggedIn: #{toJSON isLoggedIn},
-                tileValues: #{toJSON tileValues}
+                isLoggedIn: #{toJSON isLoggedIn}
               });
              
           |]

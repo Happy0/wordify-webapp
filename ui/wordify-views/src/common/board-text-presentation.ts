@@ -111,3 +111,28 @@ export function fromBoardTextRepresentation(
 
   return placedTiles
 }
+
+/**
+ * Converts a PlacedTile[] array to a board text representation string.
+ * This is the inverse of fromBoardTextRepresentation.
+ *
+ * @param placedTiles - A PlacedTile[] array with 1-based positions
+ * @returns A comma-delimited board string
+ */
+export function toBoardTextRepresentation(placedTiles: PlacedTile[]): string {
+  const board = new Array<string>(BOARD_SIZE * BOARD_SIZE).fill('')
+
+  for (const placed of placedTiles) {
+    // Convert from 1-based coordinates to 0-based index
+    // Column-major order: index = (x - 1) * BOARD_SIZE + (y - 1)
+    const index = (placed.position.x - 1) * BOARD_SIZE + (placed.position.y - 1)
+
+    if (placed.tile.type === 'blank') {
+      board[index] = `[${placed.tile.assigned ?? ''}]`
+    } else {
+      board[index] = placed.tile.letter
+    }
+  }
+
+  return board.join(',')
+}

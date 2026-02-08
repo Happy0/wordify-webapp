@@ -78,16 +78,16 @@ takeLobbySnapshot lobby = do
 
 
 gameStarted :: ClientLobbyJoinResult -> Bool
-gameStarted lobbyJoinResult = isJust $ (createdGame lobbyJoinResult)
+gameStarted lobbyJoinResult = isJust (createdGame lobbyJoinResult)
 
 duplicateBroadcastChannel :: GameLobby -> STM (TChan LobbyMessage)
-duplicateBroadcastChannel gameLobby = dupTChan . channel $ gameLobby
+duplicateBroadcastChannel = dupTChan . channel
 
 addPlayer :: GameLobby -> SP.ServerPlayer -> STM Bool
 addPlayer lobby newPlayer = do
   currentPlayers <- readTVar (lobbyPlayers lobby)
 
-  if ((not $ playerAlreadyExists currentPlayers (SP.playerId newPlayer)))
+  if not $ playerAlreadyExists currentPlayers (SP.playerId newPlayer)
     then do
       let newPlayers = currentPlayers ++ [newPlayer]
       writeTVar (lobbyPlayers lobby) newPlayers
@@ -105,4 +105,4 @@ lobbyIsFull lobby = do
 inLobby :: GameLobby -> T.Text -> STM Bool
 inLobby lobby playerIdentifier = isJust . find isPlayer <$> readTVar (lobbyPlayers lobby)
   where
-    isPlayer player = (SP.playerId player) == playerIdentifier
+    isPlayer player = SP.playerId player == playerIdentifier

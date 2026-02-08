@@ -80,6 +80,12 @@ const activeMobilePanel = ref<'none' | 'scores' | 'history' | 'chat'>('none')
 const showBlankSelector = ref(false)
 const selectedBlankTileId = ref<string | null>(null)
 
+// Exchange dialog state (exposed from MoveControls via ref)
+const moveControlsRef = ref<InstanceType<typeof MoveControls> | null>(null)
+
+// Flag to distinguish popstate-triggered closes from UI-triggered closes
+let handlingPopState = false
+
 // Drag state for coordinating between rack and board
 const draggingTileId = ref<string | null>(null)
 const draggingFromBoard = ref<{ row: number; col: number } | null>(null)
@@ -150,6 +156,33 @@ watch([gameEnded, isMyTurn], ([ended, myTurn]) => {
   }
 }, { immediate: true })
 
+// Push history state when exchange dialog opens, consume it when closed via UI
+watch(
+  () => moveControlsRef.value?.exchangeMode,
+  (isOpen, wasOpen) => {
+    if (isOpen) {
+      history.pushState({ dialog: 'exchange' }, '')
+    } else if (wasOpen && !handlingPopState) {
+      history.back()
+    }
+  },
+  { flush: 'sync' }
+)
+
+// Consume stale history entry when mobile panel is closed via UI (not back button)
+watch(activeMobilePanel, (newVal, oldVal) => {
+  if (oldVal !== 'none' && newVal === 'none' && !handlingPopState) {
+    history.back()
+  }
+}, { flush: 'sync' })
+
+// Consume stale history entry when blank selector is closed via UI (not back button)
+watch(showBlankSelector, (newVal, oldVal) => {
+  if (oldVal && !newVal && !handlingPopState) {
+    history.back()
+  }
+}, { flush: 'sync' })
+
 // Watch for tile placements and request potential score
 watch(
   candidateTilesOnBoard,
@@ -178,6 +211,7 @@ function handleTileEndDrag() {
 function handleBlankTileClick(tileId: string) {
   selectedBlankTileId.value = tileId
   showBlankSelector.value = true
+  history.pushState({ dialog: 'blankSelector' }, '')
 }
 
 function handleBlankLetterSelect(letter: string) {
@@ -232,12 +266,13 @@ function closeMobilePanel() {
   activeMobilePanel.value = 'none'
 }
 
-// Handle browser back button for mobile panels
+// Handle browser back button for mobile panels and dialogs
 function handlePopState(_: PopStateEvent) {
-  // If any mobile panel is open, close it instead of navigating back
-  if (activeMobilePanel.value !== 'none') {
-    closeMobilePanel()
-  }
+  handlingPopState = true
+  if (showBlankSelector.value) { showBlankSelector.value = false; handlingPopState = false; return }
+  if (moveControlsRef.value?.exchangeMode) { moveControlsRef.value.exchangeMode = false; handlingPopState = false; return }
+  if (activeMobilePanel.value !== 'none') { closeMobilePanel(); handlingPopState = false; return }
+  handlingPopState = false
 }
 
 onMounted(() => {
@@ -637,6 +672,7 @@ provide('onRackDrop', handleRackDrop)
           @tile-drop="handleTouchTileDrop"
         />
         <MoveControls
+          ref="moveControlsRef"
           @submit="handleSubmit"
           @exchange="handleExchange"
           @pass="handlePass"

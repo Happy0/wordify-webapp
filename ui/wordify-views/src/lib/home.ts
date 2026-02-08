@@ -37,6 +37,11 @@ export interface GameSummary {
    * Different locales can have different tiles with different values
    */
   tileValues: TileValueMap
+
+  /**
+   * Names of the other players in this game (not the current user)
+   */
+  otherPlayers: string[]
 }
 
 export interface HomeOptions {

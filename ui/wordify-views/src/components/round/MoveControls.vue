@@ -65,6 +65,8 @@ function handlePass() {
     emit('pass')
   }
 }
+
+defineExpose({ exchangeMode })
 </script>
 
 <template>

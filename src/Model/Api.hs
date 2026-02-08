@@ -14,7 +14,7 @@ module Model.Api (ServerMessage, ClientError(ClientError), Locale, GameID, comma
         Represents an error on bad input from the client such as sending
         invalid JSON or a malformed command.
     -}
-    data ClientError = ClientError {reason :: Text}
+    newtype ClientError = ClientError {reason :: Text}
 
     instance ToJSON ClientError where
         toJSON serverError = object ["reason" .= reason serverError]

@@ -10,3 +10,4 @@ cd ../..
 
 cp ui/wordify-views/dist/wordify.umd.js static/js/wordify.js
 cp ui/wordify-views/dist/wordify-ui.css static/css/wordify.css
+cp ui/wordify-views/dist/wordify.umd.js.map static/js/wordify.umd.js.map

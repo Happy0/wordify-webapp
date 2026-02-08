@@ -8,6 +8,7 @@ import type {
 import { tileToWire, positionTileToWire } from './interfaces'
 import type { Position, Tile, PlayerSummary, PlacedTile } from '@/types/game'
 import { BOARD_LAYOUT } from '@/types/game'
+import { toBoardTextRepresentation } from '@/common/board-text-presentation'
 import type {
   ServerMessage,
   WireTile,
@@ -311,7 +312,7 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
       lastDefinitionReceived: existingLastDefinitionReceived,
       rack,
       boardLayout: BOARD_LAYOUT,
-      placedTiles,
+      boardString: toBoardTextRepresentation(placedTiles),
       gameEnded
     })
 

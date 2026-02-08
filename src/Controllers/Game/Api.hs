@@ -30,6 +30,7 @@ import Controllers.Game.Model.ServerPlayer
 import Controllers.User.Model.AuthUser (AuthUser)
 import Data.Aeson
 import Data.Aeson.Types
+import Data.Bifunctor (first)
 import Data.Foldable
 import qualified Data.HashMap.Strict as HM
 import qualified Data.List as L
@@ -97,13 +98,13 @@ instance ToJSON MoveSummary where
         "wordsMade" .= fmap wordSummaryJSON wordsWithScores,
         "type" .= boardSummaryType
       ]
-  toJSON (PassMoveSummary) = object ["type" .= passSummaryType]
-  toJSON (ExchangeMoveSummary) = object ["type" .= exchangeSummaryType]
+  toJSON PassMoveSummary = object ["type" .= passSummaryType]
+  toJSON ExchangeMoveSummary = object ["type" .= exchangeSummaryType]
   toJSON (GameEndSummary maybeWords players) =
     object
       [ "type" .= gameEndSummaryType,
         "players" .= players,
-        "lastMoveScore" .= (fmap sum $ (fmap . fmap) snd maybeWords),
+        "lastMoveScore" .= fmap (sum . fmap snd) maybeWords,
         "wordsMade"
           .= case maybeWords of
             Nothing -> []
@@ -112,13 +113,13 @@ instance ToJSON MoveSummary where
 
 wordSummaryJSON (word, score) = object ["word" .= word, "score" .= score]
 
-boardSummaryType = ("board" :: Text)
+boardSummaryType = "board" :: Text
 
-passSummaryType = ("pass" :: Text)
+passSummaryType = "pass" :: Text
 
-exchangeSummaryType = ("exchange" :: Text)
+exchangeSummaryType = "exchange" :: Text
 
-gameEndSummaryType = ("gameEnd" :: Text)
+gameEndSummaryType = "gameEnd" :: Text
 
 instance ToJSON Definition where
   toJSON (Definition partOfSpeech definition example) = object ["partOfSpeech" .= partOfSpeech, "definition" .= definition, "example" .= example]
@@ -131,7 +132,7 @@ instance ServerMessage GameMessage where
   commandName (PlayerChat {}) = "playerChat"
   commandName (PlayerConnect _ _) = "playerConnect"
   commandName (PlayerDisconnect _ _) = "playerDisconnect"
-  commandName (WordDefinitions _ _ _ _) = "wordDefinitions"
+  commandName (WordDefinitions {}) = "wordDefinitions"
 
 instance ToJSON GameMessage where
   toJSON (PlayerBoardMove moveNumber placed summary players nowPlaying tilesRemaining) =
@@ -173,13 +174,13 @@ instance ToJSON ServerResponse where
   toJSON (BoardMoveSuccess tiles) = object ["rack" .= toJSON tiles]
   toJSON PassMoveSuccess = object []
   toJSON (ExchangeMoveSuccess tiles) = object ["rack" .= toJSON tiles]
-  toJSON (ChatSuccess) = object []
-  toJSON (AskDefinitionSuccess) = object []
+  toJSON ChatSuccess = object []
+  toJSON AskDefinitionSuccess = object []
   toJSON (InvalidCommand msg) = object ["error" .= msg]
   toJSON (PotentialScore score) = object ["potentialScore" .= score]
   toJSON (InitialiseGame moves rack players playerNumber toMove tilesRemaining connectionStatuses appVersion) =
     object
-      [ "moveCommands" .= (fmap toJSONMessage moves),
+      [ "moveCommands" .= fmap toJSONMessage moves,
         "rack" .= rack,
         "players" .= players,
         "playerNumber" .= playerNumber,
@@ -286,7 +287,7 @@ transitionToMessage pt@(MoveTransition _ newGame wordsFormed) =
     (G.moveNumber newGame)
     ( Mb.mapMaybe
         ( \(pos, square) ->
-            (pos,) <$> (tileIfOccupied square)
+            (pos,) <$> tileIfOccupied square
         )
         $ playerPlaced wordsFormed
     )
@@ -311,24 +312,24 @@ transitionToMessage gf@(GameFinished game maybeWords) =
 transitionToSummary :: GameTransition -> MoveSummary
 transitionToSummary (MoveTransition player game formed) = toMoveSummary formed
 transitionToSummary (PassTransition _) = PassMoveSummary
-transitionToSummary (ExchangeTransition _ _ _ _) = ExchangeMoveSummary
+transitionToSummary (ExchangeTransition {}) = ExchangeMoveSummary
 transitionToSummary (GameFinished game maybeWords) =
-  GameEndSummary ((toTextScores . snd . wordsWithScores) <$> maybeWords) (G.players game)
+  GameEndSummary (toTextScores . snd . wordsWithScores <$> maybeWords) (G.players game)
   where
-    getPenalty before after = (score after - score before)
+    getPenalty before after = score after - score before
 
 toMoveSummary :: FormedWords -> MoveSummary
 toMoveSummary formedWords =
   let (overallScore, wordsAndScores) = wordsWithScores formedWords
    in let maybeDirection = direction (fst $ M.findMin (playerPlacedMap formedWords)) (fst $ M.findMax (playerPlacedMap formedWords))
-       in let direction = maybe Horizontal id maybeDirection -- Default to Horizontal
+       in let direction = Mb.fromMaybe Horizontal maybeDirection -- Default to Horizontal
            in BoardMoveSummary
                 overallScore
                 (toTextScores wordsAndScores)
                 direction
                 (M.keys (playerPlacedMap formedWords))
 
-toTextScores = fmap (\(word, score) -> (pack word, score))
+toTextScores = fmap (first pack)
 
 instance ToJSON ConnectionStatus where
   toJSON (ConnectionStatus playerNumber active lastSeen) = object ["playerNumber" .= playerNumber, "active" .= active, "lastSeen" .= lastSeen]

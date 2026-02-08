@@ -16,7 +16,7 @@ data FreeDictionaryMeaning = FreeDictionaryMeaning {partOfSpeech :: T.Text, defi
 
 data FreeDictionaryResponseItem = FreeDictionaryResponseItem {word :: T.Text, meanings :: [FreeDictionaryMeaning]} deriving (Show)
 
-data FreeDictionaryResponse = FreeDictionaryResponse [FreeDictionaryResponseItem] deriving (Show)
+newtype FreeDictionaryResponse = FreeDictionaryResponse [FreeDictionaryResponseItem] deriving (Show)
 
 instance FromJSON FreeDictionaryDefinition where
   parseJSON = withObject "Definition" $ \obj -> do
@@ -51,7 +51,7 @@ getDefinitionsImpl service word "en" =
 getDefinitionsImpl service word _ = pure (Right [])
 
 freeDictionaryResponseToDefinition :: FreeDictionaryResponse -> [Definition]
-freeDictionaryResponseToDefinition (FreeDictionaryResponse items) = concatMap (\item -> concatMap definitionFromFreeDictionaryMeaning (meanings item)) items
+freeDictionaryResponseToDefinition (FreeDictionaryResponse items) = concatMap (concatMap definitionFromFreeDictionaryMeaning . meanings) items
   where
     definitionFromFreeDictionaryMeaning :: FreeDictionaryMeaning -> [Definition]
     definitionFromFreeDictionaryMeaning (FreeDictionaryMeaning partOfSpeech definitions) = map (toDefinition partOfSpeech) definitions

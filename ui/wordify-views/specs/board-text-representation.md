@@ -77,3 +77,9 @@ The function returns a sparse array of PlacedTile objects, where each PlacedTile
 - A TileInput object (either a LetterTileInput or BlankTileInput)
 
 The function returns null if the board string is invalid (wrong length or unrecognized tile letters).
+
+There is also an inverse function `toBoardTextRepresentation` that converts a `PlacedTile[]` array back to a board string. It takes a single parameter:
+
+1. A `PlacedTile[]` array with 1-based positions
+
+The function returns the comma-delimited board string.

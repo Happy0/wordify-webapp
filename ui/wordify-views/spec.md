@@ -37,10 +37,12 @@ const spanishTileValues: TileValueMap = {
 }
 
 const options: RoundOptions = {
-  initialState: { /* GameState object */ },
+  initialState: {
+    /* ...other GameState fields... */
+    tileValues: tileValues  // or spanishTileValues for Spanish games
+  },
   websocketUrl: 'wss://example.com/game/123',
-  isLoggedIn: true,
-  tileValues: tileValues  // or spanishTileValues for Spanish games
+  isLoggedIn: true
 }
 
 const instance = createRound('#app', options)
@@ -50,14 +52,13 @@ instance.unmount()
 ```
 
 **Options:**
-- `initialState`: The initial game state
+- `initialState`: The initial game state (includes `tileValues` for locale support)
 - `websocketUrl`: WebSocket URL for real-time game updates
 - `isLoggedIn`: Whether the user is logged in (affects navigation)
-- `tileValues`: Map of letter strings to their point values (for locale support)
 
 **Locale Support:**
 
-The `tileValues` option enables support for different game locales. The keys of this map determine which letters are available for blank tile assignment. This supports:
+The `tileValues` field on the `GameState` (inside `initialState`) enables support for different game locales. The keys of this map determine which letters are available for blank tile assignment. This supports:
 
 - Standard single-character letters (A, B, C, etc.)
 - Multi-character tiles used in some languages (CH, RR, LL for Spanish)

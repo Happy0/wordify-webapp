@@ -176,9 +176,9 @@ getAuthDetails =
   do
     runExceptT
       $ do
-        clientId <- ExceptT $ note "Missing AUTH_CLIENT_ID environment variable" <$> (lookupEnv "AUTH_CLIENT_ID")
-        clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> (lookupEnv "AUTH_CLIENT_SECRET")
-        authBaseUri <- ExceptT $ note "Missing AUTH_BASE_URI environment variable" <$> (lookupEnv "AUTH_BASE_URI")
+        clientId <- ExceptT $ note "Missing AUTH_CLIENT_ID environment variable" <$> lookupEnv "AUTH_CLIENT_ID"
+        clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> lookupEnv "AUTH_CLIENT_SECRET"
+        authBaseUri <- ExceptT $ note "Missing AUTH_BASE_URI environment variable" <$> lookupEnv "AUTH_BASE_URI"
         except $ buildOAuthDetails (pack authBaseUri) (pack clientId) (pack clientSecret)
 
 getExitAppOnIdleConfig :: IO Bool
@@ -186,7 +186,7 @@ getExitAppOnIdleConfig = do
   exitOnIdle <- lookupEnv "EXIT_ON_IDLE"
   case exitOnIdle of
     Nothing -> pure False
-    Just configValue -> pure ((toLower configValue) == "true")
+    Just configValue -> pure (toLower configValue == "true")
 
 loadGameBundles :: IO LocalisedGameSetups
 loadGameBundles =
@@ -210,9 +210,9 @@ loadGameBundle locale =
     let tileValues = getTileValues (validLetters bag)
 
     case locale of
-      "es_fise" -> return $ (pack locale, GameSetup "es" dictionary bag spanishGameExtraRules tileValues)
-      _ -> return $ (pack locale, GameSetup (pack locale) dictionary bag [] tileValues)
-    
+      "es_fise" -> return (pack locale, GameSetup "es" dictionary bag spanishGameExtraRules tileValues)
+      _ -> return (pack locale, GameSetup (pack locale) dictionary bag [] tileValues)
+
 
 loadBag :: String -> IO LetterBag
 loadBag locale =
@@ -315,9 +315,7 @@ appMain = do
 
   let runApp = runSettings (warpSettings foundation) app
 
-  case exitAppOnIdle of
-    True -> raceUntilInactive inactivityTracker runApp
-    False -> runApp
+  (if exitAppOnIdle then raceUntilInactive inactivityTracker runApp else runApp)
 
 --------------------------------------------------------------
 -- Functions for DevelMain.hs (a way to run the app from GHCi)
@@ -342,7 +340,7 @@ shutdownApp _ = return ()
 handler :: Handler a -> IO a
 handler h = do
   inactivityTracker <- makeInactivityTracker
-  getAppSettings >>= (\appSettings -> makeFoundation appSettings inactivityTracker) >>= flip unsafeHandler h
+  getAppSettings >>= (`makeFoundation` inactivityTracker) >>= flip unsafeHandler h
 
 -- | Run DB queries
 db :: ReaderT SqlBackend Handler a -> IO a

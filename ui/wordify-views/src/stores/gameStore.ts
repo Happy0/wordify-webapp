@@ -13,6 +13,8 @@ import type {
   PlacedTile
 } from '@/types/game'
 import { BOARD_LAYOUT, BOARD_SIZE } from '@/types/game'
+import { fromBoardTextRepresentation } from '@/common/board-text-presentation'
+import type { TileValueMap } from '@/common/tile-value-map'
 
 // Generate a unique ID for tiles
 let tileIdCounter = 0
@@ -90,6 +92,7 @@ export const useGameStore = defineStore('game', () => {
   const gameEnded = ref<boolean>(false)
   const lastError = ref<string | null>(null)
   const gameId = ref<string | null>(null)
+  const tileValues = ref<TileValueMap | null>(null)
 
   // Getters
   const isMyTurn = computed(() => myPlayerNumber.value === playerToMove.value)
@@ -131,9 +134,19 @@ export const useGameStore = defineStore('game', () => {
     rack.value = state.rack ? state.rack.map(tile => toInternalTile(tile, true)) : []
     gameEnded.value = state.gameEnded
 
-    // Construct the board from boardLayout and placedTiles
+    // Update tileValues if provided in state
+    if (state.tileValues) {
+      tileValues.value = state.tileValues
+    }
+
+    // Construct the board from boardLayout and boardString
     const newBoard = createBoardFromLayout(state.boardLayout)
-    placeTilesOnBoard(newBoard, state.placedTiles)
+    if (state.boardString && tileValues.value) {
+      const parsedTiles = fromBoardTextRepresentation(state.boardString, tileValues.value)
+      if (parsedTiles) {
+        placeTilesOnBoard(newBoard, parsedTiles)
+      }
+    }
     board.value = newBoard
   }
 
@@ -301,6 +314,10 @@ export const useGameStore = defineStore('game', () => {
     lastError.value = null
   }
 
+  function setTileValues(values: TileValueMap) {
+    tileValues.value = values
+  }
+
   function setGameId(id: string) {
     gameId.value = id
   }
@@ -370,6 +387,7 @@ export const useGameStore = defineStore('game', () => {
     setGameEnded,
     setError,
     clearError,
+    setTileValues,
     setGameId,
     getCandidateTilePositions
   }

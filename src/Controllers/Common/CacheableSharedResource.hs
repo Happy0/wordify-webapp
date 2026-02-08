@@ -24,8 +24,8 @@ import Prelude
 data CacheItem a = CacheItem {cacheItem :: a, connections :: TVar Int}
 
 data ResourceCache err a = ResourceCache
-  { cache :: (M.Map Text (CacheItem a)),
-    cleanUpMap :: (M.Map Text UTCTime),
+  { cache :: M.Map Text (CacheItem a),
+    cleanUpMap :: M.Map Text UTCTime,
     loadResourceOp :: Text -> IO (Either err a),
     onRemoval :: Maybe (a -> IO ()),
     cacheCleanupThreadId :: ThreadId
@@ -45,12 +45,12 @@ makeResourceCache loadResourceOp onRemoval = do
   allocate (allocateResource loadResourceOp onRemoval) deallocateResource
   where
     allocateResource :: (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> IO (ResourceCache err a)
-    allocateResource loadResource onRemoval = makeGlobalResourceCache loadResource onRemoval
 
     deallocateResource :: ResourceCache err a -> IO ()
     deallocateResource cache = do
       let threadId = cacheCleanupThreadId cache
       killThread threadId
+    allocateResource = makeGlobalResourceCache
 
 makeGlobalResourceCache :: (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> IO (ResourceCache err a)
 makeGlobalResourceCache loadResourceOp onRemoval = do
@@ -106,7 +106,7 @@ removeIfNoSharers cache cleanupMap resourceId = do
     Just cached -> do
       sharers <- numberOfSharers cached
 
-      if (sharers == 0)
+      if sharers == 0
         then do
           removeFromCache cache resourceId
           removeScheduledCleanup cleanupMap resourceId
@@ -159,13 +159,14 @@ getCacheableResource resourceCache resourceId = do
   return (releaseKey, cacheItem <$> cacheEntry)
   where
     allocateResource :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
-    allocateResource resourceCache resourceId = loadCacheableResource resourceCache resourceId
+    allocateResource = loadCacheableResource
 
     deAllocateResource :: ResourceCache err a -> Either err (CacheItem a) -> IO ()
     deAllocateResource resourceCache resource = do
       case resource of
         Left _ -> pure ()
         Right sharedResource -> handleSharerLeave resourceCache sharedResource resourceId
+
 
 {-
   Returns the item if it's in the cache but does not load it into the cache if it is not present

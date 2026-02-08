@@ -37,7 +37,8 @@ This view should be responsive - it should be pleasant to use on both mobile/tab
 4. No scrolling left or right or up or down should be required while on the main view but the move history and chat can be scrolled when they're being viewed
 5. It should be easy to get back to the main view from the 'expanded view' of the individual components using the back button or a button on the component
 6. When any mobile panel (scores, chat, or move history) is open, pressing the browser back button should close the panel and return to the main view instead of navigating to the previous page in browser history. This is achieved by pushing a history state when opening these panels and handling the `popstate` event to close them.
-7. It should be possible to drag and drop tiles on the rack and board on a touch screen. Touch-based drag and drop should show a visual clone of the tile being dragged that follows the user's finger.
+7. When the tile exchange dialog or blank tile assignment dialog is open, pressing the browser back button should close the dialog instead of navigating to the previous page in browser history. This uses the same `pushState`/`popstate` pattern as the mobile panels.
+8. It should be possible to drag and drop tiles on the rack and board on a touch screen. Touch-based drag and drop should show a visual clone of the tile being dragged that follows the user's finger.
 
 #### Larger devices
 
@@ -146,6 +147,7 @@ The following rules apply to drag and drop for both mouse (desktop) and touch (m
 * Moves are displayed in chronological order: the first move appears at the top, and the latest move appears at the bottom.
 * Each row contains the overall move score as well as the score of each individual word formed
 * When new moves are added, the widget scrolls to the bottom to show the latest move
+* When the move history is first displayed (e.g. opening the mobile panel), it scrolls to the bottom to show the latest move
 
 #### Chat
 
@@ -304,15 +306,6 @@ type BoardSquare = {
     tile: Tile | undefined
 }
 
-// Represents a tile placed on the board at a specific position
-// Used for sparse representation of placed tiles during initialization
-type PlacedTile = {
-    // Position on the board using 1-based coordinates (1-15 for a standard 15x15 board)
-    position: { x: number, y: number }
-    // The tile at this position
-    tile: Tile
-}
-
 type GameState = {
 
     // The player number of the user
@@ -355,10 +348,11 @@ type GameState = {
     // Uses the same format as the BOARD_LAYOUT constant
     boardLayout: SquareType[][],
 
-    // The tiles that have been placed on the board. This is a sparse array - it only contains entries for
-    // occupied squares, not empty ones. Each entry specifies the position (using 1-based coordinates) and the tile.
-    // The initialization code uses this array along with boardLayout to construct the internal board state.
-    placedTiles: PlacedTile[]
+    // The tiles on the board represented as a comma-delimited board string.
+    // See the board-text-representation spec for format details.
+    // An empty board is represented as 224 commas (225 empty values).
+    // Requires tileValues to be provided in the GameState for parsing.
+    boardString: string
 }
 ```
 
@@ -415,7 +409,7 @@ const round = createRound('#game-container', {
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `initialState` | `GameState` | Yes | The initial game state to render |
+| `initialState` | `GameState` | Yes | The initial game state to render (includes optional `tileValues` for locale support and board string parsing) |
 | `websocketUrl` | `string` | No | WebSocket URL for real-time updates |
 | `gameId` | `string` | No | Game ID for localStorage scoping (e.g., unread chat tracking) |
 | `isLoggedIn` | `boolean` | No | Whether the user is logged in (controls Login/Logout in navigation) |
