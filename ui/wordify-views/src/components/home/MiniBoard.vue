@@ -1,8 +1,25 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { BOARD_SIZE, BOARD_LAYOUT, type TileInput, type SquareType } from '@/types/game'
 import { fromBoardTextRepresentation } from '@/common/board-text-presentation'
 import type { TileValueMap } from '@/common/tile-value-map'
+
+// Reactive timestamp that updates every minute to keep "last activity" times fresh
+const currentTime = ref(Date.now())
+let updateInterval: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  updateInterval = setInterval(() => {
+    currentTime.value = Date.now()
+  }, 60000)
+})
+
+onUnmounted(() => {
+  if (updateInterval) {
+    clearInterval(updateInterval)
+    updateInterval = null
+  }
+})
 
 const props = defineProps<{
   boardString: string
@@ -129,8 +146,8 @@ function getSquareLabelColorClass(row: number, col: number): string {
 // Format last activity as relative time
 const formattedLastActivity = computed(() => {
   const date = new Date(props.lastActivity)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
+  const now = currentTime.value
+  const diffMs = now - date.getTime()
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)

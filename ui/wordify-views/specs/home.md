@@ -14,7 +14,7 @@ This view should display well on mobile and desktop
 The miniboard should display:
 * A mini view of the board of the game in progress
 * A UI indication of whether it's the user's move or not in the game
-* The last activity time for the game (formatted as relative time, e.g., "5m ago", "2h ago", "3d ago")
+* The last activity time for the game (formatted as relative time, e.g., "5m ago", "2h ago", "3d ago"). These timestamps should refresh every minute so they stay accurate without requiring a page reload.
 * The names of the other players in the game (e.g., "vs Alice, Bob")
 
 # Configuration
