@@ -20,6 +20,9 @@
 **/*.keter
 **/*~
 **/\#*
+# Exclude UI build outputs so changes don't invalidate the backend Docker cache
+static/js
+static/css
 **/wordify-webapp.cabal
 **/node_modules
 fly.toml

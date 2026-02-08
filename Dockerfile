@@ -41,6 +41,12 @@ COPY templates templates
 COPY static static
 COPY test test
 
+# Create placeholder files for Yesod's staticFiles TH splice.
+# The real files come from the ui-build stage; these just need to exist
+# so the compile-time identifier generation succeeds.
+RUN mkdir -p static/js static/css && \
+    touch static/js/wordify.js static/js/wordify.umd.js.map static/css/wordify.css
+
 # Build the application
 RUN stack build --copy-bins --local-bin-path "bin"
 
