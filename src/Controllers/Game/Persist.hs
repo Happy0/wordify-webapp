@@ -197,7 +197,7 @@ withPool = flip runSqlPersistMPool
 
 persistGameState :: Pool SqlBackend -> T.Text -> T.Text -> ServerGame -> IO (Key M.Game)
 persistGameState pool gameId locale serverGame = do
-  ServerGameSnapshot gameId gameState gamePlayers created lastMove finished <- atomically $ makeServerGameSnapshot serverGame
+  ServerGameSnapshot gameId gameState gamePlayers created snapshotLastMove finished _ <- atomically $ makeServerGameSnapshot serverGame
   let History letterBag _ = history gameState
   let currentMove = L.length (movesMade gameState) + 1
   let boardRepresentation = T.pack (L.replicate 255 ',')
@@ -211,7 +211,7 @@ persistGameState pool gameId locale serverGame = do
           (Just locale)
           created
           finished
-          lastMove
+          snapshotLastMove
           currentMove
           boardRepresentation
 

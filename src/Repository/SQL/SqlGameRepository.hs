@@ -2,8 +2,10 @@
 
 module Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend), GameRepository (getActiveUserGames)) where
 
+import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (MonadIO)
 import Data.List (groupBy)
+import qualified Data.Map as Map
 import Data.Maybe
 import Data.Pool
 import qualified Data.Text as T
@@ -11,16 +13,17 @@ import Database.Esqueleto ((^.))
 import qualified Database.Esqueleto as E
 import Database.Persist.Sql
 import qualified Model as M
+import Model.GameSetup (LocalisedGameSetup)
 import Repository.GameRepository (GameRepository, GameSummary (GameSummary), UserId, getActiveUserGames)
 import Prelude
 
-newtype GameRepositorySQLBackend = GameRepositorySQLBackend (Pool SqlBackend)
+data GameRepositorySQLBackend = GameRepositorySQLBackend (Pool SqlBackend) (Map.Map T.Text LocalisedGameSetup)
 
 instance GameRepository GameRepositorySQLBackend where
-  getActiveUserGames (GameRepositorySQLBackend pool) userId = withPool pool (activeUserGames userId)
+  getActiveUserGames (GameRepositorySQLBackend pool gameSetups) userId = withPool pool (activeUserGames gameSetups userId)
 
-activeUserGames :: (Monad m, MonadIO m) => UserId -> E.SqlPersistT m [GameSummary]
-activeUserGames userId = do
+activeUserGames :: (Monad m, MonadIO m) => Map.Map T.Text LocalisedGameSetup -> UserId -> E.SqlPersistT m [GameSummary]
+activeUserGames gameSetups userId = do
   rows <- E.select $
     E.from $ \(me `E.InnerJoin` game `E.LeftOuterJoin` other `E.LeftOuterJoin` usr) -> do
       E.on (usr ^. M.UserIdent E.==. other ^. M.PlayerPlayerId)
@@ -35,10 +38,10 @@ activeUserGames userId = do
               ])
         ]
       return (me, game, E.just (usr ^. M.UserNickname))
-  return $ toGameSummaries rows
+  return $ toGameSummaries gameSetups rows
 
-toGameSummaries :: [(E.Entity M.Player, E.Entity M.Game, E.Value (Maybe (Maybe T.Text)))] -> [GameSummary]
-toGameSummaries rows =
+toGameSummaries :: Map.Map T.Text LocalisedGameSetup -> [(E.Entity M.Player, E.Entity M.Game, E.Value (Maybe (Maybe T.Text)))] -> [GameSummary]
+toGameSummaries gameSetups rows =
   let grouped = groupBy (\(_, E.Entity _ g1, _) (_, E.Entity _ g2, _) -> M.gameGameId g1 == M.gameGameId g2) rows
    in mapMaybe groupToSummary grouped
   where
@@ -46,16 +49,18 @@ toGameSummaries rows =
     groupToSummary [] = Nothing
     groupToSummary group@((E.Entity _ player, E.Entity _ game, _):_) =
       if isNothing (M.gameFinishedAt game)
-        then
+        then do
+          let localeCode = fromMaybe "en" (M.gameBagLocale game)
+          localisedSetup <- Map.lookup localeCode gameSetups
           let otherNames = concatMap extractName group
               totalPlayers = length otherNames + 1
               playable = isPlayerMove (M.gameCurrentMoveNumber game) totalPlayers (M.playerPlayerNumber player)
-           in Just $ GameSummary
+          Just $ GameSummary
                 (M.gameGameId game)
-                (M.gameLastMoveMadeAt game)
+                (M.gameLastMoveMadeAt game <|> Just (M.gameCreatedAt game))
                 playable
                 (M.gameBoard game)
-                (fromMaybe "en" (M.gameBagLocale game))
+                localisedSetup
                 otherNames
         else Nothing
 

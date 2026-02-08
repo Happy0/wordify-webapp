@@ -10,12 +10,18 @@ import Yesod.Auth
 import Import.NoFoundation (js_wordify_js, css_wordify_css)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
 import ClassyPrelude (undefined, Maybe (Nothing))
-import Controllers.User.Model.AuthUser (AuthUser)
+import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
 import Yesod.WebSockets
-import Network.WebSockets (Connection)
-import Controllers.Game.Model.UserEventSubscription (UserEvent)
+import Network.WebSockets (Connection, sendTextData)
+import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
 import Controllers.Common.CacheableSharedResource
-
+import Control.Monad.Loops (iterateM_)
+import qualified Network.WebSockets.Connection as C
+import Data.Aeson (encode)
+import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), lastMove)
+import qualified Controllers.Game.Model.ServerPlayer as SP
+import Wordify.Rules.Board (textRepresentation)
+import Wordify.Rules.Game (board)
 
 data ActiveGameSummary = ActiveGameSummary {gameId :: Text, boardString:: Text,yourMove :: Bool, lastActivity :: Maybe UTCTime, tileValues :: TileValues, otherPlayers :: [Text]}
 
@@ -29,16 +35,9 @@ instance ToJSON ActiveGameSummary where
     "otherPlayers" .= otherPlayers
      ]
 
-getLocaleTileValues :: App -> Text -> Maybe TileValues
-getLocaleTileValues app locale = do
-  let setups = localisedGameSetups app
-  setup <- M.lookup locale setups
-  return (tileLettersToValueMap setup)
-
-
-mapGameSummary :: App -> GameSummary -> ActiveGameSummary
-mapGameSummary app (GameSummary gameId latestActivity myMove boardString locale otherPlayerNames) =
-  let tileValues = fromMaybe M.empty (getLocaleTileValues app locale)
+mapGameSummary :: GameSummary -> ActiveGameSummary
+mapGameSummary summary@(GameSummary gameId latestActivity myMove boardString localisedGameSetup otherPlayerNames) =
+  let tileValues = tileLettersToValueMap localisedGameSetup
   in ActiveGameSummary gameId boardString myMove latestActivity tileValues otherPlayerNames
 
 renderNotLoggedInPage :: Handler Html
@@ -77,7 +76,7 @@ renderActiveGamePage app gameRepository userId = do
       [julius|
         const lobby = Wordify.createHome('#home', {
           isLoggedIn: true,
-          games: #{toJSON (map (mapGameSummary app) activeGames)},
+          games: #{toJSON (map mapGameSummary activeGames)},
           tileValues: {}
         });
       |]
@@ -86,12 +85,15 @@ getHomeR :: Handler Html
 getHomeR = do
   app <- getYesod
   let pool = appConnPool app
-  let gameRepositorySQLBackend = GameRepositorySQLBackend pool
+  let gameRepositorySQLBackend = GameRepositorySQLBackend pool (localisedGameSetups app)
   maybePlayerId <- maybeAuthId
 
   case maybePlayerId of
     Nothing -> renderNotLoggedInPage
-    Just userId -> renderActiveGamePage app gameRepositorySQLBackend userId
+    Just userId -> do
+      {- If this is a websocket request the handler short circuits here, otherwise it goes on to return the HTML page -}
+      webSockets $ homeWebsocketHandler app userId 
+      renderActiveGamePage app gameRepositorySQLBackend userId
 
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html
@@ -111,14 +113,58 @@ gamePagelayout widget = do
                         ^{pageBody pc}
         |]
 
-homeWebsocketHandler :: App -> Maybe AuthUser -> WebSocketsT Handler ()
-homeWebsocketHandler app Nothing = undefined
-homeWebsocketHandler app (Just authedUser) = do
+homeWebsocketHandler :: App -> Text -> WebSocketsT Handler ()
+homeWebsocketHandler app userIdent = do
+  connection <- ask
+  let gameRepository = GameRepositorySQLBackend (appConnPool app) (localisedGameSetups app)
   let userChannels = userEventChannels app
+  liftIO $ handleHomeWebsocket gameRepository connection userIdent userChannels
 
-  undefined
-
-handleHomeWebsocket :: Connection -> Text -> ResourceCache Text (TChan UserEvent) -> IO ()
-handleHomeWebsocket connection userIdent userEventBroadcastChannels = runResourceT $ do
+handleHomeWebsocket :: (GameRepository a) => a -> Connection -> Text -> ResourceCache Text (TChan UserEvent) -> IO ()
+handleHomeWebsocket gameRepository connection userIdent userEventBroadcastChannels = runResourceT $ do
     (_, userBroadcastChannel) <- getCacheableResource userEventBroadcastChannels userIdent
-    undefined
+    case userBroadcastChannel of
+      Left _ -> return ()
+      Right channel -> do
+        -- Important that we duplicate the channel first so that we don't miss any game updates after fetching from the database
+        channelSubscription <- atomically (dupTChan channel)
+        activeGames <- liftIO $ getActiveUserGames gameRepository userIdent
+        let activeGameMap = M.fromList $ map (\u -> (gameSummaryGameId u, u)) activeGames
+        _ <- liftIO (sendGameSummaryState connection activeGameMap)
+        flip iterateM_ activeGameMap $ \newActiveGameState -> do
+          nextMessage <- atomically (readTChan channelSubscription)
+          liftIO (handleUserEvent userIdent connection nextMessage newActiveGameState)
+
+handleUserEvent :: T.Text -> C.Connection -> UserEvent -> Map Text GameSummary -> IO (Map Text GameSummary)
+handleUserEvent userIdent connection (MoveInUserGame gameId gameState userToMove) gameStates = do
+  let gameSummary = gameSummaryFromServerGame userIdent gameState userToMove
+  let newState = M.insert gameId gameSummary gameStates
+  sendGameSummaryState connection newState
+  pure newState
+handleUserEvent userIdent connection (GameOver gameId serverGameSnapshot) gameStates = do
+  let newState = M.delete gameId gameStates
+  _ <- sendGameSummaryState connection newState
+  pure newState
+handleUserEvent userIdent connection (NewGame gameId gameState userToMove) gameStates = do
+  let gameSummary = gameSummaryFromServerGame userIdent gameState userToMove
+  let newState = M.insert gameId gameSummary gameStates
+  sendGameSummaryState connection newState
+  pure newState
+
+sendGameSummaryState :: C.Connection -> Map Text GameSummary -> IO ()
+sendGameSummaryState connection state = do
+  let summaries = map snd (M.toList state)
+  let x = map mapGameSummary summaries
+  let payload = object [ "command" .= ("gamesUpdate" :: T.Text), "payload" .= x ]
+  C.sendTextData connection (encode payload)
+
+gameSummaryFromServerGame :: T.Text -> ServerGameSnapshot -> Bool -> GameSummary
+gameSummaryFromServerGame userIdent serverGameSnapshot userToMove =
+  let otherPlayers = filter (\p -> SP.playerId p /= userIdent) (snapshotPlayers serverGameSnapshot)
+  in GameSummary
+    (snapshotGameId serverGameSnapshot)
+    (Just (lastMove serverGameSnapshot))
+    userToMove
+    (T.pack (textRepresentation (board (gameState serverGameSnapshot))))
+    (gameLocalisation serverGameSnapshot)
+    (map (fromMaybe "<Unknown>" . SP.name) otherPlayers)
