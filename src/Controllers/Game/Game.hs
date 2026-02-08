@@ -167,10 +167,12 @@ handleMove serverGame pool userEventChannelSubscriptions playerMoving move moveO
             let eventMessage = transitionToMessage transition
             let newGameState = newGame transition
 
+            now <- getCurrentTime
             P.persistGameUpdate pool (snapshotGameId gameSnapshot) newGameState eventMessage
 
             newSnapshot <- atomically $ do
               writeTVar (game serverGame) newGameState
+              updateLastMoveMade serverGame now
               writeTChan channel eventMessage
               makeServerGameSnapshot serverGame
 
