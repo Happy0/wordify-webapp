@@ -1,27 +1,57 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
 import NavigationButton from '@/components/common/NavigationButton.vue'
 import MiniBoard from '@/components/home/MiniBoard.vue'
-import type { TileValueMap } from '@/common/tile-value-map'
-
-export interface GameSummary {
-  gameId: string
-  boardString: string
-  yourMove: boolean
-  lastActivity: string
-  tileValues: TileValueMap
-  otherPlayers: string[]
-}
+import { useHomeWebSocket } from '@/composables/useHomeWebSocket'
+import type { GameSummary } from '@/lib/home'
 
 const props = defineProps<{
   games: GameSummary[]
 }>()
 
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
+const toast = useToast()
 
-const hasGames = computed(() => props.games.length > 0)
+const { games, connectionState, connect, disconnect } = useHomeWebSocket(props.games)
+
+const hasGames = computed(() => games.value.length > 0)
+
+// Watch for reconnection success (same pattern as GameView.vue)
+const hasBeenConnected = ref(false)
+const wasDisconnected = ref(false)
+
+watch(connectionState, (newState) => {
+  if (newState === 'connected') {
+    if (wasDisconnected.value) {
+      toast.add({
+        severity: 'success',
+        summary: 'Connected',
+        detail: 'Connection restored',
+        life: 3000
+      })
+    }
+    hasBeenConnected.value = true
+    wasDisconnected.value = false
+  }
+
+  if (hasBeenConnected.value && (newState === 'disconnected' || newState === 'error')) {
+    wasDisconnected.value = true
+  }
+})
+
+onMounted(() => {
+  if (isLoggedIn) {
+    connect()
+  }
+})
+
+onUnmounted(() => {
+  disconnect()
+})
 
 function navigateToCreateGame() {
   window.location.href = '/create-lobby'
@@ -35,6 +65,7 @@ function navigateToLogin() {
 
 <template>
   <div class="home-view min-h-dvh bg-stone-100 flex flex-col">
+    <Toast />
     <NavigationButton :is-logged-in="isLoggedIn" />
 
     <div class="flex-1 flex items-center justify-center p-4">

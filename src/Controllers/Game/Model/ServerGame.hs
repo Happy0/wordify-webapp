@@ -1,6 +1,7 @@
 module Controllers.Game.Model.ServerGame
   ( ServerGame,
-    ServerGameSnapshot (ServerGameSnapshot, snapshotGameId, gameState, snapshotPlayers),
+    ServerGameSnapshot (ServerGameSnapshot, snapshotGameId, gameState, snapshotPlayers, gameLocalisation, created),
+    lastMove,
     getServerPlayer,
     getPlayerNumber,
     makeNewServerGame,
@@ -41,9 +42,13 @@ data ServerGameSnapshot = ServerGameSnapshot
     gameState :: G.Game,
     snapshotPlayers :: [SP.ServerPlayer],
     created :: UTCTime,
-    lastMove :: Maybe UTCTime,
-    finished :: Maybe UTCTime
+    snapshotLastMove :: Maybe UTCTime,
+    finished :: Maybe UTCTime,
+    gameLocalisation :: LocalisedGameSetup
   }
+
+lastMove :: ServerGameSnapshot -> UTCTime
+lastMove snapshot = fromMaybe (created snapshot) (snapshotLastMove snapshot)
 
 data ServerGame = ServerGame
   { gameId :: Text,
@@ -57,12 +62,12 @@ data ServerGame = ServerGame
   }
 
 makeServerGameSnapshot :: ServerGame -> STM ServerGameSnapshot
-makeServerGameSnapshot (ServerGame id game playing _ createdAt lastMoveMadeAt finishedAt _) = do
+makeServerGameSnapshot (ServerGame id game playing _ createdAt lastMoveMadeAt finishedAt localisation) = do
   players <- mapM (readTVar . snd) playing
   gameState <- readTVar game
   lastMoveMade <- readTVar lastMoveMadeAt
   finished <- readTVar finishedAt
-  return $ ServerGameSnapshot id gameState players createdAt lastMoveMade finished
+  return $ ServerGameSnapshot id gameState players createdAt lastMoveMade finished localisation
 
 makeNewServerGame :: Text -> G.Game -> [SP.ServerPlayer] -> UTCTime -> LocalisedGameSetup -> STM ServerGame
 makeNewServerGame gameId initialGameState players createdAt gameSetup = do
