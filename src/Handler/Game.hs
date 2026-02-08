@@ -208,7 +208,7 @@ handleInboundSocketMessages app connection chatroom serverGame maybeUser = forev
     case eitherDecode msg of
       Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
       Right parsedCommand -> do
-        response <- liftIO $ performRequest serverGame chatroom (gameDefinitionController app) (appConnPool app) maybeUser parsedCommand
+        response <- liftIO $ performRequest serverGame chatroom (gameDefinitionController app) (appConnPool app) (userEventChannels app) maybeUser parsedCommand
         C.sendTextData connection $ toJSONResponse response
 
 sendInitialGameState :: C.Connection -> ServerGameSnapshot -> Maybe AuthUser -> IO ()

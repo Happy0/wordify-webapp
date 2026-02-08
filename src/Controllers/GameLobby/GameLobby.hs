@@ -5,8 +5,10 @@ import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.STM
+import Controllers.Common.CacheableSharedResource (peekCacheableResource)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
+import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
 import Controllers.Game.Persist
 import Controllers.GameLobby.Api
 import Controllers.GameLobby.Model.GameLobby
@@ -17,6 +19,7 @@ import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import Foundation
 import System.Random.Shuffle
+import Wordify.Rules.Game (playerNumber)
 import Prelude
 
 {-
@@ -72,6 +75,8 @@ startGame app gameId gameLanguage channel serverGame = do
     persistNewGame pool gameId gameLanguage serverGame
     -- Inform the clients that the game has been started
     atomically (writeTChan channel (LobbyFull gameId))
+    -- Notify user event channels about the new game
+    notifyNewGame app serverGame
 
 handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
@@ -122,3 +127,19 @@ createGame gameId lobby now =
     -- We shuffle so that who gets to go first is randomised.
     let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
     makeNewServerGame gameId initialGameState shuffledPlayers now (pendingGameSetup lobby)
+
+notifyNewGame :: App -> ServerGame -> IO ()
+notifyNewGame app serverGame = do
+  let userChannels = userEventChannels app
+  snapshot <- atomically $ makeServerGameSnapshot serverGame
+  let gId = snapshotGameId snapshot
+      gamePlayers = snapshotPlayers snapshot
+      currentPlayerNum = playerNumber (gameState snapshot)
+  forM_ (zip [1..] gamePlayers) $ \(playerIdx, player) -> do
+    let userIdent = playerId player
+        isUserToMove = currentPlayerNum == playerIdx
+    atomically $ do
+      maybeChannel <- peekCacheableResource userChannels userIdent
+      case maybeChannel of
+        Nothing -> return ()
+        Just chan -> writeTChan chan (NewGame gId snapshot isUserToMove)
