@@ -40,9 +40,10 @@ export interface GameSummary {
   tileValues: TileValueMap
 
   /**
-   * Names of the other players in this game (not the current user)
+   * The other players in this game (not the current user)
+   * Each entry has a name and whether they're currently connected
    */
-  otherPlayers: string[]
+  otherPlayers: { name: string; active: boolean }[]
 }
 
 export interface HomeOptions {

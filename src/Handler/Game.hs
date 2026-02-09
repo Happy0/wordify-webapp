@@ -230,7 +230,7 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSin
       let inactivityTrackerState = inactivityTracker app
       (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
       withTrackWebsocketActivity inactivityTrackerState $ do
-        withNotifyJoinAndLeave (appConnPool app) serverGame maybeUser $ do
+        withNotifyJoinAndLeave (appConnPool app) (userEventChannels app) serverGame maybeUser $ do
           sendInitialGameState connection gameSnapshot maybeUser
           sendPreviousDefinitions (gameDefinitionController app) gameId definitionsSince connection
           let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince

@@ -27,7 +27,7 @@ const props = defineProps<{
   lastActivity: string
   gameId: string
   tileValues: TileValueMap
-  otherPlayers: string[]
+  otherPlayers: { name: string; active: boolean }[]
 }>()
 
 // Parse the board string into placed tiles
@@ -223,13 +223,14 @@ function navigateToGame() {
     <!-- Other players -->
     <div v-if="otherPlayers.length" class="mt-2 flex flex-wrap gap-1 justify-center">
       <span
-        v-for="name in otherPlayers"
-        :key="name"
-        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-stone-100 text-gray-700"
-        :title="name"
+        v-for="player in otherPlayers"
+        :key="player.name"
+        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+        :class="player.active ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-gray-700'"
+        :title="player.name"
       >
         <i class="pi pi-user player-icon" />
-        <span class="player-name truncate">{{ name }}</span>
+        <span class="player-name truncate">{{ player.name }}</span>
       </span>
     </div>
   </div>

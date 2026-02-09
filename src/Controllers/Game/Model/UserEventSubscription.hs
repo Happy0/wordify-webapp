@@ -5,11 +5,12 @@ module Controllers.Game.Model.UserEventSubscription (UserEvent(..), newUserEvent
     import ClassyPrelude (Bool, TChan, IO, (.), STM)
     import Control.Concurrent.STM (dupTChan, newBroadcastTChanIO)
     import Controllers.Game.Model.ServerGame (ServerGameSnapshot)
-    
-    data UserEvent = 
+
+    data UserEvent =
         MoveInUserGame { userEventGameId :: Text, userEventGameState :: ServerGameSnapshot, userEventUserToMove :: Bool }
         |  GameOver { userEventGameId :: Text, userEventGameState :: ServerGameSnapshot }
         |  NewGame { userEventGameId :: Text, userEventGameState :: ServerGameSnapshot, userEventUserToMove :: Bool }
+        |  PlayerActivityChanged { userEventGameId :: Text, activePlayerNames :: [Text] }
 
     newUserEventSubcriptionChannel :: IO (TChan UserEvent)
     newUserEventSubcriptionChannel = newBroadcastTChanIO

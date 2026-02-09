@@ -25,6 +25,7 @@ import Controllers.User.Model.AuthUser
 import Data.Conduit
 import qualified Data.List as L
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import Data.Pool
 import Data.Text
 import Data.Time
@@ -48,39 +49,49 @@ import Controllers.Common.CacheableSharedResource (ResourceCache, peekCacheableR
 import Controllers.Game.Model.UserEventSubscription
 import Controllers.Push.PushController
 
-handlePlayerConnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
-handlePlayerConnect pool serverGame Nothing = pure ()
-handlePlayerConnect pool serverGame (Just user) = do
+handlePlayerConnect :: Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerConnect pool _ serverGame Nothing = pure ()
+handlePlayerConnect pool userEventChannelSubscriptions serverGame (Just user) = do
   now <- getCurrentTime
   persistPlayerLastSeen pool user (gameId serverGame) now
-  atomically $ handleNewPlayerConnection serverGame user now
-  where
-    handleNewPlayerConnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
-    handleNewPlayerConnection serverGame user now = do
-      newConnectionCount <- increasePlayerConnections serverGame user now
-      when (isFirstConnection newConnectionCount) $ do
-        notifyPlayerConnect serverGame user now
+  atomically $ do
+    newConnectionCount <- increasePlayerConnections serverGame user now
+    when (isFirstConnection newConnectionCount) $ do
+      notifyPlayerConnect serverGame user now
+      notifyUserChannelsPlayerActivity userEventChannelSubscriptions serverGame
 
+  where
     isFirstConnection :: Maybe Int -> Bool
     isFirstConnection (Just connectionCount) = connectionCount == 1
     isFirstConnection Nothing = False
 
-handlePlayerDisconnect :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO ()
-handlePlayerDisconnect pool serverGame Nothing = pure ()
-handlePlayerDisconnect pool serverGame (Just user) = do
+handlePlayerDisconnect :: Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerDisconnect pool _ serverGame Nothing = pure ()
+handlePlayerDisconnect pool userEventChannelSubscriptions serverGame (Just user) = do
   now <- getCurrentTime
   persistPlayerLastSeen pool user (gameId serverGame) now
-  atomically $ handleNewPlayerDisconnection serverGame user now
-  where
-    handleNewPlayerDisconnection :: ServerGame -> AuthUser -> UTCTime -> STM ()
-    handleNewPlayerDisconnection serverGame user now = do
-      newConnectionCount <- decreasePlayerConnections serverGame user now
-      when (isLastConnection newConnectionCount) $ do
-        notifyPlayerDisconnect serverGame user now
+  atomically $ do
+    newConnectionCount <- decreasePlayerConnections serverGame user now
+    when (isLastConnection newConnectionCount) $ do
+      notifyPlayerDisconnect serverGame user now
+      notifyUserChannelsPlayerActivity userEventChannelSubscriptions serverGame
 
+  where
     isLastConnection :: Maybe Int -> Bool
     isLastConnection (Just connectionCount) = connectionCount == 0
     isLastConnection Nothing = False
+
+notifyUserChannelsPlayerActivity :: ResourceCache Text (TChan UserEvent) -> ServerGame -> STM ()
+notifyUserChannelsPlayerActivity userEventChannelSubscriptions serverGame = do
+  players <- mapM (readTVar . snd) (playing serverGame)
+  let activeNames = [ fromMaybe "<Unknown>" (SP.name p) | p <- players, SP.numConnections p > 0 ]
+      gId = gameId serverGame
+  forM_ players $ \player -> do
+    let userIdent = SP.playerId player
+    maybeChannel <- peekCacheableResource userEventChannelSubscriptions userIdent
+    case maybeChannel of
+      Nothing -> return ()
+      Just channel -> writeTChan channel (PlayerActivityChanged gId activeNames)
 
 notifyPlayerConnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
 notifyPlayerConnect serverGame user@(AuthUser userid _) now = do
@@ -95,8 +106,8 @@ notifyPlayerDisconnect serverGame user now = do
 persistPlayerLastSeen :: Pool SqlBackend -> AuthUser -> Text -> UTCTime -> IO ()
 persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen pool gameId userId
 
-withNotifyJoinAndLeave :: Pool SqlBackend -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
-withNotifyJoinAndLeave pool serverGame maybeUser = bracket_ (handlePlayerConnect pool serverGame maybeUser) (handlePlayerDisconnect pool serverGame maybeUser)
+withNotifyJoinAndLeave :: Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
+withNotifyJoinAndLeave pool userEventChannels serverGame maybeUser = bracket_ (handlePlayerConnect pool userEventChannels serverGame maybeUser) (handlePlayerDisconnect pool userEventChannels serverGame maybeUser)
 
 performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Pool SqlBackend ->  ResourceCache Text (TChan UserEvent) -> PushController -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
 performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl player (BoardMove placed) =
