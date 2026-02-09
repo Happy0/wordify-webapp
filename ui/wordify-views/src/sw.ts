@@ -20,8 +20,9 @@ self.addEventListener('push', (event: PushEvent) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      const focused = clients.some((client) => client.focused)
-      if (focused) return
+      const notificationUrl = payload.url ?? '/'
+      const alreadyViewing = clients.some((client) => client.focused && client.url === notificationUrl)
+      if (alreadyViewing) return
       return self.registration.showNotification(title, options)
     })
   )

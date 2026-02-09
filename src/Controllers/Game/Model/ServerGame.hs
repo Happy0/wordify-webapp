@@ -17,6 +17,7 @@ module Controllers.Game.Model.ServerGame
     broadcastChannel,
     getServerPlayerSnapshot,
     getSnapshotPlayerNumber,
+    currentPlayerToMove,
     gameSetup
   )
 where
@@ -31,6 +32,7 @@ import qualified Controllers.Game.Model.ServerPlayer as SP
 import Controllers.User.Model.AuthUser
 import qualified Data.List as L
 import Data.Maybe
+import Data.Maybe (listToMaybe)
 import Data.Text
 import qualified Wordify.Rules.Game as G
 import Prelude
@@ -138,3 +140,9 @@ getSnapshotPlayerNumber :: ServerGameSnapshot -> AuthUser -> Maybe Int
 getSnapshotPlayerNumber serverGame (AuthUser userId _) = do
   let playerIds = Prelude.map SP.playerId (snapshotPlayers serverGame)
   fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)
+
+currentPlayerToMove :: ServerGameSnapshot -> Maybe Text
+currentPlayerToMove snapshot =
+  let pNum = G.playerNumber (gameState snapshot)
+      players = snapshotPlayers snapshot
+  in SP.playerId <$> listToMaybe (Prelude.drop (pNum - 1) players)

@@ -2,6 +2,7 @@ module Controllers.Push.PushController
   ( PushController,
     makePushController,
     subscribe,
+    sendMoveNotification,
     PushTokenSubscription (PushTokenSubscription, tokenAuth, tokenP256dh, tokenEndpoint, tokenExpirationTime),
   )
 where
