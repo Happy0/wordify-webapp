@@ -6,10 +6,14 @@ module Controllers.Push.PushController
   )
 where
 
-import ClassyPrelude (IO, Maybe)
+import ClassyPrelude (IO, Maybe (Nothing, Just), Either, pure, fmap)
+import Control.Lens ((.~))
+import qualified Data.Aeson as A
 import qualified Data.Text as T
 import Data.Time (UTCTime)
+import Network.HTTP.Client (Manager)
 import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription), saveSubscriptionImpl)
+import Web.WebPush (VAPIDKeys, PushNotificationError, sendPushNotification, mkPushNotification, pushMessage)
 
 -- | HTTP-facing subscription type for JSON deserialization
 data PushTokenSubscription = PushTokenSubscription
@@ -19,11 +23,22 @@ data PushTokenSubscription = PushTokenSubscription
     tokenExpirationTime :: Maybe UTCTime
   }
 
-data PushController = PushController
-  { pushNotificationRepository :: PushNotificationRepositoryImpl
+-- | Notification message payload sent to the browser
+data NotificationMessage = NotificationMessage
+  { notificationText :: T.Text,
+    notificationUrl :: T.Text
   }
 
-makePushController :: PushNotificationRepositoryImpl -> PushController
+instance A.ToJSON NotificationMessage where
+  toJSON (NotificationMessage t u) = A.object ["text" A..= t, "url" A..= u]
+
+data PushController = PushController
+  { pushNotificationRepository :: PushNotificationRepositoryImpl,
+    vapidKeys :: Maybe VAPIDKeys,
+    httpManager :: Manager
+  }
+
+makePushController :: PushNotificationRepositoryImpl -> Maybe VAPIDKeys -> Manager -> PushController
 makePushController = PushController
 
 subscribe :: PushController -> T.Text -> PushTokenSubscription -> IO ()
@@ -31,3 +46,12 @@ subscribe controller userId tokenSub =
   saveSubscriptionImpl
     (pushNotificationRepository controller)
     (PushSubscription userId (tokenEndpoint tokenSub) (tokenAuth tokenSub) (tokenP256dh tokenSub) (tokenExpirationTime tokenSub))
+
+sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> IO (Maybe (Either PushNotificationError ()))
+sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _) notifText notifUrl =
+  case vapidKeys controller of
+    Nothing -> pure Nothing
+    Just keys ->
+      let baseNotification = mkPushNotification subEndpoint subP256dh subAuth
+          notification = (pushMessage .~ NotificationMessage notifText notifUrl) baseNotification
+      in fmap Just (sendPushNotification keys (httpManager controller) notification)

@@ -78,8 +78,11 @@ dependencies:
   - req
   - async
   - base16-bytestring
-  - crypton
   - tagsoup
+  - base64-bytestring
+  - http-client
+  - lens
+  - web-push
 
 # The library contains all of our application code. The executable
 # defined below is just a thin wrapper.

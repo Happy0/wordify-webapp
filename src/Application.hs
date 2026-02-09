@@ -40,6 +40,15 @@ import Controllers.Definition.DefinitionService (DefinitionServiceImpl, toDefini
 import Controllers.Definition.FreeDictionaryService (FreeDictionaryService (FreeDictionaryService))
 import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
 import Controllers.Push.PushController (makePushController)
+import Web.WebPush (generateVAPIDKeys, readVAPIDKeys, vapidPublicKeyBytes, VAPIDKeys, VAPIDKeysMinDetails(..))
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Types as A
+import qualified Data.ByteString.Lazy as LB
+import System.Directory (doesFileExist, createDirectoryIfMissing)
+import System.FilePath ((</>))
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base64.URL as B64URL
+import qualified Data.Text.Encoding as TE
 import Repository.PushNotificationRepository (toPushNotificationRepositoryImpl)
 import Repository.SQL.SqlPushNotificationRepository (SqlPushNotificationRepositoryBackend (SqlPushNotificationRepositoryBackend))
 import Controllers.Game.Model.ServerGame
@@ -135,7 +144,12 @@ makeFoundation appSettings inactivityTracker = do
   randomGenerator <- newTVarIO stdGen
 
   authDetails <- getAuthDetails
-  vapidPublicKey <- fmap (fmap pack) (lookupEnv "VAPID_PUBLIC_KEY")
+
+  maybeVapidKeysDir <- lookupEnv "VAPID_KEYS_DIR"
+  maybeVapidKeys <- case maybeVapidKeysDir of
+    Nothing -> return Nothing
+    Just dir -> fmap Just (loadOrGenerateVAPIDKeys dir)
+  let vapidPublicKey = fmap vapidPublicKeyToBase64 maybeVapidKeys
 
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
@@ -174,7 +188,7 @@ makeFoundation appSettings inactivityTracker = do
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
   let pushNotificationRepository = toPushNotificationRepositoryImpl (SqlPushNotificationRepositoryBackend pool)
-  let pushCtrl = makePushController pushNotificationRepository
+  let pushCtrl = makePushController pushNotificationRepository maybeVapidKeys appHttpManager
 
   -- Return the foundation
   return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels pushCtrl
@@ -188,6 +202,37 @@ getAuthDetails =
         clientSecret <- ExceptT $ note "Missing AUTH_CLIENT_SECRET environment variable" <$> lookupEnv "AUTH_CLIENT_SECRET"
         authBaseUri <- ExceptT $ note "Missing AUTH_BASE_URI environment variable" <$> lookupEnv "AUTH_BASE_URI"
         except $ buildOAuthDetails (pack authBaseUri) (pack clientId) (pack clientSecret)
+
+loadOrGenerateVAPIDKeys :: FilePath -> IO VAPIDKeys
+loadOrGenerateVAPIDKeys dir = do
+  let keyFile = dir </> "vapid_keys.json"
+  exists <- doesFileExist keyFile
+  if exists
+    then do
+      contents <- LB.readFile keyFile
+      case decodeVAPIDKeysMinDetails contents of
+        Just details -> return (readVAPIDKeys details)
+        Nothing -> error "Failed to parse VAPID keys from vapid_keys.json"
+    else do
+      createDirectoryIfMissing True dir
+      details <- generateVAPIDKeys
+      LB.writeFile keyFile (encodeVAPIDKeysMinDetails details)
+      return (readVAPIDKeys details)
+
+vapidPublicKeyToBase64 :: VAPIDKeys -> Text
+vapidPublicKeyToBase64 keys =
+  let b64 = B64URL.encode (BS.pack (vapidPublicKeyBytes keys))
+  in TE.decodeUtf8 (fst (BS.breakSubstring "=" b64))
+
+encodeVAPIDKeysMinDetails :: VAPIDKeysMinDetails -> LB.ByteString
+encodeVAPIDKeysMinDetails (VAPIDKeysMinDetails priv pubX pubY) =
+  A.encode $ A.object ["privateNumber" A..= priv, "publicCoordX" A..= pubX, "publicCoordY" A..= pubY]
+
+decodeVAPIDKeysMinDetails :: LB.ByteString -> Maybe VAPIDKeysMinDetails
+decodeVAPIDKeysMinDetails bs = do
+  obj <- A.decode bs
+  flip A.parseMaybe obj $ A.withObject "VAPIDKeysMinDetails" $ \o ->
+    VAPIDKeysMinDetails <$> o A..: "privateNumber" <*> o A..: "publicCoordX" <*> o A..: "publicCoordY"
 
 getExitAppOnIdleConfig :: IO Bool
 getExitAppOnIdleConfig = do
