@@ -117,4 +117,4 @@ ENV LANG=C.UTF-8 \
     YESOD_HOST=0.0.0.0 \
     YESOD_PORT=8080
 
-CMD ["sh", "-c", "YESOD_SQLITE_DATABASE=/data/wordify-webapp-v3.sqlite3 SESSION_BACKEND_CERTIFICATE_DIRECTORY=/data ./bin/wordify-webapp"]
+CMD ["sh", "-c", "YESOD_SQLITE_DATABASE=/data/wordify-webapp-v3.sqlite3 VAPID_KEYS_DIR=/data SESSION_BACKEND_CERTIFICATE_DIRECTORY=/data ./bin/wordify-webapp"]
