@@ -7,14 +7,14 @@ module Controllers.Push.PushController
   )
 where
 
-import ClassyPrelude (IO, Maybe (Nothing, Just), Either (..), pure, fmap, undefined, mapM_, ($), putStr, putStrLn, show)
+import ClassyPrelude (IO, Maybe (Nothing, Just), Either (..), pure, undefined, mapM_, ($), putStr, putStrLn, show)
 import Control.Lens ((.~))
 import qualified Data.Aeson as A
 import qualified Data.Text as T
 import Data.Time (UTCTime)
 import Network.HTTP.Client (Manager)
-import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription), saveSubscriptionImpl, getSubscriptionsByUserIdImpl)
-import Web.WebPush (VAPIDKeys, PushNotificationError, sendPushNotification, mkPushNotification, pushMessage)
+import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription), saveSubscriptionImpl, getSubscriptionsByUserIdImpl, deleteSubscriptionImpl)
+import Web.WebPush (VAPIDKeys, PushNotificationError (RecepientEndpointNotFound), sendPushNotification, mkPushNotification, pushMessage)
 import Controllers.User.Model.AuthUser (AuthUser)
 import Control.Monad (forM_)
 import Data.List ((++))
@@ -56,19 +56,19 @@ sendMoveNotification pushController@(PushController pushNotificationRepository _
   subscriptions <- getSubscriptionsByUserIdImpl pushNotificationRepository userId
   forM_ subscriptions $
     -- TODO: base URL by configuration
-    \subscription -> do
-      result <- sendNotification pushController subscription "It's your move!" (T.concat ["https://wordify.gordo.life/games/", gameId])
+    \subscription ->
+      sendNotification pushController subscription "It's your move!" (T.concat ["https://wordify.gordo.life/games/", gameId])
 
-      case result of 
-        (Just (Left err)) -> putStrLn (T.pack (show err))
-        Nothing -> putStrLn "vapid keys not configured"
-        _ -> pure ()
-
-sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> IO (Maybe (Either PushNotificationError ()))
+sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> IO ()
 sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _) notifText notifUrl =
   case vapidKeys controller of
-    Nothing -> pure Nothing
-    Just keys ->
+    Nothing -> putStrLn "vapid keys not configured"
+    Just keys -> do
       let baseNotification = mkPushNotification subEndpoint subP256dh subAuth
           notification = (pushMessage .~ NotificationMessage notifText notifUrl) baseNotification
-      in fmap Just (sendPushNotification keys (httpManager controller) notification)
+      result <- sendPushNotification keys (httpManager controller) notification
+      case result of
+        Left RecepientEndpointNotFound ->
+          deleteSubscriptionImpl (pushNotificationRepository controller) subEndpoint
+        Left err -> putStrLn (T.pack (show err))
+        Right _ -> pure ()
