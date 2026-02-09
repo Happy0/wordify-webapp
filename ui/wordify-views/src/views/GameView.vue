@@ -20,6 +20,7 @@ import Button from 'primevue/button'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import NavigationButton from '@/components/common/NavigationButton.vue'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 
 // Props for SSR initialization
 const props = defineProps<{
@@ -34,6 +35,9 @@ const toast = useToast()
 
 // Inject isLoggedIn from the app-level provider
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
+
+// Push notifications
+const { bannerVisible: pushBannerVisible, subscribing: pushSubscribing, enableNotifications, dismissBanner } = usePushNotifications()
 
 // Unread chat message tracking (mobile only)
 const lastSeenChatMessage = ref<number>(0)
@@ -560,6 +564,31 @@ provide('onRackDrop', handleRackDrop)
         />
         <span v-if="connectionState === 'connecting'">Reconnecting...</span>
         <span v-else>Connection lost. Reconnecting...</span>
+      </div>
+    </Transition>
+
+    <!-- Push notification prompt banner -->
+    <Transition name="banner">
+      <div
+        v-if="pushBannerVisible"
+        class="push-banner fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-3 px-4 py-2 text-sm font-medium bg-blue-50 text-blue-800"
+      >
+        <i class="pi pi-bell" />
+        <span>Enable notifications to know when it's your turn</span>
+        <Button
+          label="Enable"
+          size="small"
+          severity="info"
+          :loading="pushSubscribing"
+          @click="enableNotifications"
+        />
+        <button
+          class="ml-1 p-1 rounded hover:bg-blue-100 text-blue-600"
+          @click="dismissBanner"
+          aria-label="Dismiss"
+        >
+          <i class="pi pi-times text-xs" />
+        </button>
       </div>
     </Transition>
 

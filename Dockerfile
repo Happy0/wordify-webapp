@@ -45,7 +45,7 @@ COPY test test
 # The real files come from the ui-build stage; these just need to exist
 # so the compile-time identifier generation succeeds.
 RUN mkdir -p static/js static/css && \
-    touch static/js/wordify.js static/js/wordify.umd.js.map static/css/wordify.css
+    touch static/js/wordify.js static/js/wordify.umd.js.map static/css/wordify.css static/sw.js
 
 # Build the application
 RUN stack build --copy-bins --local-bin-path "bin"
@@ -109,6 +109,7 @@ COPY templates templates
 COPY --from=ui-build /app/static/js/wordify.js static/js/wordify.js
 COPY --from=ui-build /app/static/js/wordify.umd.js.map static/js/wordify.umd.js.map
 COPY --from=ui-build /app/static/css/wordify.css static/css/wordify.css
+COPY --from=ui-build /app/static/sw.js static/sw.js
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \

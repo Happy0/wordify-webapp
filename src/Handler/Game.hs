@@ -176,7 +176,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 initialState: initialState,
                 websocketUrl: webSocketUrl,
                 gameId: #{toJSON gameId},
-                isLoggedIn: #{toJSON isLoggedIn}
+                isLoggedIn: #{toJSON isLoggedIn},
+                vapidPublicKey: #{toJSON (vapidPublicKey app)}
               });
              
           |]

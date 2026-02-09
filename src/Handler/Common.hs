@@ -20,3 +20,9 @@ getFaviconR = do cacheSeconds $ 60 * 60 * 24 * 30 -- cache for a month
 getRobotsR :: Handler TypedContent
 getRobotsR = return $ TypedContent typePlain
                     $ toContent $(embedFile "config/robots.txt")
+
+getServiceWorkerR :: Handler ()
+getServiceWorkerR = do
+    cacheSeconds 0
+    addHeader "Service-Worker-Allowed" "/"
+    sendFile "application/javascript" "static/sw.js"

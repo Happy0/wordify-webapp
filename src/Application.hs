@@ -135,6 +135,7 @@ makeFoundation appSettings inactivityTracker = do
   randomGenerator <- newTVarIO stdGen
 
   authDetails <- getAuthDetails
+  vapidPublicKey <- fmap (fmap pack) (lookupEnv "VAPID_PUBLIC_KEY")
 
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:

@@ -15,6 +15,7 @@ export interface RoundOptions {
   websocketUrl?: string
   gameId?: string
   isLoggedIn?: boolean
+  vapidPublicKey?: string | null
 }
 
 export interface RoundInstance {
@@ -52,6 +53,9 @@ export function createRound(
 
   // Provide isLoggedIn to all components
   app.provide('isLoggedIn', opts.isLoggedIn ?? false)
+
+  // Provide VAPID public key for push notification subscription
+  app.provide('vapidPublicKey', opts.vapidPublicKey ?? null)
 
   // Provide tileValues for locale-specific letter sets (used by BlankTileSelector)
   app.provide('tileValues', opts.initialState.tileValues ?? null)

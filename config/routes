@@ -6,6 +6,7 @@
 
 /favicon.ico FaviconR GET
 /robots.txt RobotsR GET
+/sw.js ServiceWorkerR GET
 
 / HomeR GET
 
