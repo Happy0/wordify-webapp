@@ -29,6 +29,7 @@ WORKDIR /app
 
 # Copy only dependency files first to cache dependencies
 COPY stack.yaml package.yaml ./
+COPY vendor vendor
 
 # Build dependencies only (this layer is cached unless stack.yaml/package.yaml change)
 RUN stack build --only-dependencies
