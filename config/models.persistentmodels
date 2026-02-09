@@ -80,8 +80,9 @@ GameDefinition
     gameId GameId
 
 PushNotificationSubscription
-    userId UserId
     endpoint Text
+    userId UserId
     auth Text
     p256dh Text
     expirationTime UTCTime Maybe
+    Primary endpoint
