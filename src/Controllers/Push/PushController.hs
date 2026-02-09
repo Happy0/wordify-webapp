@@ -34,7 +34,7 @@ data NotificationMessage = NotificationMessage
   }
 
 instance A.ToJSON NotificationMessage where
-  toJSON (NotificationMessage t u) = A.object ["text" A..= t, "url" A..= u]
+  toJSON (NotificationMessage t u) = A.object ["title" A..= ("Wordify" :: T.Text), "body" A..= t, "url" A..= u]
 
 data PushController = PushController
   { pushNotificationRepository :: PushNotificationRepositoryImpl,

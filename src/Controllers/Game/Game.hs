@@ -8,7 +8,9 @@ where
 import ClassyPrelude (getCurrentTime, putStrLn, traverse_, whenM)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
+import Control.Concurrent (forkIO)
 import Control.Exception (bracket_)
+import System.Timeout (timeout)
 import Control.Monad
 import Control.Monad.STM
 import Controllers.Chat.Chatroom
@@ -189,8 +191,12 @@ handleMove serverGame pool userEventChannelSubscriptions pushCtrl playerMoving m
 sendMovePushNotification :: PushController -> ServerGameSnapshot -> GameTransition -> Maybe Text -> IO ()
 sendMovePushNotification _ _ (GameFinished _ _) _ = pure ()
 sendMovePushNotification _ _ _ Nothing = pure ()
-sendMovePushNotification pushCtrl snapshot _ (Just nextPlayerId) =
-  sendMoveNotification pushCtrl nextPlayerId (snapshotGameId snapshot)
+sendMovePushNotification pushCtrl snapshot _ (Just nextPlayerId) = do
+  _ <- forkIO $ do
+    _ <- timeout (10 * 1000000) $
+      sendMoveNotification pushCtrl nextPlayerId (snapshotGameId snapshot)
+    pure ()
+  pure ()
 
 updateUserChannels :: ResourceCache Text (TChan UserEvent) -> ServerGameSnapshot -> Maybe Text -> Bool -> IO ()
 updateUserChannels userEventChannelSubscriptions snapshot nextPlayerUserId isGameOver = do

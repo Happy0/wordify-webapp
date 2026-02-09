@@ -13,13 +13,13 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
   let binary = ''
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]!)
   }
-  return btoa(binary)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 export function usePushNotifications() {
@@ -83,8 +83,8 @@ export function usePushNotifications() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           endpoint: subscription.endpoint,
-          p256dh: arrayBufferToBase64(key),
-          auth: arrayBufferToBase64(auth),
+          p256dh: arrayBufferToBase64Url(key),
+          auth: arrayBufferToBase64Url(auth),
           expirationTime: subscription.expirationTime ?? null
         })
       })
