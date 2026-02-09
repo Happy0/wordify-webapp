@@ -78,3 +78,10 @@ GameDefinition
     createdAt UTCTime
     definitionId DefinitionId Maybe
     gameId GameId
+
+PushNotificationSubscription
+    userId UserId
+    endpoint Text
+    auth Text
+    p256dh Text
+    expirationTime UTCTime Maybe

@@ -19,3 +19,4 @@
 /games/#Text/lobby GameLobbyR GET
 /games/#Text GameR GET
 
+/push/subscribe SubscribeR POST

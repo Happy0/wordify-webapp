@@ -18,6 +18,7 @@ import Controllers.Chat.Chatroom
 import Controllers.Common.CacheableSharedResource
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl)
 import Controllers.Game.GameDefinitionController (GameDefinitionController)
+import Controllers.Push.PushController (PushController)
 import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser)
@@ -75,7 +76,8 @@ data App = App
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
     inactivityTracker :: TVar InactivityTracker,
-    gameDefinitionController :: GameDefinitionController
+    gameDefinitionController :: GameDefinitionController,
+    pushController :: PushController
   }
 
 data MenuItem = MenuItem

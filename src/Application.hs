@@ -39,6 +39,9 @@ import Controllers.Common.CacheableSharedResource
 import Controllers.Definition.DefinitionService (DefinitionServiceImpl, toDefinitionServiceImpl)
 import Controllers.Definition.FreeDictionaryService (FreeDictionaryService (FreeDictionaryService))
 import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
+import Controllers.Push.PushController (makePushController)
+import Repository.PushNotificationRepository (toPushNotificationRepositoryImpl)
+import Repository.SQL.SqlPushNotificationRepository (SqlPushNotificationRepositoryBackend (SqlPushNotificationRepositoryBackend))
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Persist (getGame, getLobby)
 import Controllers.GameLobby.Model.GameLobby
@@ -61,6 +64,7 @@ import Handler.Game
 import Handler.GameLobby
 import Handler.Home
 import Handler.Login
+import Handler.Push
 import Import
 import InactivityTracker
 import Language.Haskell.TH.Syntax (qLocation)
@@ -135,14 +139,14 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventChannels = App {..}
+  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventChannels pushController = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Push controller forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool
@@ -168,8 +172,11 @@ makeFoundation appSettings inactivityTracker = do
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
+  let pushNotificationRepository = toPushNotificationRepositoryImpl (SqlPushNotificationRepositoryBackend pool)
+  let pushCtrl = makePushController pushNotificationRepository
+
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels
+  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels pushCtrl
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =
