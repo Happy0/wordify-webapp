@@ -26,3 +26,8 @@ getServiceWorkerR = do
     cacheSeconds 0
     addHeader "Service-Worker-Allowed" "/"
     sendFile "application/javascript" "static/sw.js"
+
+getManifestR :: Handler ()
+getManifestR = do
+    cacheSeconds $ 60 * 60 * 24
+    sendFile "application/manifest+json" "static/manifest.json"

@@ -2,6 +2,7 @@
     <head>
         <title>#{pageTitle pc}
         <meta charset=utf-8>
+        <link rel="manifest" href="/manifest.json">
         <style>body { font-family: verdana }
         ^{pageHead pc}
     <body>
