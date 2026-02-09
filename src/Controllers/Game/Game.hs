@@ -179,6 +179,9 @@ handleMove serverGame pool userEventChannelSubscriptions playerMoving move moveO
             updateUserChannels userEventChannelSubscriptions newSnapshot transition
             return $ moveOutcomeHandler moveOutcome
 
+sendMovePushNotification :: ServerGameSnapshot -> Text -> IO ()
+sendMovePushNotification gameState playerToMoveId = undefined
+
 updateUserChannels :: ResourceCache Text (TChan UserEvent) -> ServerGameSnapshot -> GameTransition -> IO ()
 updateUserChannels userEventChannelSubscriptions snapshot transition = do
   let players = snapshotPlayers snapshot

@@ -6,14 +6,17 @@ module Controllers.Push.PushController
   )
 where
 
-import ClassyPrelude (IO, Maybe (Nothing, Just), Either, pure, fmap)
+import ClassyPrelude (IO, Maybe (Nothing, Just), Either (..), pure, fmap, undefined, mapM_, ($), putStr, putStrLn, show)
 import Control.Lens ((.~))
 import qualified Data.Aeson as A
 import qualified Data.Text as T
 import Data.Time (UTCTime)
 import Network.HTTP.Client (Manager)
-import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription), saveSubscriptionImpl)
+import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription), saveSubscriptionImpl, getSubscriptionsByUserIdImpl)
 import Web.WebPush (VAPIDKeys, PushNotificationError, sendPushNotification, mkPushNotification, pushMessage)
+import Controllers.User.Model.AuthUser (AuthUser)
+import Control.Monad (forM_)
+import Data.List ((++))
 
 -- | HTTP-facing subscription type for JSON deserialization
 data PushTokenSubscription = PushTokenSubscription
@@ -46,6 +49,19 @@ subscribe controller userId tokenSub =
   saveSubscriptionImpl
     (pushNotificationRepository controller)
     (PushSubscription userId (tokenEndpoint tokenSub) (tokenAuth tokenSub) (tokenP256dh tokenSub) (tokenExpirationTime tokenSub))
+
+sendMoveNotification :: PushController -> T.Text -> T.Text -> IO ()
+sendMoveNotification pushController@(PushController pushNotificationRepository _ _) userId gameId = do
+  subscriptions <- getSubscriptionsByUserIdImpl pushNotificationRepository userId
+  forM_ subscriptions $
+    -- TODO: base URL by configuration
+    \subscription -> do
+      result <- sendNotification pushController subscription "It's your move!" (T.concat ["https://wordify.gordo.life/games/", gameId])
+
+      case result of 
+        (Just (Left err)) -> putStrLn (T.pack (show err))
+        Nothing -> putStrLn "vapid keys not configured"
+        _ -> pure ()
 
 sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> IO (Maybe (Either PushNotificationError ()))
 sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _) notifText notifUrl =
