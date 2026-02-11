@@ -18,6 +18,7 @@ import Data.Either
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import Foundation
+import Controllers.Push.PushController (sendGameStartedNotification)
 import System.Random.Shuffle
 import Wordify.Rules.Game (playerNumber)
 import Prelude
@@ -77,6 +78,8 @@ startGame app gameId gameLanguage channel serverGame = do
     atomically (writeTChan channel (LobbyFull gameId))
     -- Notify user event channels about the new game
     notifyNewGame app serverGame
+    -- Send push notifications to all players
+    notifyGameStartedPush app gameId serverGame
 
 handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
@@ -127,6 +130,13 @@ createGame gameId lobby now =
     -- We shuffle so that who gets to go first is randomised.
     let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
     makeNewServerGame gameId initialGameState shuffledPlayers now (pendingGameSetup lobby)
+
+notifyGameStartedPush :: App -> T.Text -> ServerGame -> IO ()
+notifyGameStartedPush app gId serverGame = do
+  let pushCtrl = pushController app
+  snapshot <- atomically $ makeServerGameSnapshot serverGame
+  forM_ (snapshotPlayers snapshot) $ \player ->
+    sendGameStartedNotification pushCtrl (playerId player) gId
 
 notifyNewGame :: App -> ServerGame -> IO ()
 notifyNewGame app serverGame = do

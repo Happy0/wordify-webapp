@@ -8,9 +8,7 @@ where
 import ClassyPrelude (getCurrentTime, putStrLn, traverse_, whenM)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
-import Control.Concurrent (forkIO)
 import Control.Exception (bracket_)
-import System.Timeout (timeout)
 import Control.Monad
 import Control.Monad.STM
 import Controllers.Chat.Chatroom
@@ -185,32 +183,30 @@ handleMove serverGame pool userEventChannelSubscriptions pushCtrl playerMoving m
             now <- getCurrentTime
             P.persistGameUpdate pool (snapshotGameId gameSnapshot) newGameState eventMessage
 
+            let isGameOver = case transition of
+                  GameFinished _ _ -> True
+                  _ -> False
+
             newSnapshot <- atomically $ do
               writeTVar (game serverGame) newGameState
               updateLastMoveMade serverGame now
               writeTChan channel eventMessage
               makeServerGameSnapshot serverGame
 
-            let nextPlayerUserId = currentPlayerToMove newSnapshot
-                isGameOver = case transition of
-                  GameFinished _ _ -> True
-                  _ -> False
-            updateUserChannels userEventChannelSubscriptions newSnapshot nextPlayerUserId isGameOver
-            sendMovePushNotification pushCtrl newSnapshot transition nextPlayerUserId
+            updateUserChannels userEventChannelSubscriptions newSnapshot isGameOver
+            sendMovePushNotification pushCtrl newSnapshot transition (currentPlayerToMove newSnapshot)
             return $ moveOutcomeHandler moveOutcome
 
 sendMovePushNotification :: PushController -> ServerGameSnapshot -> GameTransition -> Maybe Text -> IO ()
-sendMovePushNotification _ _ (GameFinished _ _) _ = pure ()
+sendMovePushNotification pushCtrl snapshot (GameFinished _ _) _ =
+  forM_ (snapshotPlayers snapshot) $ \player ->
+    sendGameOverNotification pushCtrl (SP.playerId player) (snapshotGameId snapshot)
 sendMovePushNotification _ _ _ Nothing = pure ()
-sendMovePushNotification pushCtrl snapshot _ (Just nextPlayerId) = do
-  _ <- forkIO $ do
-    _ <- timeout (10 * 1000000) $
-      sendMoveNotification pushCtrl nextPlayerId (snapshotGameId snapshot)
-    pure ()
-  pure ()
+sendMovePushNotification pushCtrl snapshot _ (Just nextPlayerId) =
+  sendMoveNotification pushCtrl nextPlayerId (snapshotGameId snapshot)
 
-updateUserChannels :: ResourceCache Text (TChan UserEvent) -> ServerGameSnapshot -> Maybe Text -> Bool -> IO ()
-updateUserChannels userEventChannelSubscriptions snapshot nextPlayerUserId isGameOver = do
+updateUserChannels :: ResourceCache Text (TChan UserEvent) -> ServerGameSnapshot -> Bool -> IO ()
+updateUserChannels userEventChannelSubscriptions snapshot True = do
   let players = snapshotPlayers snapshot
       gId = snapshotGameId snapshot
   forM_ players $ \player -> do
@@ -219,11 +215,17 @@ updateUserChannels userEventChannelSubscriptions snapshot nextPlayerUserId isGam
       maybeChannel <- peekCacheableResource userEventChannelSubscriptions userIdent
       case maybeChannel of
         Nothing -> return ()
-        Just channel -> do
-          let event = if isGameOver
-                then GameOver gId snapshot
-                else MoveInUserGame gId snapshot (Just userIdent == nextPlayerUserId)
-          writeTChan channel event
+        Just channel -> writeTChan channel (GameOver gId snapshot)
+updateUserChannels userEventChannelSubscriptions snapshot False =
+  case currentPlayerToMove snapshot of
+    Nothing -> return ()
+    Just nextPlayerId -> do
+      let gId = snapshotGameId snapshot
+      atomically $ do
+        maybeChannel <- peekCacheableResource userEventChannelSubscriptions nextPlayerId
+        case maybeChannel of
+          Nothing -> return ()
+          Just channel -> writeTChan channel (MoveInUserGame gId snapshot True)
 
 applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameTransition
 applyLocalisedRules gameTransition localisedGameSetup =

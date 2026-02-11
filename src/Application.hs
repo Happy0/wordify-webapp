@@ -188,7 +188,7 @@ makeFoundation appSettings inactivityTracker = do
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
   let pushNotificationRepository = toPushNotificationRepositoryImpl (SqlPushNotificationRepositoryBackend pool)
-  let pushCtrl = makePushController pushNotificationRepository maybeVapidKeys appHttpManager
+  pushCtrl <- makePushController pushNotificationRepository maybeVapidKeys appHttpManager
 
   -- Return the foundation
   return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels pushCtrl
