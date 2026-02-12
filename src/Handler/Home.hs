@@ -7,7 +7,7 @@ import Foundation
 import Repository.GameRepository
 import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend))
 import Yesod.Auth
-import Import.NoFoundation (js_wordify_js, css_wordify_css)
+import Import.NoFoundation (css_wordify_css, wordifyJs)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
 import ClassyPrelude (undefined, Maybe (Nothing))
 import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
@@ -60,7 +60,7 @@ renderNotLoggedInPage :: Handler Html
 renderNotLoggedInPage =
   gamePagelayout $ do
     addStylesheet $ (StaticR css_wordify_css)
-    addScript $ StaticR js_wordify_js
+    addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
           
@@ -84,7 +84,7 @@ renderActiveGamePage app gameRepository userId = do
   summaries <- liftIO $ buildActiveGameSummaries (games app) activeGames
   gamePagelayout $ do
     addStylesheet $ (StaticR css_wordify_css)
-    addScript $ StaticR js_wordify_js
+    addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
 

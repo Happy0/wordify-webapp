@@ -43,7 +43,7 @@ getCreateGamePageR = do
       Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
       Just _ -> gamePagelayout $ do
         addStylesheet $ (StaticR css_wordify_css)
-        addScript $ StaticR js_wordify_js
+        addScript $ StaticR wordifyJs
         [whamlet|
           <div #createlobby>
               
@@ -80,7 +80,7 @@ postCreateGameR =
 renderNotLoggedInLobbyPage :: Text -> WidgetFor App ()
 renderNotLoggedInLobbyPage message = do
   addStylesheet $ (StaticR css_wordify_css)
-  addScript $ StaticR js_wordify_js
+  addScript $ StaticR wordifyJs
   [whamlet|
     <div #lobbylogin>
         
@@ -138,7 +138,7 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnaps
   let joinedPlayerNames = map name (snapshotLobbyPlayers lobbySnapshot)
 
   addStylesheet $ (StaticR css_wordify_css)
-  addScript $ StaticR js_wordify_js
+  addScript $ StaticR wordifyJs
   [whamlet|
     <div #lobby>
         

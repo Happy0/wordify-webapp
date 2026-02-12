@@ -4,7 +4,7 @@
 module Settings.StaticFiles where
 
 import Settings     (appStaticDir, compileTimeAppSettings)
-import Yesod.Static (staticFiles)
+import Yesod.Static
 
 -- This generates easy references to files in the static directory at compile time,
 -- giving you compile-time verification that referenced files exist.
@@ -19,3 +19,9 @@ import Yesod.Static (staticFiles)
 --
 --     StaticFile ["js", "script.js"] []
 staticFiles (appStaticDir compileTimeAppSettings)
+
+-- Cache-busted JS route. The filename below is updated by build-ui.sh at build
+-- time to include a timestamp suffix, so browsers always fetch the latest version
+-- instead of serving a stale cached copy.
+wordifyJs :: StaticRoute
+wordifyJs = StaticRoute ["js", "wordify_20260212_235520.js"] []

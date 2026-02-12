@@ -1,8 +1,8 @@
 # ===========================================
-# Stage 1: Build the Haskell backend
-# Changes to ui/ will NOT invalidate this stage
+# Stage 1: Cache Haskell dependencies
+# Runs in parallel with the UI build (Stage 2)
 # ===========================================
-FROM debian:bookworm as backend-build
+FROM debian:bookworm as backend-deps
 
 # Install build dependencies in a single layer and clean up
 RUN apt-get update && \
@@ -34,26 +34,10 @@ COPY vendor vendor
 # Build dependencies only (this layer is cached unless stack.yaml/package.yaml change)
 RUN stack build --only-dependencies
 
-# Copy only backend source files (not ui/)
-COPY app app
-COPY src src
-COPY config config
-COPY templates templates
-COPY static static
-COPY test test
-
-# Create placeholder files for Yesod's staticFiles TH splice.
-# The real files come from the ui-build stage; these just need to exist
-# so the compile-time identifier generation succeeds.
-RUN mkdir -p static/js static/css && \
-    touch static/js/wordify.js static/js/wordify.umd.js.map static/css/wordify.css static/sw.js
-
-# Build the application
-RUN stack build --copy-bins --local-bin-path "bin"
-
 # ===========================================
 # Stage 2: Build the UI
-# Changes to backend files will NOT invalidate this stage
+# Runs in parallel with the dependency build (Stage 1).
+# Also updates src/Settings/StaticFiles.hs with the cache-busted JS filename.
 # ===========================================
 FROM debian:bookworm as ui-build
 
@@ -73,16 +57,40 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | b
 
 WORKDIR /app
 
-# Copy only UI files
+# Copy UI files and the Haskell static routes file (updated by build-ui.sh)
 COPY ui ui
 COPY build-ui.sh ./
+COPY src/Settings/StaticFiles.hs src/Settings/StaticFiles.hs
 
 # Create output directories and build the UI
 RUN mkdir -p static/js static/css && \
     . "$NVM_DIR/nvm.sh" && bash build-ui.sh
 
 # ===========================================
-# Stage 3: Runtime - use slim image for smaller size
+# Stage 3: Build the Haskell backend
+# Depends on stages 1 (cached deps) and 2 (updated source + static files)
+# ===========================================
+FROM backend-deps as backend-build
+
+# Copy backend source files
+COPY app app
+COPY src src
+COPY config config
+COPY templates templates
+COPY static static
+COPY test test
+
+# Override with UI build outputs: timestamped JS and updated Haskell static route
+COPY --from=ui-build /app/src/Settings/StaticFiles.hs src/Settings/StaticFiles.hs
+COPY --from=ui-build /app/static/js/ static/js/
+COPY --from=ui-build /app/static/css/ static/css/
+COPY --from=ui-build /app/static/sw.js static/sw.js
+
+# Build the application
+RUN stack build --copy-bins --local-bin-path "bin"
+
+# ===========================================
+# Stage 4: Runtime - use slim image for smaller size
 # ===========================================
 FROM debian:bookworm-slim as app
 
@@ -107,9 +115,8 @@ COPY static static
 COPY templates templates
 
 # Copy UI build outputs on top of static files
-COPY --from=ui-build /app/static/js/wordify.js static/js/wordify.js
-COPY --from=ui-build /app/static/js/wordify.umd.js.map static/js/wordify.umd.js.map
-COPY --from=ui-build /app/static/css/wordify.css static/css/wordify.css
+COPY --from=ui-build /app/static/js/ static/js/
+COPY --from=ui-build /app/static/css/ static/css/
 COPY --from=ui-build /app/static/sw.js static/sw.js
 
 ENV LANG=C.UTF-8 \

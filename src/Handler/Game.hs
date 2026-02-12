@@ -145,7 +145,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
   gamePagelayout $ do
     addStylesheet $ StaticR css_wordify_css
-    addScript $ StaticR js_wordify_js
+    addScript $ StaticR wordifyJs
     toWidget
       [julius|
 
