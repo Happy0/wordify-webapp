@@ -144,12 +144,10 @@ notifyNewGame app serverGame = do
   snapshot <- atomically $ makeServerGameSnapshot serverGame
   let gId = snapshotGameId snapshot
       gamePlayers = snapshotPlayers snapshot
-      currentPlayerNum = playerNumber (gameState snapshot)
-  forM_ (zip [1..] gamePlayers) $ \(playerIdx, player) -> do
+  forM_ gamePlayers $ \player -> do
     let userIdent = playerId player
-        isUserToMove = currentPlayerNum == playerIdx
     atomically $ do
       maybeChannel <- peekCacheableResource userChannels userIdent
       case maybeChannel of
         Nothing -> return ()
-        Just chan -> writeTChan chan (NewGame gId snapshot isUserToMove)
+        Just chan -> writeTChan chan (NewGame gId serverGame)

@@ -18,7 +18,7 @@ import Controllers.Common.CacheableSharedResource
 import Control.Monad.Loops (iterateM_)
 import qualified Network.WebSockets.Connection as C
 import Data.Aeson (encode)
-import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), ServerGame, lastMove, playing)
+import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), ServerGame, lastMove, playing, makeServerGameSnapshot, currentPlayerToMove)
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Wordify.Rules.Board (textRepresentation)
 import Wordify.Rules.Game (board)
@@ -109,7 +109,7 @@ getHomeR = do
     Nothing -> renderNotLoggedInPage
     Just userId -> do
       {- If this is a websocket request the handler short circuits here, otherwise it goes on to return the HTML page -}
-      webSockets $ homeWebsocketHandler app userId 
+      webSockets $ homeWebsocketHandler app userId
       renderActiveGamePage app gameRepositorySQLBackend userId
 
 -- TODO: don't copypasta this and share it somewhere
@@ -154,7 +154,9 @@ handleHomeWebsocket gameRepository gamesCache connection userIdent userEventBroa
           liftIO (handleUserEvent userIdent connection nextMessage currentState)
 
 handleUserEvent :: T.Text -> C.Connection -> UserEvent -> Map Text ActiveGameSummary -> IO (Map Text ActiveGameSummary)
-handleUserEvent userIdent connection (MoveInUserGame gameId snapshot userToMove) state = do
+handleUserEvent userIdent connection (MoveInUserGame gameId serverGame) state = do
+  snapshot <- atomically (makeServerGameSnapshot serverGame)
+  let userToMove = isUserToMove userIdent snapshot
   let gameSummary = gameSummaryFromServerGame userIdent snapshot userToMove
   let activeSummary = mapGameSummary gameSummary (activePlayerNamesFromSnapshot snapshot)
   let newState = M.insert gameId activeSummary state
@@ -164,7 +166,9 @@ handleUserEvent _ connection (GameOver gameId _) state = do
   let newState = M.delete gameId state
   sendGameSummaryState connection newState
   pure newState
-handleUserEvent userIdent connection (NewGame gameId snapshot userToMove) state = do
+handleUserEvent userIdent connection (NewGame gameId serverGame) state = do
+  snapshot <- atomically (makeServerGameSnapshot serverGame)
+  let userToMove = isUserToMove userIdent snapshot
   let gameSummary = gameSummaryFromServerGame userIdent snapshot userToMove
   let activeSummary = mapGameSummary gameSummary (activePlayerNamesFromSnapshot snapshot)
   let newState = M.insert gameId activeSummary state
@@ -174,6 +178,9 @@ handleUserEvent _ connection (PlayerActivityChanged gId activeNames) state = do
   let newState = M.adjust (updateActivePlayers activeNames) gId state
   sendGameSummaryState connection newState
   pure newState
+
+isUserToMove :: T.Text -> ServerGameSnapshot -> Bool
+isUserToMove ident snapshot = currentPlayerToMove snapshot == Just ident
 
 updateActivePlayers :: [Text] -> ActiveGameSummary -> ActiveGameSummary
 updateActivePlayers activeNames summary =

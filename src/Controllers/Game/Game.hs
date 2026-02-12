@@ -1,11 +1,10 @@
 module Controllers.Game.Game
   ( performRequest,
     withNotifyJoinAndLeave,
-    updateUserChannels,
   )
 where
 
-import ClassyPrelude (getCurrentTime, putStrLn, traverse_, whenM)
+import ClassyPrelude (getCurrentTime, putStrLn, traverse_, whenM, writeTBChan)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Exception (bracket_)
@@ -195,11 +194,13 @@ handleMove serverGame pool userEventChannelSubscriptions pushCtrl playerMoving m
               GameFinished _ _ -> True
               _ -> False
 
+        updateUserChannelsOfMove userEventChannelSubscriptions serverGame newSnapshot isGameOver
+        sendMovePushNotification pushCtrl newSnapshot transition (currentPlayerToMove newSnapshot)
+
         -- TODO: Think of how to handle this if it fails... Could end up with a corrupted game state if next move succeeds (missing move)
         -- especially important if we stop using sqlite ':D
         P.persistGameUpdate pool (snapshotGameId newSnapshot) newGameState eventMessage
-        updateUserChannels userEventChannelSubscriptions newSnapshot isGameOver
-        sendMovePushNotification pushCtrl newSnapshot transition (currentPlayerToMove newSnapshot)
+
         return $ moveOutcomeHandler moveOutcome
 
 sendMovePushNotification :: PushController -> ServerGameSnapshot -> GameTransition -> Maybe Text -> IO ()
@@ -210,27 +211,18 @@ sendMovePushNotification _ _ _ Nothing = pure ()
 sendMovePushNotification pushCtrl snapshot _ (Just nextPlayerId) =
   sendMoveNotification pushCtrl nextPlayerId (snapshotGameId snapshot)
 
-updateUserChannels :: ResourceCache Text (TChan UserEvent) -> ServerGameSnapshot -> Bool -> IO ()
-updateUserChannels userEventChannelSubscriptions snapshot True = do
+updateUserChannelsOfMove :: ResourceCache Text (TChan UserEvent) -> ServerGame -> ServerGameSnapshot -> Bool -> IO ()
+updateUserChannelsOfMove userEventChannelSubscriptions serverGame snapshot gameOver = do
   let players = snapshotPlayers snapshot
       gId = snapshotGameId snapshot
   forM_ players $ \player -> do
     let userIdent = SP.playerId player
     atomically $ do
       maybeChannel <- peekCacheableResource userEventChannelSubscriptions userIdent
-      case maybeChannel of
-        Nothing -> return ()
-        Just channel -> writeTChan channel (GameOver gId snapshot)
-updateUserChannels userEventChannelSubscriptions snapshot False =
-  case currentPlayerToMove snapshot of
-    Nothing -> return ()
-    Just nextPlayerId -> do
-      let gId = snapshotGameId snapshot
-      atomically $ do
-        maybeChannel <- peekCacheableResource userEventChannelSubscriptions nextPlayerId
-        case maybeChannel of
-          Nothing -> return ()
-          Just channel -> writeTChan channel (MoveInUserGame gId snapshot True)
+      case (maybeChannel, gameOver) of
+        (Nothing, _) -> return ()
+        (Just channel, True) -> writeTChan channel (GameOver gId serverGame)
+        (Just channel, False) -> writeTChan channel (MoveInUserGame gId serverGame)
 
 applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameTransition
 applyLocalisedRules gameTransition localisedGameSetup =
