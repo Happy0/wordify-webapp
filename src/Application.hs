@@ -114,6 +114,7 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Extra.SpanishExtraRule (spanishGameExtraRules)
 import qualified Prelude as P
 import Migrations.DatabaseTileListFormatMigration (runTileListMigration)
+import Migrations.PushNotificationHostNameMigration (runPushNotificationHostNameMigration)
 import Model.GameSetup (LocalisedGameSetup (GameSetup), TileValues)
 import Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService)
 import Wordify.Rules.Tile (tileValue)
@@ -174,6 +175,7 @@ makeFoundation appSettings inactivityTracker = do
   -- Perform database migration using our application's logging settings.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
   runTileListMigration pool
+  runPushNotificationHostNameMigration pool (appRoot appSettings)
 
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
   chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)

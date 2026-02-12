@@ -5,7 +5,7 @@ module Repository.PushNotificationRepository
     saveSubscriptionImpl,
     getSubscriptionsByUserIdImpl,
     deleteSubscriptionImpl,
-    PushSubscription (PushSubscription),
+    PushSubscription (PushSubscription, baseHostName),
   )
 where
 
@@ -18,7 +18,8 @@ data PushSubscription = PushSubscription
     endpoint :: T.Text,
     auth :: T.Text,
     p256dh :: T.Text,
-    expirationTime :: Maybe UTCTime
+    expirationTime :: Maybe UTCTime,
+    baseHostName :: T.Text
   }
 
 class PushNotificationRepository a where

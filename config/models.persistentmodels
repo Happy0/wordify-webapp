@@ -85,4 +85,5 @@ PushNotificationSubscription
     auth Text
     p256dh Text
     expirationTime UTCTime Maybe
+    baseHostName Text default='http://127.0.0.1:4000'
     Primary endpoint

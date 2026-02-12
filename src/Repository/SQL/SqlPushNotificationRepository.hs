@@ -15,9 +15,9 @@ instance PushNotificationRepository SqlPushNotificationRepositoryBackend where
   deleteSubscription (SqlPushNotificationRepositoryBackend pool) = deleteSubscriptionImpl pool
 
 saveSubscriptionImpl :: Pool SqlBackend -> PushSubscription -> IO ()
-saveSubscriptionImpl pool (PushSubscription usrId endpoint auth p256dh expirationTime) = do
+saveSubscriptionImpl pool (PushSubscription usrId endpoint auth p256dh expirationTime baseHostName) = do
   withPool pool $ do
-    repsert (M.PushNotificationSubscriptionKey endpoint) (M.PushNotificationSubscription endpoint (M.UserKey usrId) auth p256dh expirationTime)
+    repsert (M.PushNotificationSubscriptionKey endpoint) (M.PushNotificationSubscription endpoint (M.UserKey usrId) auth p256dh expirationTime baseHostName)
 
 getSubscriptionsByUserIdImpl :: Pool SqlBackend -> T.Text -> IO [PushSubscription]
 getSubscriptionsByUserIdImpl pool usrId = do
@@ -29,7 +29,7 @@ deleteSubscriptionImpl pool endpoint = do
   withPool pool $ delete (M.PushNotificationSubscriptionKey endpoint)
 
 subscriptionFromEntity :: Entity M.PushNotificationSubscription -> PushSubscription
-subscriptionFromEntity (Entity _ (M.PushNotificationSubscription endpoint (M.UserKey usrId) auth p256dh expirationTime)) =
-  PushSubscription usrId endpoint auth p256dh expirationTime
+subscriptionFromEntity (Entity _ (M.PushNotificationSubscription endpoint (M.UserKey usrId) auth p256dh expirationTime baseHostName)) =
+  PushSubscription usrId endpoint auth p256dh expirationTime baseHostName
 
 withPool = flip runSqlPersistMPool

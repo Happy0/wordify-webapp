@@ -16,7 +16,7 @@ import qualified Data.Aeson as A
 import qualified Data.Text as T
 import Data.Time (UTCTime)
 import Network.HTTP.Client (Manager)
-import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription), saveSubscriptionImpl, getSubscriptionsByUserIdImpl, deleteSubscriptionImpl)
+import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription, baseHostName), saveSubscriptionImpl, getSubscriptionsByUserIdImpl, deleteSubscriptionImpl)
 import Web.WebPush (VAPIDKeys, PushNotificationError (RecepientEndpointNotFound), sendPushNotification, mkPushNotification, pushMessage)
 import Controllers.User.Model.AuthUser (AuthUser)
 import Control.Monad (forM_, replicateM)
@@ -87,11 +87,11 @@ processQueueLoop pushController = forever $ do
         Nothing -> pure []
         Just x  -> (x :) <$> replicateWhileJust (n - 1) action
 
-subscribe :: PushController -> T.Text -> PushTokenSubscription -> IO ()
-subscribe controller userId tokenSub =
+subscribe :: PushController -> T.Text -> T.Text -> PushTokenSubscription -> IO ()
+subscribe controller userId baseHostName tokenSub =
   saveSubscriptionImpl
     (pushNotificationRepository controller)
-    (PushSubscription userId (tokenEndpoint tokenSub) (tokenAuth tokenSub) (tokenP256dh tokenSub) (tokenExpirationTime tokenSub))
+    (PushSubscription userId (tokenEndpoint tokenSub) (tokenAuth tokenSub) (tokenP256dh tokenSub) (tokenExpirationTime tokenSub) baseHostName)
 
 sendMoveNotification :: PushController -> T.Text -> T.Text -> IO ()
 sendMoveNotification pushController@(PushController pushNotificationRepository _ _ workQueue _) userId gameId = atomically (writeTQueue workQueue (MoveNotification userId gameId))
@@ -106,16 +106,17 @@ processNotificationEvent :: PushController -> PushEvent -> IO ()
 processNotificationEvent pushController event = do
   subscriptions <- getSubscriptionsByUserIdImpl (pushNotificationRepository pushController) userId
   forM_ subscriptions $
-    -- TODO: base URL by configuration
-    \subscription -> sendNotification pushController subscription message url
+    \subscription ->
+      let url = T.concat [baseHostName subscription, "/games/", gameId]
+      in sendNotification pushController subscription message url
   where
-    (userId, message, url) = case event of
-      MoveNotification user gameId -> (user, "It's your move!", T.concat ["https://wordify.gordo.life/games/", gameId])
-      GameOverNotification user gameId -> (user, "Your game has ended!", T.concat ["https://wordify.gordo.life/games/", gameId])
-      GameStartedNotification user gameId -> (user, "Your game has started!", T.concat ["https://wordify.gordo.life/games/", gameId])
+    (userId, message, gameId) = case event of
+      MoveNotification user gId -> (user, "It's your move!", gId)
+      GameOverNotification user gId -> (user, "Your game has ended!", gId)
+      GameStartedNotification user gId -> (user, "Your game has started!", gId)
 
 sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> IO ()
-sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _) notifText notifUrl =
+sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _ _) notifText notifUrl =
   case vapidKeys controller of
     Nothing -> putStrLn "vapid keys not configured"
     Just keys -> do
