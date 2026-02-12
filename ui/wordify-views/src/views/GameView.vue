@@ -29,7 +29,7 @@ const props = defineProps<{
 }>()
 
 const store = useGameStore()
-const { lastError, candidateTilesOnBoard, lastChatMessageReceived, gameId, isMyTurn, gameEnded } = storeToRefs(store)
+const { lastError, candidateTilesOnBoard, lastChatMessageReceived, chatMessages, myPlayer, gameId, isMyTurn, gameEnded } = storeToRefs(store)
 const { controller, connect, connectionState } = useGameController()
 const toast = useToast()
 
@@ -74,7 +74,16 @@ function saveLastSeenChatMessage() {
 const hasUnreadMessages = computed(() => {
   // Only show unread indicator if we have a gameId for proper tracking
   if (!gameId.value) return false
-  return lastChatMessageReceived.value > lastSeenChatMessage.value
+  if (lastChatMessageReceived.value <= lastSeenChatMessage.value) return false
+
+  // Don't light up if the most recent message was sent by us
+  // (e.g. we sent it from another device)
+  const lastMessage = chatMessages.value[chatMessages.value.length - 1]
+  if (lastMessage && lastMessage.type === 'message' && lastMessage.user === myPlayer.value?.name) {
+    return false
+  }
+
+  return true
 })
 
 // Mobile panel state
