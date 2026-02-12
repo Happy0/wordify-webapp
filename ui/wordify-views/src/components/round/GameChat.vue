@@ -90,14 +90,10 @@ function handleKeyDown(e: KeyboardEvent) {
       >
         <!-- Regular chat message -->
         <template v-if="msg.type === 'message'">
-          <div class="flex gap-2 text-sm">
-            <span class="font-semibold text-blue-600 flex-shrink-0">
-              {{ msg.user }}:
-            </span>
-            <span class="text-gray-700 break-words">
-              {{ msg.message }}
-            </span>
-          </div>
+          <p class="text-sm text-gray-700 break-words">
+            <span class="font-semibold text-blue-600">{{ msg.user }}:</span>
+            {{ msg.message }}
+          </p>
         </template>
 
         <!-- Definition message -->
