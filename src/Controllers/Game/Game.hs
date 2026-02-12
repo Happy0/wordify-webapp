@@ -165,37 +165,42 @@ handleMove ::
   IO ServerResponse
 handleMove serverGame pool userEventChannelSubscriptions pushCtrl playerMoving move moveOutcomeHandler =
   do
-    gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
-    let currentGameState = gameState gameSnapshot
-    if playerNumber currentGameState /= playerMoving
-      then return $ InvalidCommand "Not your move"
-      else do
-        let channel = broadcastChannel serverGame
-        let moveOutcome = A.left (pack . show) (makeMove currentGameState move)
-        let moveWithLocalisedRulesOutcome = moveOutcome >>= flip applyLocalisedRules (gameSetup serverGame)
+    now <- getCurrentTime
+    moveResult <- atomically $ do
+      currentGameState <- readTVar (game serverGame)
+      if playerNumber currentGameState /= playerMoving
+        then return $ Left "Not your move"
+        else do
+          let moveOutcome = A.left (pack . show) (makeMove currentGameState move)
+          let moveWithLocalisedRulesOutcome = moveOutcome >>= flip applyLocalisedRules (gameSetup serverGame)
 
-        case moveWithLocalisedRulesOutcome of
-          Left err -> return $ moveOutcomeHandler $ Left err
-          Right transition -> do
-            let eventMessage = transitionToMessage transition
-            let newGameState = newGame transition
+          case moveWithLocalisedRulesOutcome of
+            Left err -> return $ Left err
+            Right transition -> do
+              let eventMessage = transitionToMessage transition
+              let newGameState = newGame transition
+              let channel = broadcastChannel serverGame
 
-            now <- getCurrentTime
-            P.persistGameUpdate pool (snapshotGameId gameSnapshot) newGameState eventMessage
-
-            let isGameOver = case transition of
-                  GameFinished _ _ -> True
-                  _ -> False
-
-            newSnapshot <- atomically $ do
               writeTVar (game serverGame) newGameState
               updateLastMoveMade serverGame now
               writeTChan channel eventMessage
-              makeServerGameSnapshot serverGame
+              snapshot <- makeServerGameSnapshot serverGame
 
-            updateUserChannels userEventChannelSubscriptions newSnapshot isGameOver
-            sendMovePushNotification pushCtrl newSnapshot transition (currentPlayerToMove newSnapshot)
-            return $ moveOutcomeHandler moveOutcome
+              return $ Right (moveOutcome, transition, newGameState, eventMessage, snapshot)
+
+    case moveResult of
+      Left err -> return $ moveOutcomeHandler $ Left err
+      Right (moveOutcome, transition, newGameState, eventMessage, newSnapshot) -> do
+        let isGameOver = case transition of
+              GameFinished _ _ -> True
+              _ -> False
+
+        -- TODO: Think of how to handle this if it fails... Could end up with a corrupted game state if next move succeeds (missing move)
+        -- especially important if we stop using sqlite ':D
+        P.persistGameUpdate pool (snapshotGameId newSnapshot) newGameState eventMessage
+        updateUserChannels userEventChannelSubscriptions newSnapshot isGameOver
+        sendMovePushNotification pushCtrl newSnapshot transition (currentPlayerToMove newSnapshot)
+        return $ moveOutcomeHandler moveOutcome
 
 sendMovePushNotification :: PushController -> ServerGameSnapshot -> GameTransition -> Maybe Text -> IO ()
 sendMovePushNotification pushCtrl snapshot (GameFinished _ _) _ =
