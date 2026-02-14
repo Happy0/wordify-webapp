@@ -181,17 +181,7 @@ makeFoundation appSettings inactivityTracker = do
   -- We use withResource to get a raw connection and avoid runSqlPool's
   -- transaction wrapper, because SQLite's PRAGMA foreign_keys cannot be
   -- changed inside a transaction.
-  withResource pool $ \backend -> flip runReaderT backend $ do
-    rawExecute "PRAGMA foreign_keys = OFF;" []
-
-    -- Pre-migration: backfill sent_by with user idents before schema change.
-    -- If sent_by is still a text column (not yet a FK), update it to match
-    -- user idents by joining on the nickname column, then delete orphaned rows.
-    rawExecute "UPDATE chat_message SET sent_by = (SELECT ident FROM \"user\" WHERE nickname = chat_message.sent_by) WHERE EXISTS (SELECT 1 FROM \"user\" WHERE nickname = chat_message.sent_by);" []
-    rawExecute "DELETE FROM chat_message WHERE sent_by NOT IN (SELECT ident FROM \"user\");" []
-
-    runMigration migrateAll
-    rawExecute "PRAGMA foreign_keys = ON;" []
+  runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
   chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
