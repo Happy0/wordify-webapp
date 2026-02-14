@@ -18,7 +18,7 @@ const usernamePattern = /^[a-zA-Z0-9_-]+$/
 const validationError = computed<string | null>(() => {
   if (username.value.length === 0) return null
   if (username.value.length < 3) return 'Username must be at least 3 characters.'
-  if (username.value.length > 20) return 'Username must be 20 characters or fewer.'
+  if (username.value.length > 15) return 'Username must be 15 characters or fewer.'
   if (!usernamePattern.test(username.value)) return 'Username may only contain letters, numbers, hyphens, and underscores.'
   return null
 })
@@ -80,6 +80,7 @@ async function handleSubmit() {
                 v-model="username"
                 placeholder="Enter a username"
                 class="w-full"
+                :maxlength="15"
                 @keyup.enter="handleSubmit"
               />
 

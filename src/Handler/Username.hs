@@ -6,8 +6,10 @@ module Handler.Username where
     import Controllers.User.UserController (setUsername)
     import Repository.UserRepository (SetUsernameResult(..))
     import Yesod.Core (sendStatusJSON)
-    import Network.HTTP.Types.Status (status409)
+    import Network.HTTP.Types.Status (status400, status409)
     import Handler.Home (gamePagelayout)
+    import qualified Data.Text as T
+    import Data.Char (isAlphaNum)
 
     getChooseUsernameR :: Handler Html
     getChooseUsernameR = do
@@ -38,8 +40,20 @@ module Handler.Username where
         uid <- requireAuthId
         app <- getYesod
 
-        result <- liftIO $ setUsername (userController app) uid (username req)
-        case result of
-            UsernameSet -> return ()
-            UsernameTaken -> sendStatusJSON status409 (object ["error" .= ("username_taken" :: Text), "message" .= ("This username is already taken. Please choose another." :: Text)])
-            UserNotFound -> notAuthenticated
+        case validateUsername (username req) of
+            Just err -> sendStatusJSON status400 (object ["error" .= ("invalid_username" :: Text), "message" .= err])
+            Nothing -> do
+                result <- liftIO $ setUsername (userController app) uid (username req)
+                case result of
+                    UsernameSet -> return ()
+                    UsernameTaken -> sendStatusJSON status409 (object ["error" .= ("username_taken" :: Text), "message" .= ("This username is already taken. Please choose another." :: Text)])
+                    UserNotFound -> notAuthenticated
+
+    validateUsername :: Text -> Maybe Text
+    validateUsername uname
+        | T.length uname < 3 = Just "Username must be at least 3 characters."
+        | T.length uname > 15 = Just "Username must be 15 characters or fewer."
+        | not (T.all isValidUsernameChar uname) = Just "Username may only contain letters, numbers, hyphens, and underscores."
+        | otherwise = Nothing
+      where
+        isValidUsernameChar c = isAlphaNum c || c == '-' || c == '_'
