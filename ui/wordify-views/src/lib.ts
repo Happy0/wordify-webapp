@@ -37,6 +37,13 @@ export {
   type GameSummary
 } from './lib/home'
 
+// Choose Username view
+export {
+  createChooseUsername,
+  type ChooseUsernameOptions,
+  type ChooseUsernameInstance
+} from './lib/choose-username'
+
 // Re-export types for TypeScript users
 export type {
   GameState,

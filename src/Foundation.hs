@@ -153,20 +153,6 @@ instance Yesod App where
     Maybe (Route App)
   authRoute _ = Just $ AuthR LoginR
 
-  isAuthorized ::
-    -- \| The route the user is visiting.
-    Route App ->
-    -- \| Whether or not this is a "write" request.
-    Bool ->
-    Handler AuthResult
-  -- Routes not requiring authentication.
-  isAuthorized (AuthR _) _ = return Authorized
-  isAuthorized FaviconR _ = return Authorized
-  isAuthorized RobotsR _ = return Authorized
-  isAuthorized ServiceWorkerR _ = return Authorized
-  -- Default to Authorized for now.
-  isAuthorized _ _ = return Authorized
-
   -- This function creates static content files in the static folder
   -- and names them based on a hash of their content. This allows
   -- expiration dates to be set far in the future without worry of

@@ -12,7 +12,6 @@ import Prelude
 pluginName :: Text
 pluginName = "oauth0"
 
--- TODO: Parameterise the domain and use environment variable to populate it
 auth0Provider :: YesodAuth m => OAuthDetails -> AuthPlugin m
 auth0Provider (OAuthDetails userDetailsEndpoint oauthAuthorizationEndpoint oauthAccessTokenEndpoint clientId clientSecret) =
   authOAuth2 pluginName oauth2 $ \manager token -> do
