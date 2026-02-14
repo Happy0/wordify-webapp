@@ -4,6 +4,8 @@
 User
     ident Text
     nickname Text Maybe
+    username Text Maybe
+    UniqueUsername username !force
     Primary ident
 
 Email

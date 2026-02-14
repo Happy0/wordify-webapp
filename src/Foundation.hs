@@ -21,8 +21,9 @@ import Controllers.Game.GameDefinitionController (GameDefinitionController)
 import Controllers.Push.PushController (PushController)
 import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
-import Controllers.User.Model.AuthUser (AuthUser)
-import Controllers.User.Persist (storeUser)
+import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
+import Controllers.User.UserController (UserController)
+import qualified Controllers.User.UserController as UC
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text.Encoding as TE
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
@@ -78,7 +79,8 @@ data App = App
     inactivityTracker :: TVar InactivityTracker,
     gameDefinitionController :: GameDefinitionController,
     pushController :: PushController,
-    vapidPublicKey :: Maybe Text
+    vapidPublicKey :: Maybe Text,
+    userController :: UserController
   }
 
 data MenuItem = MenuItem
@@ -216,8 +218,8 @@ instance YesodAuth App where
 
     case userProfile of
       Left _ -> return ()
-      Right profile -> liftIO $ do
-        storeUser (appConnPool app) profile
+      Right (AuthUser uid nick) -> liftIO $ do
+        UC.createUserIfNotExists (userController app) uid nick
 
     return . Authenticated . credsIdent $ creds
 

@@ -21,8 +21,8 @@ data ClientPlayer = ClientPlayer {name:: Text, score:: Int, endBonus:: Maybe Int
 data ClientTile = ClientLetter {letter :: Text, value:: Int} | ClientBlank { assigned :: Maybe Text}
 
 fromServerPlayer :: Bool -> ServerPlayer -> P.Player -> ClientPlayer
-fromServerPlayer gameOver (ServerPlayer name _ _ numConnections lastActive) playerGameState  =
-    ClientPlayer (playerName name) (P.score playerGameState) bonus (numConnections > 0) (map toMillisecondsSinceUnixEpoch lastActive)
+fromServerPlayer gameOver serverPlayer playerGameState  =
+    ClientPlayer (playerName (playerUsername serverPlayer)) (P.score playerGameState) bonus (numConnections serverPlayer > 0) (map toMillisecondsSinceUnixEpoch (lastActive serverPlayer))
     where
         playerName Nothing = ""
         playerName (Just n) = n

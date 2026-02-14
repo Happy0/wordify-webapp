@@ -10,8 +10,9 @@ import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.GameLobby.Model.GameLobby
-import Controllers.User.Model.AuthUser
-import Controllers.User.Persist
+import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
+import Controllers.User.UserController (UserController)
+import qualified Controllers.User.UserController as UC
 import qualified Data.Char as C
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -46,8 +47,8 @@ deleteLobby app gameId = do
     deleteWhere [M.LobbyGameId ==. gameId]
     deleteWhere [M.LobbyPlayerGame ==. gameId]
 
-getLobby :: ConnectionPool -> LocalisedGameSetups -> T.Text -> IO (Either T.Text GameLobby)
-getLobby pool localisedGameSetups gameId = do
+getLobby :: ConnectionPool -> UserController -> LocalisedGameSetups -> T.Text -> IO (Either T.Text GameLobby)
+getLobby pool userCtrl localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
     maybeLobby <- selectFirst [M.LobbyGameId ==. gameId] []
     case maybeLobby of
@@ -58,7 +59,7 @@ getLobby pool localisedGameSetups gameId = do
 
   case dbEntries of
     Right (Entity _ (M.Lobby gameId originalLetterBag letterBagSeed maybeLocale numPlayers createdAt), playerModels) -> do
-      players <- mapM (playerFromLobbyEntity pool) playerModels
+      players <- mapM (playerFromLobbyEntity userCtrl) playerModels
       serverPlayers <- newTVarIO players
       channel <- newBroadcastTChanIO
       playerIdGenerator <- getStdGen
@@ -75,20 +76,20 @@ getLobby pool localisedGameSetups gameId = do
         return $ GameLobby pendingGame serverPlayers numPlayers channel playerIdGeneratorTvar createdAt locale setup
     Left err -> return $ Left err
 
-getLobbyPlayer :: ConnectionPool -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
-getLobbyPlayer pool gameId playerId = do
+getLobbyPlayer :: ConnectionPool -> UserController -> T.Text -> T.Text -> IO (Maybe ServerPlayer)
+getLobbyPlayer pool userCtrl gameId playerId = do
   playerEntity <- withPool pool $ selectFirst [M.LobbyPlayerGame ==. gameId, M.LobbyPlayerPlayerId ==. playerId] []
 
   case playerEntity of
     Nothing -> pure Nothing
-    Just entity -> Just <$> playerFromLobbyEntity pool entity
+    Just entity -> Just <$> playerFromLobbyEntity userCtrl entity
 
 addDisplayNames :: [ServerPlayer] -> [P.Player] -> [P.Player]
 addDisplayNames = L.zipWith addDisplayName
   where
     -- TODO: expose function to modify name of player in game state in wordify lib
     addDisplayName serverPlayer gameStatePlayer =
-      let serverName = maybe (P.name gameStatePlayer) T.unpack (name serverPlayer)
+      let serverName = maybe (P.name gameStatePlayer) T.unpack (playerUsername serverPlayer)
        in let player = P.makePlayer serverName
            in let playerWithTiles = P.giveTiles player (P.tilesOnRack gameStatePlayer)
                in let playerWithScore = P.increaseScore playerWithTiles (P.score gameStatePlayer)
@@ -107,8 +108,8 @@ getCurrentPlayer game (player1 : player2 : player3 : x) 3 = player3
 getCurrentPlayer game (player1 : player2 : player3 : player4 : x) 4 = player4
 getCurrentPlayer game _ _ = currentPlayer game
 
-getGame :: ConnectionPool -> LocalisedGameSetups -> T.Text -> IO (Either T.Text ServerGame)
-getGame pool localisedGameSetups gameId = do
+getGame :: ConnectionPool -> UserController -> LocalisedGameSetups -> T.Text -> IO (Either T.Text ServerGame)
+getGame pool userCtrl localisedGameSetups gameId = do
   dbEntries <- withPool pool $ do
     maybeGame <- selectFirst [M.GameGameId ==. gameId] []
     case maybeGame of
@@ -121,7 +122,7 @@ getGame pool localisedGameSetups gameId = do
   case dbEntries of
     Right (Entity _ (M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _), playerModels, moveModels) -> do
       -- This could be more efficient than individual fetches, but it doesn't matter for now
-      serverPlayers <- mapConcurrently (playerFromEntity pool) playerModels
+      serverPlayers <- mapConcurrently (playerFromEntity userCtrl) playerModels
 
       runExceptT $ do
         let locale = fromMaybe "en" maybeLocale
@@ -221,16 +222,16 @@ persistGameState pool gameId locale serverGame = do
 persistLobbyPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
    in forM_ playersWithNumbers $ do
-        \(playerNumber, ServerPlayer playerName identifier gameId active lastActive) ->
+        \(playerNumber, player) ->
           insert $
-            M.LobbyPlayer gameId identifier playerNumber lastActive
+            M.LobbyPlayer gameId (playerId player) playerNumber (lastActive player)
 
 persistPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
    in forM_ playersWithNumbers $ do
-        \(playerNumber, ServerPlayer _ identifier gameId _ lastActive) ->
+        \(playerNumber, player) ->
           insert $
-            M.Player gameId identifier playerNumber lastActive
+            M.Player gameId (playerId player) playerNumber (lastActive player)
 
 updatePlayerLastSeen :: Pool SqlBackend -> T.Text -> T.Text -> UTCTime -> IO ()
 updatePlayerLastSeen pool gameId playerId now = do
@@ -349,23 +350,23 @@ moveFromEntity
       return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
 moveFromEntity _ _ m@M.Move {} = error "you've dun goofed, see database logs (hopefully) "
 
-playerFromEntity :: ConnectionPool -> Entity M.Player -> IO ServerPlayer
-playerFromEntity pool (Entity _ (M.Player gameId playerId _ lastActive)) =
+playerFromEntity :: UserController -> Entity M.Player -> IO ServerPlayer
+playerFromEntity userCtrl (Entity _ (M.Player gameId playerId _ lastActive)) =
   do
-    user <- getUser pool playerId
-    case user of
+    maybeUser <- UC.getUser userCtrl playerId
+    case maybeUser of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing gameId playerId 0 lastActive
-      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId 0 lastActive)
+      Nothing -> return $ makeNewPlayer (ServerUser playerId Nothing) gameId 0 lastActive
+      Just serverUser -> return (makeNewPlayer serverUser gameId 0 lastActive)
 
-playerFromLobbyEntity :: ConnectionPool -> Entity M.LobbyPlayer -> IO ServerPlayer
-playerFromLobbyEntity pool (Entity _ (M.LobbyPlayer gameId playerId _ lastActive)) =
+playerFromLobbyEntity :: UserController -> Entity M.LobbyPlayer -> IO ServerPlayer
+playerFromLobbyEntity userCtrl (Entity _ (M.LobbyPlayer gameId playerId _ lastActive)) =
   do
-    user <- getUser pool playerId
-    case user of
+    maybeUser <- UC.getUser userCtrl playerId
+    case maybeUser of
       -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer Nothing gameId playerId 0 Nothing
-      Just (AuthUser ident nickname) -> return (makeNewPlayer nickname gameId playerId 0 lastActive)
+      Nothing -> return $ makeNewPlayer (ServerUser playerId Nothing) gameId 0 Nothing
+      Just serverUser -> return (makeNewPlayer serverUser gameId 0 lastActive)
 
 dbTileRepresentationToTiles :: LetterBag -> T.Text -> Either T.Text [Tile]
 dbTileRepresentationToTiles letterBag textRepresentation =

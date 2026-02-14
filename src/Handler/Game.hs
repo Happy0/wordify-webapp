@@ -17,7 +17,6 @@ import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
 import Controllers.User.Model.AuthUser
-import Controllers.User.Persist
 import Data.Aeson
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -61,9 +60,7 @@ getGameR gameId = do
   let cookies = reqCookies request
   userId <- maybeAuthId
 
-  maybeUser <- case userId of
-    Nothing -> pure Nothing
-    Just user -> liftIO $ getUser (appConnPool app) user
+  let maybeUser = fmap (\uid -> AuthUser uid Nothing) userId
 
   {-- If this is a websocket request, the handler is short cutted here
       Once the client has loaded the page and javascript, the javascript for the page

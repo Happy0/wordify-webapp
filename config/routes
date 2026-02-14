@@ -22,3 +22,6 @@
 /games/#Text GameR GET
 
 /push/subscribe SubscribeR POST
+
+/choose-username ChooseUsernameR GET
+/api/username SetUsernameR POST

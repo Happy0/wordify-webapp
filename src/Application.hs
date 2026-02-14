@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -51,6 +52,9 @@ import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.Text.Encoding as TE
 import Repository.PushNotificationRepository (toPushNotificationRepositoryImpl)
 import Repository.SQL.SqlPushNotificationRepository (SqlPushNotificationRepositoryBackend (SqlPushNotificationRepositoryBackend))
+import Repository.UserRepository (toUserRepositoryImpl)
+import Repository.SQL.SqlUserRepository (SqlUserRepositoryBackend (SqlUserRepositoryBackend))
+import Controllers.User.UserController (makeUserController, UserController)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Persist (getGame, getLobby)
 import Controllers.GameLobby.Model.GameLobby
@@ -60,8 +64,10 @@ import Data.List.Split
 import qualified Data.Map as M
 import Data.Time.Clock
 import Database.Persist
+import Data.Pool (withResource)
 import Database.Persist.Sqlite
   ( createSqlitePool,
+    rawExecute,
     runSqlPool,
     sqlDatabase,
     sqlPoolSize,
@@ -74,6 +80,7 @@ import Handler.GameLobby
 import Handler.Home
 import Handler.Login
 import Handler.Push
+import Handler.Username
 import Import
 import InactivityTracker
 import Language.Haskell.TH.Syntax (qLocation)
@@ -153,14 +160,14 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventChannels pushController = App {..}
+  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventChannels pushController userController = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Push controller forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Push controller forced in tempFoundation") (error "User controller forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool
@@ -170,14 +177,23 @@ makeFoundation appSettings inactivityTracker = do
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
 
-  -- Perform database migration using our application's logging settings.
-  runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
+  -- Perform database migration with foreign key checks disabled.
+  -- We use withResource to get a raw connection and avoid runSqlPool's
+  -- transaction wrapper, because SQLite's PRAGMA foreign_keys cannot be
+  -- changed inside a transaction.
+  withResource pool $ \backend -> flip runReaderT backend $ do
+    rawExecute "PRAGMA foreign_keys = OFF;" []
+    runMigration migrateAll
+    rawExecute "PRAGMA foreign_keys = ON;" []
 
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
   chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
 
-  games <- makeGlobalResourceCache (getGame pool localisedGameSetups) Nothing
-  gameLobbies <- makeGlobalResourceCache (getLobby pool localisedGameSetups) Nothing
+  let userRepo = toUserRepositoryImpl (SqlUserRepositoryBackend pool)
+  let userCtrl = makeUserController userRepo
+
+  games <- makeGlobalResourceCache (getGame pool userCtrl localisedGameSetups) Nothing
+  gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing
 
   userEventChannels <- makeGlobalResourceCache (\_ -> fmap Right newUserEventSubcriptionChannel) Nothing
 
@@ -189,7 +205,7 @@ makeFoundation appSettings inactivityTracker = do
   pushCtrl <- makePushController pushNotificationRepository maybeVapidKeys appHttpManager
 
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels pushCtrl
+  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels pushCtrl userCtrl
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =

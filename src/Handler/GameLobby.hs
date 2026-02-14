@@ -16,8 +16,7 @@ import Controllers.GameLobby.CreateGame
 import Controllers.GameLobby.GameLobby
 import Controllers.GameLobby.Model.GameLobby
 import qualified Controllers.GameLobby.Model.GameLobby as GL
-import Controllers.User.Model.AuthUser (AuthUser (AuthUser, nickname))
-import Controllers.User.Persist (getUser)
+import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
 import Data.Aeson
 import Data.Either
 import qualified Data.Map as M
@@ -135,7 +134,7 @@ renderLobbyPage (Left InvalidPlayerID) gameId = invalidArgs ["Invalid player ID 
 renderLobbyPage (Left _) gameId = redirectHandler gameId
 renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) gameId = redirectHandler gameId
 renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) gameId = gamePagelayout $ do
-  let joinedPlayerNames = map name (snapshotLobbyPlayers lobbySnapshot)
+  let joinedPlayerNames = map playerUsername (snapshotLobbyPlayers lobbySnapshot)
 
   addStylesheet $ (StaticR css_wordify_css)
   addScript $ StaticR wordifyJs

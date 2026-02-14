@@ -39,7 +39,7 @@ data LobbyResponse = Joined ServerPlayer | JoinSuccess Text Text | StartGame Tex
 data LobbyInputError = GameLobbyDoesNotExist | InvalidPlayerID | LobbyAlreadyFull
 
 instance ToJSON LobbyResponse where
-  toJSON (Joined player) = object ["name" .= name player]
+  toJSON (Joined player) = object ["name" .= playerUsername player]
   toJSON (StartGame gameId) = object ["gameId" .= gameId]
   toJSON (JoinSuccess gameId newId) = object ["gameId" .= gameId, "id" .= newId]
 

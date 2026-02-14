@@ -9,8 +9,7 @@ module Handler.AuthTest where
     import Yesod
     import           Data.Default                (def)
     import           Data.Text                   (Text)
-    import Controllers.User.Persist(getUser)
-    import Controllers.User.Model.AuthUser(ident)
+    import Controllers.User.UserController(getUser)
 
     getLoginTestPageR :: Handler Html
     getLoginTestPageR = do
@@ -20,7 +19,7 @@ module Handler.AuthTest where
         authId <- maybeAuthId
 
         profileDetails <- case authId of
-            Just ident -> liftIO $ getUser pool ident
+            Just ident -> liftIO $ getUser (userController app) ident
             Nothing -> return Nothing
 
         defaultLayout

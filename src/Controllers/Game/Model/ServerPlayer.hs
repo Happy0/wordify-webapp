@@ -1,17 +1,21 @@
 module Controllers.Game.Model.ServerPlayer
   ( ServerPlayer (ServerPlayer),
-    name,
+    user,
     playerId,
+    playerUsername,
     makeNewPlayer,
     addConnection,
     removeConnection,
     makeGameStatePlayers,
     makeNewPlayerId,
     numConnections,
+    lastActive,
   )
 where
 
 import ClassyPrelude (UTCTime)
+import Controllers.User.Model.ServerUser (ServerUser)
+import qualified Controllers.User.Model.ServerUser as SU
 import Data.Text as T
 import Network.Mail.Mime
 import System.Random
@@ -19,15 +23,20 @@ import qualified Wordify.Rules.Player as G
 import Prelude
 
 data ServerPlayer = ServerPlayer {
-  name :: Maybe Text,
-  playerId :: Text,
+  user :: ServerUser,
   gameId :: Text,
   numConnections :: Int,
   lastActive :: Maybe UTCTime
 }
 
-makeNewPlayer :: Maybe Text -> Text -> Text -> Int -> Maybe UTCTime -> ServerPlayer
-makeNewPlayer playerName gameId playerId = ServerPlayer playerName playerId gameId
+playerId :: ServerPlayer -> Text
+playerId = SU.userId . user
+
+playerUsername :: ServerPlayer -> Maybe Text
+playerUsername = SU.username . user
+
+makeNewPlayer :: ServerUser -> Text -> Int -> Maybe UTCTime -> ServerPlayer
+makeNewPlayer serverUser gameId = ServerPlayer serverUser gameId
 
 addConnection :: ServerPlayer -> UTCTime -> ServerPlayer
 addConnection player time = player {numConnections = numConnections player + 1, lastActive = Just time}

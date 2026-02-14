@@ -12,7 +12,7 @@ type UserId = T.Text
 type LatestActivity = Maybe UTCTime
 type MyMove = Bool
 type BoardString = T.Text
-type OtherPlayerNames = [T.Text]
+type OtherPlayerNames = [Maybe T.Text]
 
 data GameSummary = GameSummary GameId LatestActivity MyMove BoardString LocalisedGameSetup OtherPlayerNames
 

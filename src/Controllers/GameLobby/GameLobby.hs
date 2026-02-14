@@ -12,8 +12,9 @@ import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
 import Controllers.Game.Persist
 import Controllers.GameLobby.Api
 import Controllers.GameLobby.Model.GameLobby
-import Controllers.User.Model.AuthUser
-import Controllers.User.Persist
+import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
+import Controllers.User.UserController (UserController)
+import qualified Controllers.User.UserController as UC
 import Data.Either
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
@@ -54,14 +55,13 @@ joinClient app gameLobby gameId userId =
           >> pure result
 
 makeLobbyServerPlayer :: App -> T.Text -> T.Text -> IO ServerPlayer
-makeLobbyServerPlayer app gameId userId =
+makeLobbyServerPlayer app gameId visitorId =
   do
-    let pool = appConnPool app
-    user <- getUser pool userId
-    case user of
-      -- TODO: proper connection tracking
-      Just (AuthUser ident nickname) -> pure $ makeNewPlayer nickname gameId ident 0 Nothing
-      Nothing -> pure $ makeNewPlayer Nothing gameId userId 0 Nothing
+    let userCtrl = userController app
+    maybeUser <- UC.getUser userCtrl visitorId
+    case maybeUser of
+      Just serverUser -> pure $ makeNewPlayer serverUser gameId 0 Nothing
+      Nothing -> pure $ makeNewPlayer (ServerUser visitorId Nothing) gameId 0 Nothing
 
 updateLobbyState :: App -> GameLobby -> ServerPlayer -> T.Text -> UTCTime -> STM (Either LobbyInputError ClientLobbyJoinResult)
 updateLobbyState app lobby serverPlayer gameId now = do
