@@ -7,7 +7,7 @@ import Foundation
 import Repository.GameRepository
 import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend))
 import Yesod.Auth
-import Import.NoFoundation (css_wordify_css, wordifyJs)
+import Import.NoFoundation (wordifyCss, wordifyJs)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
 import ClassyPrelude (undefined, Maybe (Nothing))
 import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
@@ -64,7 +64,7 @@ buildActiveGameSummary gameSummary (Just serverGame) = do
 renderNotLoggedInPage :: Handler Html
 renderNotLoggedInPage =
   gamePagelayout $ do
-    addStylesheet $ (StaticR css_wordify_css)
+    addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
@@ -88,7 +88,7 @@ renderActiveGamePage app gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
   summaries <- liftIO $ buildActiveGameSummaries (games app) activeGames
   gamePagelayout $ do
-    addStylesheet $ (StaticR css_wordify_css)
+    addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
@@ -112,7 +112,9 @@ getHomeR = do
 
   case maybePlayerId of
     Nothing -> renderNotLoggedInPage
-    Just userId -> do
+    Just _ -> do
+      authedUser <- requireUsername
+      let userId = authenticatedUserId authedUser
       {- If this is a websocket request the handler short circuits here, otherwise it goes on to return the HTML page -}
       webSockets $ homeWebsocketHandler app userId
       renderActiveGamePage app gameRepositorySQLBackend userId

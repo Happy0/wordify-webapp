@@ -24,6 +24,7 @@ import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
 import Controllers.User.UserController (UserController)
 import qualified Controllers.User.UserController as UC
+import qualified Controllers.User.Model.ServerUser as SU
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text.Encoding as TE
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
@@ -246,6 +247,22 @@ isAuthenticated = do
   return $ case muid of
     Nothing -> Unauthorized "You must login to access this page"
     Just _ -> Authorized
+
+data AuthenticatedUser = AuthenticatedUser
+  { authenticatedUserId :: Text
+  , authenticatedUsername :: Text
+  , authenticatedServerUser :: SU.ServerUser
+  }
+
+requireUsername :: Handler AuthenticatedUser
+requireUsername = do
+  authId <- requireAuthId
+  app <- getYesod
+  maybeUser <- liftIO $ UC.getUser (userController app) authId
+  case maybeUser of
+    Just user | Just uname <- SU.username user ->
+      return $ AuthenticatedUser authId uname user
+    _ -> redirect ChooseUsernameR
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.

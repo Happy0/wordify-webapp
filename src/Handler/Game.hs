@@ -141,7 +141,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let summaries = fromRight [] gameMoveSummaries
 
   gamePagelayout $ do
-    addStylesheet $ StaticR css_wordify_css
+    addStylesheet $ StaticR wordifyCss
     addScript $ StaticR wordifyJs
     toWidget
       [julius|

@@ -40,24 +40,26 @@ getCreateGamePageR = do
     maid <- maybeAuthId
     case maid of
       Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
-      Just _ -> gamePagelayout $ do
-        addStylesheet $ (StaticR css_wordify_css)
-        addScript $ StaticR wordifyJs
-        [whamlet|
-          <div #createlobby>
-              
+      Just _ -> do
+        _ <- requireUsername
+        gamePagelayout $ do
+          addStylesheet $ (StaticR wordifyCss)
+          addScript $ StaticR wordifyJs
+          [whamlet|
+            <div #createlobby>
+
+              |]
+          toWidget
+            [julius|
+
+              const lobby = Wordify.createCreateGame('#createlobby', {
+                locales: {
+                  "English": "en",
+                  "Spanish (FISE)": "es_fise"
+                },
+                isLoggedIn: true
+              });
             |]
-        toWidget
-          [julius|
-            
-            const lobby = Wordify.createCreateGame('#createlobby', {
-              locales: {
-                "English": "en",
-                "Spanish (FISE)": "es_fise"
-              },
-              isLoggedIn: true
-            });
-          |]
 
 {-
   Creates a new game lobby for inviting players to a game via a link.
@@ -78,7 +80,7 @@ postCreateGameR =
 
 renderNotLoggedInLobbyPage :: Text -> WidgetFor App ()
 renderNotLoggedInLobbyPage message = do
-  addStylesheet $ (StaticR css_wordify_css)
+  addStylesheet $ (StaticR wordifyCss)
   addScript $ StaticR wordifyJs
   [whamlet|
     <div #lobbylogin>
@@ -108,7 +110,9 @@ getGameLobbyR gameId =
     liftIO $ trackRequestReceivedActivity (inactivityTracker app)
     maid <- maybeAuthId
     case maid of
-      Just userId -> handlerLobbyAuthenticated gameId userId
+      Just _ -> do
+        authedUser <- requireUsername
+        handlerLobbyAuthenticated gameId (authenticatedUserId authedUser)
       Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
 
 handlerLobbyAuthenticated :: Text -> Text -> Handler Html
@@ -136,7 +140,7 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCrea
 renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) gameId = gamePagelayout $ do
   let joinedPlayerNames = map playerUsername (snapshotLobbyPlayers lobbySnapshot)
 
-  addStylesheet $ (StaticR css_wordify_css)
+  addStylesheet $ (StaticR wordifyCss)
   addScript $ StaticR wordifyJs
   [whamlet|
     <div #lobby>

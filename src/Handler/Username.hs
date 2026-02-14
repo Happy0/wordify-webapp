@@ -1,7 +1,7 @@
 module Handler.Username where
 
     import Import
-    import Import.NoFoundation (css_wordify_css, wordifyJs)
+    import Import.NoFoundation (wordifyCss, wordifyJs)
     import Data.Aeson (FromJSON, (.:), (.=), object, withObject)
     import Controllers.User.UserController (setUsername)
     import Repository.UserRepository (SetUsernameResult(..))
@@ -11,22 +11,19 @@ module Handler.Username where
 
     getChooseUsernameR :: Handler Html
     getChooseUsernameR = do
-        maybeUserId <- maybeAuthId
-        case maybeUserId of
-            Nothing -> notAuthenticated
-            Just _ ->
-                gamePagelayout $ do
-                    addStylesheet $ StaticR css_wordify_css
-                    addScript $ StaticR wordifyJs
-                    [whamlet|
-                        <div #choose-username-container>
-                    |]
-                    toWidget
-                        [julius|
-                            Wordify.createChooseUsername('#choose-username-container', {
-                                redirectUrl: '/'
-                            });
-                        |]
+        _ <- requireAuthId
+        gamePagelayout $ do
+            addStylesheet $ StaticR wordifyCss
+            addScript $ StaticR wordifyJs
+            [whamlet|
+                <div #choose-username-container>
+            |]
+            toWidget
+                [julius|
+                    Wordify.createChooseUsername('#choose-username-container', {
+                        redirectUrl: '/'
+                    });
+                |]
 
     newtype UsernameRequest = UsernameRequest { username :: Text }
 
@@ -38,14 +35,11 @@ module Handler.Username where
     postSetUsernameR :: Handler ()
     postSetUsernameR = do
         req <- requireCheckJsonBody :: Handler UsernameRequest
-        userId <- maybeAuthId
+        uid <- requireAuthId
         app <- getYesod
 
-        case userId of
-            Nothing -> notAuthenticated
-            Just uid -> do
-                result <- liftIO $ setUsername (userController app) uid (username req)
-                case result of
-                    UsernameSet -> return ()
-                    UsernameTaken -> sendStatusJSON status409 (object ["error" .= ("username_taken" :: Text), "message" .= ("This username is already taken. Please choose another." :: Text)])
-                    UserNotFound -> notAuthenticated
+        result <- liftIO $ setUsername (userController app) uid (username req)
+        case result of
+            UsernameSet -> return ()
+            UsernameTaken -> sendStatusJSON status409 (object ["error" .= ("username_taken" :: Text), "message" .= ("This username is already taken. Please choose another." :: Text)])
+            UserNotFound -> notAuthenticated
