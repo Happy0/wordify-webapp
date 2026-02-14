@@ -15,8 +15,8 @@ import qualified Data.Text as T
 import Data.Time (UTCTime)
 
 data ChatMessageEntity = ChatMessageEntity
-  { -- TODO: this should be a userID but needs a DB migration
-    chatroomId :: T.Text,
+  { chatroomId :: T.Text,
+    senderUserId :: T.Text,
     senderDisplayName :: T.Text,
     message :: T.Text,
     timestamp :: UTCTime,

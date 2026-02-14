@@ -279,10 +279,11 @@ handleChatMessage serverGame chatroom pool (Just user) messageText =
     gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
     let serverPlayer = getServerPlayerSnapshot gameSnapshot user
     let playerName = serverPlayer >>= SP.playerUsername
+    let userId = ident user
 
     case playerName of
       Nothing -> return $ InvalidCommand "Internal server error"
-      Just playerName -> sendMessage chatroom (CR.SendMessage playerName messageText) >> return ChatSuccess
+      Just playerName -> sendMessage chatroom (CR.SendMessage userId playerName messageText) >> return ChatSuccess
 
 defaultPlayerName :: Int -> SP.ServerPlayer -> Text
 defaultPlayerName n player = fromMaybe (pack ("Player " ++ show n)) (SP.playerUsername player)

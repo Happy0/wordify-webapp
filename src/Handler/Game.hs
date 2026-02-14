@@ -54,13 +54,15 @@ import Wordify.Rules.Game (Game(..))
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
-  request <- getRequest
   app <- getYesod
   liftIO $ trackRequestReceivedActivity (inactivityTracker app)
-  let cookies = reqCookies request
-  userId <- maybeAuthId
+  maid <- maybeAuthId
 
-  let maybeUser = fmap (\uid -> AuthUser uid Nothing) userId
+  maybeUser <- case maid of
+    Nothing -> return Nothing
+    Just _ -> do
+      authedUser <- requireUsername
+      return $ Just (AuthUser (authenticatedUserId authedUser) Nothing)
 
   {-- If this is a websocket request, the handler is short cutted here
       Once the client has loaded the page and javascript, the javascript for the page
@@ -187,7 +189,7 @@ subscribeChatGameMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage
 subscribeChatGameMessages chatroom since = subscribeMessagesLive chatroom since .| CL.map toGameMessage
   where
     toGameMessage :: CR.ChatMessage -> GameMessage
-    toGameMessage (CR.ChatMessage displayName chatMessage sentTime messageNumber) =
+    toGameMessage (CR.ChatMessage _ displayName chatMessage sentTime messageNumber) =
       PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime messageNumber)
 
 subscribeGameMessages :: TChan GameMessage -> ConduitT () GameMessage IO ()

@@ -1,14 +1,15 @@
 module Repository.SQL.SqlChatRepository (SqlChatRepositoryBackend (SqlChatRepositoryBackend)) where
 
-import ClassyPrelude (Bool (False, True), IO, Int, Maybe (Just, Nothing), Monad, MonadIO, UTCTime, flip, lift, liftIO, return, undefined, ($), (>))
+import ClassyPrelude (Bool (False, True), IO, Int, Maybe (Just, Nothing), Monad, MonadIO, UTCTime, flip, fromMaybe, lift, liftIO, return, undefined, ($), (>))
 import Conduit (runConduit)
 import qualified Conduit as C (ConduitT, lengthC)
 import Data.Conduit (ConduitT, (.|))
 import qualified Data.Conduit.List as CL (filter, sourceList)
 import qualified Data.List as L
+import qualified Data.Map as Map
 import Data.Pool (Pool)
 import qualified Data.Text as T
-import Database.Persist (insert)
+import Database.Persist (insert, getMany, selectList, (==.), SelectOpt(Asc))
 import Database.Persist.Sql
 import qualified Model as M
 import Repository.ChatRepository (ChatMessageEntity (ChatMessageEntity), ChatRepository (countChatMessages, getChatMessages, saveChatMessage))
@@ -22,9 +23,9 @@ instance ChatRepository SqlChatRepositoryBackend where
   countChatMessages (SqlChatRepositoryBackend pool) = countChatMessagesImpl pool
 
 saveChatMessageImpl :: Pool SqlBackend -> ChatMessageEntity -> IO ()
-saveChatMessageImpl pool (ChatMessageEntity chatroomId senderDisplayName message now _) = do
+saveChatMessageImpl pool (ChatMessageEntity chatroomId senderUserId _ msg now _) = do
   withPool pool $ do
-    _ <- insert (M.ChatMessage chatroomId now senderDisplayName message)
+    _ <- insert (M.ChatMessage chatroomId now (M.UserKey senderUserId) msg)
     return ()
 
 -- TODO: do this in SQL
@@ -35,17 +36,24 @@ countChatMessagesImpl pool chatroomId = runConduit $ getChatMessagesImpl pool ch
 -- doesn't truely stream - would need ot manually page through the results. in a custom 'stream source' implementation
 getChatMessagesImpl :: (MonadIO m) => Pool SqlBackend -> T.Text -> Maybe Int -> C.ConduitT () ChatMessageEntity m ()
 getChatMessagesImpl pool chatroomId sinceMessageNumber = do
-  -- TODO: rename ChatMessageGame field to ChatMessageRoomId
-  allMessages <- liftIO (withPool pool $ selectList [M.ChatMessageGame ==. chatroomId] [])
-  let messages = L.zipWith chatMessageFromEntity [1 ..] allMessages
+  (allMessages, userMap) <- liftIO $ withPool pool $ do
+    msgs <- selectList [M.ChatMessageGame ==. chatroomId] [Asc M.ChatMessageCreatedAt]
+    let userIds = L.nub [sentBy | Entity _ (M.ChatMessage _ _ sentBy _) <- msgs]
+    users <- getMany userIds
+    return (msgs, users)
+  let messages = L.zipWith (chatMessageFromEntity userMap) [1 ..] allMessages
   -- TODO: store the message number in the database and use that to filter in the query - needs migration
   CL.sourceList messages .| CL.filter (isGreaterThanMessageNumber sinceMessageNumber)
   where
     isGreaterThanMessageNumber :: Maybe Int -> ChatMessageEntity -> Bool
     isGreaterThanMessageNumber Nothing _ = True
-    isGreaterThanMessageNumber (Just since) (ChatMessageEntity _ _ _ _ messageNumber) = messageNumber > since
+    isGreaterThanMessageNumber (Just since) (ChatMessageEntity _ _ _ _ _ messageNumber) = messageNumber > since
 
-chatMessageFromEntity :: Int -> Entity M.ChatMessage -> ChatMessageEntity
-chatMessageFromEntity messageNumber (Entity _ (M.ChatMessage roomId created user message)) = ChatMessageEntity roomId user message created messageNumber
+chatMessageFromEntity :: Map.Map M.UserId M.User -> Int -> Entity M.ChatMessage -> ChatMessageEntity
+chatMessageFromEntity userMap messageNumber (Entity _ (M.ChatMessage roomId created userId@(M.UserKey userIdText) message)) =
+  let displayName = case Map.lookup userId userMap of
+        Just user -> fromMaybe (fromMaybe userIdText (M.userNickname user)) (M.userUsername user)
+        Nothing -> "Unknown"
+  in ChatMessageEntity roomId userIdText displayName message created messageNumber
 
 withPool = flip runSqlPersistMPool

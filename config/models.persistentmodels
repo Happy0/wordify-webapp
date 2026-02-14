@@ -43,7 +43,7 @@ Move
 ChatMessage
     game Text
     createdAt UTCTime
-    sentBy Text
+    sentBy UserId
     message Text
 
 Player
