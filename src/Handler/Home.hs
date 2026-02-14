@@ -7,7 +7,7 @@ import Foundation
 import Repository.GameRepository
 import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend))
 import Yesod.Auth
-import Import.NoFoundation (css_wordify_css, wordifyJs)
+import Import.NoFoundation (wordifyCss, wordifyJs)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
 import ClassyPrelude (undefined, Maybe (Nothing))
 import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
@@ -46,20 +46,25 @@ instance ToJSON ActiveGameSummary where
 mapGameSummary :: GameSummary -> [Text] -> ActiveGameSummary
 mapGameSummary (GameSummary gameId latestActivity myMove boardString localisedGameSetup otherPlayerNames) activePlayerNames =
   let tileValues = tileLettersToValueMap localisedGameSetup
-      otherPlayersWithStatus = map (\name -> OtherPlayer name (name `elem` activePlayerNames)) otherPlayerNames
+      resolvedNames = zipWith resolvePlayerName [1..] otherPlayerNames
+      otherPlayersWithStatus = map (\name -> OtherPlayer name (name `elem` activePlayerNames)) resolvedNames
   in ActiveGameSummary gameId boardString myMove latestActivity tileValues otherPlayersWithStatus
+  where
+    resolvePlayerName :: Int -> Maybe Text -> Text
+    resolvePlayerName n Nothing = T.pack ("Player " ++ show n)
+    resolvePlayerName _ (Just name) = name
 
 buildActiveGameSummary :: GameSummary -> Maybe ServerGame -> IO ActiveGameSummary
 buildActiveGameSummary gameSummary Nothing = pure $ mapGameSummary gameSummary []
 buildActiveGameSummary gameSummary (Just serverGame) = do
   players <- mapM (readTVarIO . snd) (playing serverGame)
-  let activeNames = [ fromMaybe "<Unknown>" (SP.name p) | p <- players, SP.numConnections p > 0 ]
+  let activeNames = [ defaultPlayerName i p | (i, p) <- zip [1..] players, SP.numConnections p > 0 ]
   pure $ mapGameSummary gameSummary activeNames
 
 renderNotLoggedInPage :: Handler Html
 renderNotLoggedInPage =
   gamePagelayout $ do
-    addStylesheet $ (StaticR css_wordify_css)
+    addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
@@ -83,7 +88,7 @@ renderActiveGamePage app gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
   summaries <- liftIO $ buildActiveGameSummaries (games app) activeGames
   gamePagelayout $ do
-    addStylesheet $ (StaticR css_wordify_css)
+    addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
@@ -107,7 +112,9 @@ getHomeR = do
 
   case maybePlayerId of
     Nothing -> renderNotLoggedInPage
-    Just userId -> do
+    Just _ -> do
+      authedUser <- requireUsername
+      let userId = authenticatedUserId authedUser
       {- If this is a websocket request the handler short circuits here, otherwise it goes on to return the HTML page -}
       webSockets $ homeWebsocketHandler app userId
       renderActiveGamePage app gameRepositorySQLBackend userId
@@ -200,11 +207,11 @@ gameSummaryFromServerGame userIdent serverGameSnapshot userToMove =
     userToMove
     (T.pack (textRepresentation (board (gameState serverGameSnapshot))))
     (gameLocalisation serverGameSnapshot)
-    (map (fromMaybe "<Unknown>" . SP.name) otherPlayers)
+    (map SP.playerUsername otherPlayers)
 
 activePlayerNamesFromSnapshot :: ServerGameSnapshot -> [Text]
 activePlayerNamesFromSnapshot snapshot =
-  [ fromMaybe "<Unknown>" (SP.name p) | p <- snapshotPlayers snapshot, SP.numConnections p > 0 ]
+  [ defaultPlayerName i p | (i, p) <- zip [1..] (snapshotPlayers snapshot), SP.numConnections p > 0 ]
 
 buildActiveGameSummaries :: ResourceCache Text ServerGame -> [GameSummary] -> IO [ActiveGameSummary]
 buildActiveGameSummaries gamesCache gameSummaries =
@@ -217,3 +224,6 @@ buildActiveGameSummaryMap gamesCache gameSummaries = do
   summaries <- buildActiveGameSummaries gamesCache gameSummaries
   let gameIds = map gameSummaryGameId gameSummaries
   return $ M.fromList (zip gameIds summaries)
+
+defaultPlayerName :: Int -> SP.ServerPlayer -> Text
+defaultPlayerName n player = fromMaybe (T.pack ("Player " ++ show n)) (SP.playerUsername player)

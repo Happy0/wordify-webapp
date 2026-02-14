@@ -24,10 +24,9 @@ import Util.ConduitChan (chanSource)
 import Util.Exception (printAndIgnoreSyncException)
 import Util.WorkerThread (WorkerThread, newUnstartedWorkerThread, startIfNotStarted, stopIfNotStopped)
 
--- TODO: include user IDs and do migration so that database 'chat' rows have user IDs
-data SendMessage = SendMessage {userDisplayName :: Text, message :: Text}
+data SendMessage = SendMessage {senderUserId :: Text, userDisplayName :: Text, message :: Text}
 
-data ChatMessage = ChatMessage {displayName :: Text, chatMessage :: Text, sentTime :: UTCTime, messageNumber :: Int}
+data ChatMessage = ChatMessage {chatSenderUserId :: Text, displayName :: Text, chatMessage :: Text, sentTime :: UTCTime, messageNumber :: Int}
 
 data Chatroom = Chatroom
   { chatroomId :: Text,
@@ -62,7 +61,7 @@ processNextMessage :: Chatroom -> SendMessage -> IO ()
 processNextMessage (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ countChatMessages _) msg = do
   now <- getCurrentTime
   messageNumber <- (+ 1) <$> countChatMessages roomId
-  let chatMessage = ChatMessage (userDisplayName msg) (message msg) now messageNumber
+  let chatMessage = ChatMessage (senderUserId msg) (userDisplayName msg) (message msg) now messageNumber
   -- TODO: stop this loop from exiting due to IO errors
   persistChatMessage roomId chatMessage
   atomically (writeTChan broadcastChan chatMessage)

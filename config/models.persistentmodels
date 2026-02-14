@@ -4,6 +4,8 @@
 User
     ident Text
     nickname Text Maybe
+    username Text Maybe
+    UniqueUsername username !force
     Primary ident
 
 Email
@@ -41,7 +43,7 @@ Move
 ChatMessage
     game Text
     createdAt UTCTime
-    sentBy Text
+    sentBy UserId
     message Text
 
 Player

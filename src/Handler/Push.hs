@@ -1,11 +1,10 @@
 module Handler.Push where
     import ClassyPrelude (Maybe(..), pure, ($), liftIO, (<>), lookup)
-    import Foundation (Handler, App (pushController))
+    import Foundation (Handler, App (pushController), requireUsername, AuthenticatedUser(..))
     import Data.Aeson (FromJSON, (.:))
     import Data.Aeson.Types (FromJSON(parseJSON))
     import Data.Aeson (withObject)
-    import ClassyPrelude.Yesod (requireCheckJsonBody, notAuthenticated, getYesod, guessApproot)
-    import Import (YesodAuth (maybeAuthId))
+    import ClassyPrelude.Yesod (requireCheckJsonBody, getYesod)
     import Controllers.Push.PushController (PushTokenSubscription(..), subscribe)
     import Yesod.Core (waiRequest)
     import Network.Wai (requestHeaders, isSecure)
@@ -25,7 +24,8 @@ module Handler.Push where
 
         subscription <- requireCheckJsonBody :: Handler PushTokenSubscription
 
-        userId <- maybeAuthId
+        authedUser <- requireUsername
+        let uid = authenticatedUserId authedUser
         app <- getYesod
         req <- waiRequest
 
@@ -39,6 +39,4 @@ module Handler.Push where
                 Nothing      -> if isSecure req then "https" else "http"
             baseUrl = scheme <> "://" <> hostHeader
 
-        case userId of
-            Nothing -> notAuthenticated
-            Just uid -> liftIO $ subscribe (pushController app) uid baseUrl subscription
+        liftIO $ subscribe (pushController app) uid baseUrl subscription

@@ -90,8 +90,8 @@ makeServerGame gameId gameState serverPlayers createdAt lastMoveMadeAt finishedA
   return (ServerGame gameId game currentPlayerStates messageChannel createdAt lastMoveMade finished gameSetup)
 
 makeServerPlayerState :: SP.ServerPlayer -> STM (Text, TVar ServerPlayer)
-makeServerPlayerState serverPlayer@(ServerPlayer _ playerId _ _ _) =
-  (,) playerId <$> newTVar serverPlayer
+makeServerPlayerState serverPlayer =
+  (,) (SP.playerId serverPlayer) <$> newTVar serverPlayer
 
 updateLastMoveMade :: ServerGame -> UTCTime -> STM ()
 updateLastMoveMade serverGame moveTime = writeTVar (lastMoveMadeAt serverGame) (Just moveTime)

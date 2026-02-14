@@ -17,7 +17,6 @@ import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
 import Controllers.User.Model.AuthUser
-import Controllers.User.Persist
 import Data.Aeson
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -55,15 +54,15 @@ import Wordify.Rules.Game (Game(..))
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
-  request <- getRequest
   app <- getYesod
   liftIO $ trackRequestReceivedActivity (inactivityTracker app)
-  let cookies = reqCookies request
-  userId <- maybeAuthId
+  maid <- maybeAuthId
 
-  maybeUser <- case userId of
-    Nothing -> pure Nothing
-    Just user -> liftIO $ getUser (appConnPool app) user
+  maybeUser <- case maid of
+    Nothing -> return Nothing
+    Just _ -> do
+      authedUser <- requireUsername
+      return $ Just (AuthUser (authenticatedUserId authedUser) Nothing)
 
   {-- If this is a websocket request, the handler is short cutted here
       Once the client has loaded the page and javascript, the javascript for the page
@@ -144,7 +143,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
   let summaries = fromRight [] gameMoveSummaries
 
   gamePagelayout $ do
-    addStylesheet $ StaticR css_wordify_css
+    addStylesheet $ StaticR wordifyCss
     addScript $ StaticR wordifyJs
     toWidget
       [julius|
@@ -190,7 +189,7 @@ subscribeChatGameMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage
 subscribeChatGameMessages chatroom since = subscribeMessagesLive chatroom since .| CL.map toGameMessage
   where
     toGameMessage :: CR.ChatMessage -> GameMessage
-    toGameMessage (CR.ChatMessage displayName chatMessage sentTime messageNumber) =
+    toGameMessage (CR.ChatMessage _ displayName chatMessage sentTime messageNumber) =
       PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime messageNumber)
 
 subscribeGameMessages :: TChan GameMessage -> ConduitT () GameMessage IO ()

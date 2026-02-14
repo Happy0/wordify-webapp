@@ -20,10 +20,12 @@ mkdir -p static/js static/css
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 rm -f static/js/wordify*.js
+rm -f static/css/wordify*.css
 cp ui/wordify-views/dist/wordify.umd.js "static/js/wordify_${TIMESTAMP}.js"
-cp ui/wordify-views/dist/wordify-ui.css static/css/wordify.css
+cp ui/wordify-views/dist/wordify-ui.css "static/css/wordify_${TIMESTAMP}.css"
 cp ui/wordify-views/dist/wordify.umd.js.map static/js/wordify.umd.js.map
 cp ui/wordify-views/dist/sw.js static/sw.js
 
-# Update the Haskell static route to point to the new timestamped JS filename
+# Update the Haskell static routes to point to the new timestamped filenames
 sed -i "s|\"js\", \"wordify[_0-9]*\.js\"|\"js\", \"wordify_${TIMESTAMP}.js\"|" src/Settings/StaticFiles.hs
+sed -i "s|\"css\", \"wordify[_0-9]*\.css\"|\"css\", \"wordify_${TIMESTAMP}.css\"|" src/Settings/StaticFiles.hs

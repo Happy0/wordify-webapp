@@ -21,8 +21,10 @@ import Controllers.Game.GameDefinitionController (GameDefinitionController)
 import Controllers.Push.PushController (PushController)
 import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
-import Controllers.User.Model.AuthUser (AuthUser)
-import Controllers.User.Persist (storeUser)
+import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
+import Controllers.User.UserController (UserController)
+import qualified Controllers.User.UserController as UC
+import qualified Controllers.User.Model.ServerUser as SU
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text.Encoding as TE
 import Database.Persist.Sql (ConnectionPool, runSqlPool)
@@ -78,7 +80,8 @@ data App = App
     inactivityTracker :: TVar InactivityTracker,
     gameDefinitionController :: GameDefinitionController,
     pushController :: PushController,
-    vapidPublicKey :: Maybe Text
+    vapidPublicKey :: Maybe Text,
+    userController :: UserController
   }
 
 data MenuItem = MenuItem
@@ -153,20 +156,6 @@ instance Yesod App where
     Maybe (Route App)
   authRoute _ = Just $ AuthR LoginR
 
-  isAuthorized ::
-    -- \| The route the user is visiting.
-    Route App ->
-    -- \| Whether or not this is a "write" request.
-    Bool ->
-    Handler AuthResult
-  -- Routes not requiring authentication.
-  isAuthorized (AuthR _) _ = return Authorized
-  isAuthorized FaviconR _ = return Authorized
-  isAuthorized RobotsR _ = return Authorized
-  isAuthorized ServiceWorkerR _ = return Authorized
-  -- Default to Authorized for now.
-  isAuthorized _ _ = return Authorized
-
   -- This function creates static content files in the static folder
   -- and names them based on a hash of their content. This allows
   -- expiration dates to be set far in the future without worry of
@@ -230,8 +219,8 @@ instance YesodAuth App where
 
     case userProfile of
       Left _ -> return ()
-      Right profile -> liftIO $ do
-        storeUser (appConnPool app) profile
+      Right (AuthUser uid nick) -> liftIO $ do
+        UC.createUserIfNotExists (userController app) uid nick
 
     return . Authenticated . credsIdent $ creds
 
@@ -258,6 +247,22 @@ isAuthenticated = do
   return $ case muid of
     Nothing -> Unauthorized "You must login to access this page"
     Just _ -> Authorized
+
+data AuthenticatedUser = AuthenticatedUser
+  { authenticatedUserId :: Text
+  , authenticatedUsername :: Text
+  , authenticatedServerUser :: SU.ServerUser
+  }
+
+requireUsername :: Handler AuthenticatedUser
+requireUsername = do
+  authId <- requireAuthId
+  app <- getYesod
+  maybeUser <- liftIO $ UC.getUser (userController app) authId
+  case maybeUser of
+    Just user | Just uname <- SU.username user ->
+      return $ AuthenticatedUser authId uname user
+    _ -> redirect ChooseUsernameR
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.

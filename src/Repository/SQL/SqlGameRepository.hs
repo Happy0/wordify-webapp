@@ -37,17 +37,17 @@ activeUserGames gameSetups userId = do
               [ game ^. M.GameLastMoveMadeAt, E.just (game ^. M.GameCreatedAt)
               ])
         ]
-      return (me, game, E.just (usr ^. M.UserNickname))
+      return (me, game, usr ^. M.UserUsername, E.just (other ^. M.PlayerPlayerNumber))
   return $ toGameSummaries gameSetups rows
 
-toGameSummaries :: Map.Map T.Text LocalisedGameSetup -> [(E.Entity M.Player, E.Entity M.Game, E.Value (Maybe (Maybe T.Text)))] -> [GameSummary]
+toGameSummaries :: Map.Map T.Text LocalisedGameSetup -> [(E.Entity M.Player, E.Entity M.Game, E.Value (Maybe T.Text), E.Value (Maybe Int))] -> [GameSummary]
 toGameSummaries gameSetups rows =
-  let grouped = groupBy (\(_, E.Entity _ g1, _) (_, E.Entity _ g2, _) -> M.gameGameId g1 == M.gameGameId g2) rows
+  let grouped = groupBy (\(_, E.Entity _ g1, _, _) (_, E.Entity _ g2, _, _) -> M.gameGameId g1 == M.gameGameId g2) rows
    in mapMaybe groupToSummary grouped
   where
-    groupToSummary :: [(E.Entity M.Player, E.Entity M.Game, E.Value (Maybe (Maybe T.Text)))] -> Maybe GameSummary
+    groupToSummary :: [(E.Entity M.Player, E.Entity M.Game, E.Value (Maybe T.Text), E.Value (Maybe Int))] -> Maybe GameSummary
     groupToSummary [] = Nothing
-    groupToSummary group@((E.Entity _ player, E.Entity _ game, _):_) =
+    groupToSummary group@((E.Entity _ player, E.Entity _ game, _, _):_) =
       if isNothing (M.gameFinishedAt game)
         then do
           let localeCode = fromMaybe "en" (M.gameBagLocale game)
@@ -64,9 +64,9 @@ toGameSummaries gameSetups rows =
                 otherNames
         else Nothing
 
-    extractName :: (E.Entity M.Player, E.Entity M.Game, E.Value (Maybe (Maybe T.Text))) -> [T.Text]
-    extractName (_, _, E.Value Nothing) = []
-    extractName (_, _, E.Value (Just nickname)) = [fromMaybe "<Unknown>" nickname]
+    extractName :: (E.Entity M.Player, E.Entity M.Game, E.Value (Maybe T.Text), E.Value (Maybe Int)) -> [Maybe T.Text]
+    extractName (_, _, _, E.Value Nothing) = []  -- no other player in this row (LEFT JOIN produced NULL)
+    extractName (_, _, E.Value uname, _) = [uname]
 
     isPlayerMove :: Int -> Int -> Int -> Bool
     isPlayerMove currentMoveNumber numberOfPlayers playerNumber =

@@ -221,7 +221,7 @@ connectionStatuses :: [ServerPlayer] -> [ConnectionStatus]
 connectionStatuses serverPlayers = L.zipWith toConnectionStatus serverPlayers [1 ..]
   where
     toConnectionStatus :: ServerPlayer -> Int -> ConnectionStatus
-    toConnectionStatus (ServerPlayer _ _ _ numConnections lastActive) playerNumber = ConnectionStatus playerNumber (numConnections > 0) lastActive
+    toConnectionStatus player playerNumber = ConnectionStatus playerNumber (numConnections player > 0) (lastActive player)
 
 instance ServerMessage ServerResponse where
   commandName (BoardMoveSuccess _) = "boardMoveSuccess"

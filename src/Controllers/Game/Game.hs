@@ -81,7 +81,7 @@ handlePlayerDisconnect pool userEventChannelSubscriptions serverGame (Just user)
 notifyUserChannelsPlayerActivity :: ResourceCache Text (TChan UserEvent) -> ServerGame -> STM ()
 notifyUserChannelsPlayerActivity userEventChannelSubscriptions serverGame = do
   players <- mapM (readTVar . snd) (playing serverGame)
-  let activeNames = [ fromMaybe "<Unknown>" (SP.name p) | p <- players, SP.numConnections p > 0 ]
+  let activeNames = [ defaultPlayerName i p | (i, p) <- Prelude.zip [1..] players, SP.numConnections p > 0 ]
       gId = gameId serverGame
   forM_ players $ \player -> do
     let userIdent = SP.playerId player
@@ -278,8 +278,12 @@ handleChatMessage serverGame chatroom pool (Just user) messageText =
     now <- getCurrentTime
     gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
     let serverPlayer = getServerPlayerSnapshot gameSnapshot user
-    let playerName = serverPlayer >>= SP.name
+    let playerName = serverPlayer >>= SP.playerUsername
+    let userId = ident user
 
     case playerName of
       Nothing -> return $ InvalidCommand "Internal server error"
-      Just playerName -> sendMessage chatroom (CR.SendMessage playerName messageText) >> return ChatSuccess
+      Just playerName -> sendMessage chatroom (CR.SendMessage userId playerName messageText) >> return ChatSuccess
+
+defaultPlayerName :: Int -> SP.ServerPlayer -> Text
+defaultPlayerName n player = fromMaybe (pack ("Player " ++ show n)) (SP.playerUsername player)

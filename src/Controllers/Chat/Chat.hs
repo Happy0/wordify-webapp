@@ -18,9 +18,9 @@ getChatMessages :: ChatRepositoryImpl -> Text -> Maybe Int -> C.ConduitT () Chat
 getChatMessages chatRepository roomId since = getChatMessagesImpl chatRepository roomId since C..| CL.map fromChatMessageEntity
 
 fromChatMessageEntity :: ChatMessageEntity -> ChatMessage
-fromChatMessageEntity (ChatMessageEntity _ senderDisplayName message now chatMessageNumber) =
-  ChatMessage senderDisplayName message now chatMessageNumber
+fromChatMessageEntity (ChatMessageEntity _ senderUserId senderDisplayName message now chatMessageNumber) =
+  ChatMessage senderUserId senderDisplayName message now chatMessageNumber
 
 toChatMessageEntity :: Text -> ChatMessage -> ChatMessageEntity
-toChatMessageEntity roomId (ChatMessage senderDisplayName message now chatMessageNumber) =
-  ChatMessageEntity roomId senderDisplayName message now chatMessageNumber
+toChatMessageEntity roomId (ChatMessage senderUserId senderDisplayName message now chatMessageNumber) =
+  ChatMessageEntity roomId senderUserId senderDisplayName message now chatMessageNumber

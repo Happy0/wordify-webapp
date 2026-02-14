@@ -20,8 +20,11 @@ import Yesod.Static
 --     StaticFile ["js", "script.js"] []
 staticFiles (appStaticDir compileTimeAppSettings)
 
--- Cache-busted JS route. The filename below is updated by build-ui.sh at build
+-- Cache-busted routes. The filenames below are updated by build-ui.sh at build
 -- time to include a timestamp suffix, so browsers always fetch the latest version
 -- instead of serving a stale cached copy.
 wordifyJs :: StaticRoute
-wordifyJs = StaticRoute ["js", "wordify_20260212_235520.js"] []
+wordifyJs = StaticRoute ["js", "wordify_20260214_154837.js"] []
+
+wordifyCss :: StaticRoute
+wordifyCss = StaticRoute ["css", "wordify_20260214_154837.css"] []
