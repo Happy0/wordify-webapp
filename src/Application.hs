@@ -183,6 +183,18 @@ makeFoundation appSettings inactivityTracker = do
   -- changed inside a transaction.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
+  -- Add a case-insensitive unique index on username so that e.g. "Alice" and "alice"
+  -- are treated as the same username, while preserving the user's chosen casing.
+  runLoggingT
+    ( runSqlPool
+        ( rawExecute
+            "CREATE UNIQUE INDEX IF NOT EXISTS unique_username_nocase ON \"user\"(username COLLATE NOCASE)"
+            []
+        )
+        pool
+    )
+    logFunc
+
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
   chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
 
