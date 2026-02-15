@@ -46,7 +46,7 @@ import Wordify.Rules.Move
 import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.WebSockets
-import Handler.Model.ClientGame (fromServerPlayer, fromServerTile)
+import Handler.Model.ClientGame (fromServerPlayer, fromServerTile, fromServerMoveHistory)
 import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
 import Model.GameSetup (LocalisedGameSetup(..))
@@ -140,7 +140,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
     Left err -> invalidArgs [err]
     Right _ -> liftIO (return ())
 
-  let summaries = fromRight [] gameMoveSummaries
+  let summaries = fromServerMoveHistory (fromRight [] gameMoveSummaries)
 
   gamePagelayout $ do
     addStylesheet $ StaticR wordifyCss
@@ -155,8 +155,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 myPlayerNumber: #{toJSON maybePlayerNumber},
                 playerToMove: #{toJSON playing},
                 players: #{toJSON clientPlayers},
-                // Just allow the first websocket message to initialise this for now
-                moveHistory: [],
+                moveHistory: #{toJSON summaries},
                 tilesRemaining: #{toJSON numTilesRemaining},
                 potentialScore: null,
                 lastMoveReceived: Date.now(),

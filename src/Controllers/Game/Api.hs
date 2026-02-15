@@ -12,7 +12,7 @@ module Controllers.Game.Api
         InitialiseGame,
         InvalidCommand
       ),
-    MoveSummary (BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary),
+    MoveSummary (BoardMoveSummary, PassMoveSummary, ExchangeMoveSummary, GameEndSummary),
     ConnectionStatus (ConnectionStatus),
     toMoveSummary,
     transitionToMessage,
