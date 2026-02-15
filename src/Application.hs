@@ -67,7 +67,6 @@ import Database.Persist
 import Data.Pool (withResource)
 import Database.Persist.Sqlite
   ( createSqlitePool,
-    rawExecute,
     runSqlPool,
     sqlDatabase,
     sqlPoolSize,
@@ -109,6 +108,7 @@ import Repository.ChatRepository
 import Repository.DefinitionRepository (toDefinitionRepositoryImpl)
 import Repository.SQL.SqlChatRepository
 import Repository.SQL.SqlDefinitionRepository (DefinitionRepositorySQLBackend (DefinitionRepositorySQLBackend))
+import Repository.SQL.Setup (runSetup)
 import System.Environment
 import System.Log.FastLogger
   ( defaultBufSize,
@@ -183,17 +183,8 @@ makeFoundation appSettings inactivityTracker = do
   -- changed inside a transaction.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
-  -- Add a case-insensitive unique index on username so that e.g. "Alice" and "alice"
-  -- are treated as the same username, while preserving the user's chosen casing.
-  runLoggingT
-    ( runSqlPool
-        ( rawExecute
-            "CREATE UNIQUE INDEX IF NOT EXISTS unique_username_nocase ON \"user\"(username COLLATE NOCASE)"
-            []
-        )
-        pool
-    )
-    logFunc
+  -- Run additional database setup (indexes, etc.)
+  runLoggingT (runSqlPool runSetup pool) logFunc
 
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
   chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
