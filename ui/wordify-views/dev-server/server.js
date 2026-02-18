@@ -32,6 +32,10 @@ async function createDevServer() {
   const app = express();
   const port = 3000;
 
+  // Session cookie stored server-side, injected into all proxied requests.
+  // This avoids document.cookie encoding issues.
+  let storedSessionCookie = null;
+
   // Create Vite dev server in middleware mode for hot reloading
   const vite = await createViteServer({
     root: uiRoot,
@@ -40,42 +44,71 @@ async function createDevServer() {
   });
 
   // Helper to load and transform an HTML file through Vite
-  async function renderPage(res, htmlFileName) {
+  async function renderPage(req, res, htmlFileName) {
     const htmlPath = resolve(__dirname, 'pages', htmlFileName);
     let html = fs.readFileSync(htmlPath, 'utf-8');
-    // Vite transforms the HTML, resolving script imports and injecting HMR client
-    html = await vite.transformIndexHtml('/', html);
+    html = await vite.transformIndexHtml(req.originalUrl, html);
     res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
   }
 
-  const proxyOptions = {
+  // Inject the stored session cookie into proxied requests
+  function onProxyReq(proxyReq) {
+    if (storedSessionCookie) {
+      proxyReq.setHeader('Cookie', `_SESSION=${storedSessionCookie}`);
+    }
+  }
+
+  // Proxy API and push requests to remote server.
+  const apiProxy = createProxyMiddleware({
     target: remoteOrigin,
     changeOrigin: true,
-    cookieDomainRewrite: { '*': '' },
-  };
-
-  // Proxy API requests to remote server (before vite middleware)
-  app.use('/api', createProxyMiddleware(proxyOptions));
-  app.use('/auth', createProxyMiddleware(proxyOptions));
-  app.use('/login', createProxyMiddleware(proxyOptions));
-  app.use('/push', createProxyMiddleware(proxyOptions));
+    on: { proxyReq: onProxyReq },
+    pathFilter: ['/api', '/push'],
+  });
+  app.use(apiProxy);
 
   // Proxy POST /games (create game) to remote server
-  app.post('/games', createProxyMiddleware(proxyOptions));
+  app.post('/games', createProxyMiddleware({
+    target: remoteOrigin,
+    changeOrigin: true,
+    on: { proxyReq: onProxyReq },
+  }));
+
+  // Dev login: accept the session cookie via POST and store it server-side
+  app.use(express.urlencoded({ extended: false }));
+
+  app.post('/dev-login', (req, res) => {
+    const cookie = req.body.session;
+    if (!cookie) {
+      return res.status(400).send('No session value provided');
+    }
+    storedSessionCookie = cookie;
+    console.log('Session cookie stored on dev server.');
+    res.redirect('/');
+  });
+
+  app.get('/dev-login', (req, res) => renderPage(req, res, 'dev-login.html'));
+
+  // Catch /login requests from Vue components and redirect to dev login page
+  app.get('/login', (_req, res) => {
+    res.redirect('/dev-login');
+  });
 
   // Use Vite's middleware for serving/transforming source files
   app.use(vite.middlewares);
 
   // HTML page routes
-  app.get('/', (_req, res) => renderPage(res, 'home.html'));
-  app.get('/create-lobby', (_req, res) => renderPage(res, 'create-game.html'));
-  app.get('/games/:gameId/lobby', (_req, res) => renderPage(res, 'game-lobby.html'));
-  app.get('/games/:gameId', (_req, res) => renderPage(res, 'round.html'));
+  app.get('/', (req, res) => renderPage(req, res, 'home.html'));
+  app.get('/create-lobby', (req, res) => renderPage(req, res, 'create-game.html'));
+  app.get('/games/:gameId/lobby', (req, res) => renderPage(req, res, 'game-lobby.html'));
+  app.get('/games/:gameId', (req, res) => renderPage(req, res, 'round.html'));
 
   // Start server
   const server = app.listen(port, () => {
     console.log(`Dev server running at http://localhost:${port}`);
     console.log(`Proxying API/WebSocket requests to ${remoteOrigin}`);
+    console.log('');
+    console.log(`To log in: visit http://localhost:${port}/dev-login`);
   });
 
   // Proxy WebSocket upgrades to the remote server
@@ -83,9 +116,14 @@ async function createDevServer() {
     target: remoteWs,
     changeOrigin: true,
     ws: true,
+    on: { proxyReq: onProxyReq },
   });
 
   server.on('upgrade', (req, socket, head) => {
+    // Inject session cookie into the WebSocket upgrade request
+    if (storedSessionCookie) {
+      req.headers.cookie = `_SESSION=${storedSessionCookie}`;
+    }
     wsProxy.upgrade(req, socket, head);
   });
 }
