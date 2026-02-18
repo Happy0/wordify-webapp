@@ -78,6 +78,7 @@ import Handler.Game
 import Handler.GameLobby
 import Handler.Home
 import Handler.Login
+import Handler.Me
 import Handler.Push
 import Handler.Username
 import Import

@@ -56,6 +56,7 @@ export interface HomeOptions {
   /**
    * Whether the user is currently logged in
    * Controls whether to show games/create-game or login prompt
+   * If omitted, the client will fetch auth state from /api/me
    */
   isLoggedIn: boolean
 }
