@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify - Game Lobby</title>
+</head>
+<body>
+  <div id="lobby"></div>
+
+  <script type="module">
+    import { createGameLobby } from '/src/lib/game-lobby.ts';
+
+    const res = await fetch('/api/me');
+    const auth = await res.json();
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const websocketUrl = `${wsProtocol}//${window.location.host}${window.location.pathname}`;
+
+    const pathParts = window.location.pathname.split('/');
+    const gameLobbyId = pathParts[pathParts.length - 2];
+
+    createGameLobby('#lobby', {
+      gameLobbyId: gameLobbyId,
+      websocketUrl: websocketUrl,
+      isLoggedIn: auth.loggedIn,
+      playerCount: 2,
+      joinedPlayers: [],
+      language: 'English',
+    });
+  </script>
+</body>
+</html>

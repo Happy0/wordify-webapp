@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify - Game</title>
+</head>
+<body>
+  <div id="wordifyround"></div>
+
+  <script type="module">
+    import { createRound, BOARD_LAYOUT } from '/src/lib/round.ts';
+
+    const res = await fetch('/api/me');
+    const auth = await res.json();
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const websocketUrl = `${wsProtocol}//${window.location.host}${window.location.pathname}`;
+
+    const emptyBoard = new Array(225).fill('').join(',');
+
+    const initialState = {
+      myPlayerNumber: 0,
+      playerToMove: 0,
+      players: [],
+      moveHistory: [],
+      tilesRemaining: 0,
+      potentialScore: null,
+      lastMoveReceived: Date.now(),
+      chatMessages: [],
+      lastChatMessageReceived: 0,
+      lastDefinitionReceived: 0,
+      rack: null,
+      boardLayout: BOARD_LAYOUT,
+      boardString: emptyBoard,
+      gameEnded: false,
+    };
+
+    const pathParts = window.location.pathname.split('/');
+    const gameId = pathParts[pathParts.length - 1];
+
+    createRound('#wordifyround', {
+      initialState: initialState,
+      websocketUrl: websocketUrl,
+      gameId: gameId,
+      isLoggedIn: auth.loggedIn,
+    });
+  </script>
+</body>
+</html>

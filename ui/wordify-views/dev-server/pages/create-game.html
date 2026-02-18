@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify - Create Game</title>
+</head>
+<body>
+  <div id="createlobby"></div>
+
+  <script type="module">
+    import { createCreateGame } from '/src/lib/create-game.ts';
+
+    const res = await fetch('/api/me');
+    const auth = await res.json();
+
+    createCreateGame('#createlobby', {
+      locales: {
+        "English": "en",
+      },
+      isLoggedIn: auth.loggedIn,
+    });
+  </script>
+</body>
+</html>
