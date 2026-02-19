@@ -18,7 +18,8 @@ module Controllers.Game.Model.ServerGame
     getServerPlayerSnapshot,
     getSnapshotPlayerNumber,
     currentPlayerToMove,
-    gameSetup
+    gameSetup,
+    playerIsInGame
   )
 where
 
@@ -140,6 +141,9 @@ getSnapshotPlayerNumber :: ServerGameSnapshot -> AuthUser -> Maybe Int
 getSnapshotPlayerNumber serverGame (AuthUser userId _) = do
   let playerIds = Prelude.map SP.playerId (snapshotPlayers serverGame)
   fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)
+
+playerIsInGame :: ServerGameSnapshot -> AuthUser -> Bool 
+playerIsInGame snapshot = isJust . getServerPlayerSnapshot snapshot
 
 currentPlayerToMove :: ServerGameSnapshot -> Maybe Text
 currentPlayerToMove snapshot =

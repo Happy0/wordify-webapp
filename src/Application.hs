@@ -109,7 +109,7 @@ import Repository.ChatRepository
 import Repository.DefinitionRepository (toDefinitionRepositoryImpl)
 import Repository.SQL.SqlChatRepository
 import Repository.SQL.SqlDefinitionRepository (DefinitionRepositorySQLBackend (DefinitionRepositorySQLBackend))
-import Repository.SQL.Setup (runSetup)
+import Repository.SQL.Setup (runDataMigrations, runSetup)
 import System.Environment
 import System.Log.FastLogger
   ( defaultBufSize,
@@ -177,6 +177,10 @@ makeFoundation appSettings inactivityTracker = do
       $ createSqlitePool
         (sqlDatabase $ appDatabaseConf appSettings)
         (sqlPoolSize $ appDatabaseConf appSettings)
+
+  -- Run data migrations (column renames, etc.) before Persistent's automatic
+  -- migration so that migrateAll sees the schema in its expected final state.
+  runLoggingT (runSqlPool runDataMigrations pool) logFunc
 
   -- Perform database migration with foreign key checks disabled.
   -- We use withResource to get a raw connection and avoid runSqlPool's

@@ -37,7 +37,7 @@ countChatMessagesImpl pool chatroomId = runConduit $ getChatMessagesImpl pool ch
 getChatMessagesImpl :: (MonadIO m) => Pool SqlBackend -> T.Text -> Maybe Int -> C.ConduitT () ChatMessageEntity m ()
 getChatMessagesImpl pool chatroomId sinceMessageNumber = do
   (allMessages, userMap) <- liftIO $ withPool pool $ do
-    msgs <- selectList [M.ChatMessageGame ==. chatroomId] [Asc M.ChatMessageCreatedAt]
+    msgs <- selectList [M.ChatMessageChatId ==. chatroomId] [Asc M.ChatMessageCreatedAt]
     let userIds = L.nub [sentBy | Entity _ (M.ChatMessage _ _ sentBy _) <- msgs]
     users <- getMany userIds
     return (msgs, users)

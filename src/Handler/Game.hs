@@ -4,7 +4,7 @@
 module Handler.Game where
 
 import Control.Concurrent
-import Control.Error (lastDef, note)
+import Control.Error (ExceptT (..), lastDef, note, runExceptT)
 import Controllers.Chat.Chatroom (subscribeMessagesLive)
 import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
 import Controllers.Common.CacheableSharedResource (getCacheableResource)
@@ -26,8 +26,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Monoid as M
 import Data.Pool
-import Data.Text (Text)
-import qualified Data.Text.Lazy as TL
+import qualified Data.Text as T
 import Data.Text.Read (decimal, rational)
 import Data.Time
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -51,6 +50,7 @@ import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
 import Model.GameSetup (LocalisedGameSetup(..))
 import Wordify.Rules.Game (Game(..))
+import qualified Data.List.Split.Internals as T
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -218,13 +218,15 @@ sendInitialGameState connection serverGameSnapshot maybeUser = do
 
 handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> IO ()
 handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince = runResourceT $ do
-  (_, eitherServerGame) <- getCacheableResource (games app) gameId
-  (_, eitherChatRoom) <- getCacheableResource (chatRooms app) gameId
+  result <- runExceptT $ do
+    serverGame <- ExceptT $ snd <$> getCacheableResource (games app) gameId
+    chatId     <- liftIO  $ getChatId gameId maybeUser serverGame
+    chatroom   <- ExceptT $ snd <$> getCacheableResource (chatRooms app) chatId
+    pure (serverGame, chatroom)
 
-  case (eitherServerGame, eitherChatRoom) of
-    (Left err, _) -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
-    (_, Left err) -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
-    (Right serverGame, Right chatroom) -> liftIO $ do
+  case result of
+    Left err -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
+    Right (serverGame, chatroom) -> liftIO $ do
       let inactivityTrackerState = inactivityTracker app
       (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
       withTrackWebsocketActivity inactivityTrackerState $ do
@@ -234,6 +236,15 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSin
           let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince
           let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
           race_ handleOutbound handleInbound
+  where
+    getChatId :: Text -> Maybe AuthUser -> ServerGame -> IO Text
+    getChatId gameId (Just user) game = do
+      playerInGame <- flip playerIsInGame user <$> atomically (makeServerGameSnapshot game)
+      if playerInGame then pure gameId else pure (observerChatId gameId)
+    getChatId gameId Nothing _ = pure (observerChatId gameId)
+
+    observerChatId :: Text -> Text
+    observerChatId gId = T.concat [gId, "#ObserverChatroom"]
 
 gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
 gameApp app gameId maybeUser = do

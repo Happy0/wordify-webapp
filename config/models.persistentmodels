@@ -41,7 +41,7 @@ Move
     isHorizontal Bool Maybe
 
 ChatMessage
-    game Text
+    chatId Text
     createdAt UTCTime
     sentBy UserId
     message Text
