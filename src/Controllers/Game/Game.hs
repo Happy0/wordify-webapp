@@ -28,7 +28,9 @@ import Data.Text
 import Data.Time
 import Database.Persist.Sql
 import GHC.IO
-import Model (User)
+import Controllers.User.UserController (UserController)
+import qualified Controllers.User.UserController as UC
+import qualified Controllers.User.Model.ServerUser as SU
 import Repository.DefinitionRepository (DefinitionRepositoryImpl, WordDefinitionItem (WordDefinitionItem), saveGameDefinitionsImpl)
 import Wordify.Rules.FormedWord
 import Wordify.Rules.Game
@@ -106,18 +108,18 @@ persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen p
 withNotifyJoinAndLeave :: Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
 withNotifyJoinAndLeave pool userEventChannels serverGame maybeUser = bracket_ (handlePlayerConnect pool userEventChannels serverGame maybeUser) (handlePlayerDisconnect pool userEventChannels serverGame maybeUser)
 
-performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Pool SqlBackend ->  ResourceCache Text (TChan UserEvent) -> PushController -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
-performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl player (BoardMove placed) =
+performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> PushController -> UserController -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
+performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl _ player (BoardMove placed) =
   handleBoardMove serverGame pool userChannelSubscriptions pushCtrl (player >>= getPlayerNumber serverGame) placed
-performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl player (ExchangeMove exchanged) =
+performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl _ player (ExchangeMove exchanged) =
   handleExchangeMove serverGame pool userChannelSubscriptions pushCtrl (player >>= getPlayerNumber serverGame) exchanged
-performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl player PassMove =
+performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl _ player PassMove =
   handlePassMove serverGame pool userChannelSubscriptions pushCtrl (player >>= getPlayerNumber serverGame)
-performRequest serverGame chatroom _ pool _ _ player (SendChatMessage msg) =
-  handleChatMessage serverGame chatroom pool player msg
-performRequest serverGame _ _ pool userChannelSubscriptions _ player (AskPotentialScore placed) =
+performRequest serverGame chatroom _ _ _ _ userCtrl player (SendChatMessage msg) =
+  handleChatMessage serverGame chatroom userCtrl player msg
+performRequest serverGame _ _ _ _ _ _ player (AskPotentialScore placed) =
   handlePotentialScore serverGame placed
-performRequest serverGame _ gameDefinitionWorker _ userChannelSubscriptions _ player (AskDefinition word) =
+performRequest serverGame _ gameDefinitionWorker _ userChannelSubscriptions _ _ player (AskDefinition word) =
   handleAskDefinition gameDefinitionWorker serverGame (player >>= getPlayerNumber serverGame) word
 
 handleAskDefinition :: GameDefinitionController -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
@@ -271,19 +273,17 @@ handlePassMove sharedServerGame pool userChannelSubscriptions pushCtrl (Just pla
     moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
-handleChatMessage :: ServerGame -> Chatroom -> Pool SqlBackend -> Maybe AuthUser -> Text -> IO ServerResponse
-handleChatMessage _ _ _ Nothing _ = return $ InvalidCommand "Observers cannot chat."
-handleChatMessage serverGame chatroom pool (Just user) messageText =
-  do
-    now <- getCurrentTime
-    gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
-    let serverPlayer = getServerPlayerSnapshot gameSnapshot user
-    let playerName = serverPlayer >>= SP.playerUsername
-    let userId = ident user
-
-    case playerName of
-      Nothing -> return $ InvalidCommand "Internal server error"
-      Just playerName -> sendMessage chatroom (CR.SendMessage userId playerName messageText) >> return ChatSuccess
+handleChatMessage :: ServerGame -> Chatroom -> UserController -> Maybe AuthUser -> Text -> IO ServerResponse
+handleChatMessage _ _ _ Nothing _ = return $ InvalidCommand "Only logged in players can chat."
+handleChatMessage serverGame chatroom userCtrl (Just user) messageText = do
+  gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
+  let userId = ident user
+  displayName <- case getServerPlayerSnapshot gameSnapshot user of
+    Just serverPlayer -> pure $ SP.playerUsername serverPlayer
+    Nothing           -> fmap (>>= SU.username) (UC.getUser userCtrl userId)
+  case displayName of
+    Nothing   -> return $ InvalidCommand "Internal server error"
+    Just name -> sendMessage chatroom (CR.SendMessage userId name messageText) >> return ChatSuccess
 
 defaultPlayerName :: Int -> SP.ServerPlayer -> Text
 defaultPlayerName n player = fromMaybe (pack ("Player " ++ show n)) (SP.playerUsername player)

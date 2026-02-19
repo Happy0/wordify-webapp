@@ -11,7 +11,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useGameStore()
-const { chatMessages } = storeToRefs(store)
+const { chatMessages, isObserver } = storeToRefs(store)
 
 // Sort messages by timestamp so definitions appear in the correct order among chat messages
 const sortedMessages = computed(() => {
@@ -70,7 +70,7 @@ function handleKeyDown(e: KeyboardEvent) {
 
 <template>
   <div class="game-chat bg-white rounded-lg shadow p-4 flex flex-col h-full">
-    <h2 class="text-lg font-semibold text-gray-800 mb-3 flex-shrink-0">Chat</h2>
+    <h2 class="text-lg font-semibold text-gray-800 mb-3 flex-shrink-0">{{ isObserver ? 'Observer Chat' : 'Chat' }}</h2>
 
     <!-- Messages container -->
     <div
@@ -79,7 +79,8 @@ function handleKeyDown(e: KeyboardEvent) {
     >
       <template v-if="sortedMessages.length === 0">
         <p class="text-gray-400 text-sm text-center py-4">
-          No messages yet. Type <code class="bg-gray-100 px-1 rounded">!define word</code> to look up definitions.
+          <template v-if="isObserver">Private observer only chat</template>
+          <template v-else>No messages yet. Type <code class="bg-gray-100 px-1 rounded">!define word</code> to look up definitions.</template>
         </p>
       </template>
 

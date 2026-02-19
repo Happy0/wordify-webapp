@@ -77,7 +77,7 @@ function placeTilesOnBoard(board: BoardSquare[][], placedTiles: PlacedTile[]): v
 
 export const useGameStore = defineStore('game', () => {
   // State
-  const myPlayerNumber = ref<number>(0)
+  const myPlayerNumber = ref<number | null>(null)
   const playerToMove = ref<number>(0)
   const players = ref<PlayerSummary[]>([])
   const moveHistory = ref<MoveSummary[]>([])
@@ -95,9 +95,11 @@ export const useGameStore = defineStore('game', () => {
   const tileValues = ref<TileValueMap | null>(null)
 
   // Getters
+  const isObserver = computed(() => myPlayerNumber.value === null)
+
   const isMyTurn = computed(() => myPlayerNumber.value === playerToMove.value)
 
-  const myPlayer = computed(() => players.value[myPlayerNumber.value])
+  const myPlayer = computed(() => myPlayerNumber.value !== null ? players.value[myPlayerNumber.value] : undefined)
 
   const currentPlayerName = computed(() => {
     const player = players.value[playerToMove.value]
@@ -358,6 +360,7 @@ export const useGameStore = defineStore('game', () => {
     gameId,
 
     // Getters
+    isObserver,
     isMyTurn,
     myPlayer,
     currentPlayerName,
