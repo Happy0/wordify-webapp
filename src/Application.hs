@@ -65,8 +65,11 @@ import qualified Data.Map as M
 import Data.Time.Clock
 import Database.Persist
 import Data.Pool (withResource)
+import Control.Lens ((&), (.~))
 import Database.Persist.Sqlite
-  ( createSqlitePool,
+  ( createSqlitePoolFromInfo,
+    extraPragmas,
+    mkSqliteConnectionInfo,
     runSqlPool,
     sqlDatabase,
     sqlPoolSize,
@@ -171,11 +174,14 @@ makeFoundation appSettings inactivityTracker = do
   let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Push controller forced in tempFoundation") (error "User controller forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
-  -- Create the database connection pool
+  -- Create the database connection pool, setting busy_timeout on every
+  -- connection so that concurrent writers retry instead of failing immediately.
   pool <-
     flip runLoggingT logFunc
-      $ createSqlitePool
-        (sqlDatabase $ appDatabaseConf appSettings)
+      $ createSqlitePoolFromInfo
+        ( mkSqliteConnectionInfo (sqlDatabase $ appDatabaseConf appSettings)
+            & extraPragmas .~ ["PRAGMA busy_timeout = 5000"]
+        )
         (sqlPoolSize $ appDatabaseConf appSettings)
 
   -- Perform database migration with foreign key checks disabled.
