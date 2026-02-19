@@ -30,7 +30,10 @@ ip-from-header: "_env:YESOD_IP_FROM_HEADER:false"
 database:
   # See config/test-settings.yml for an override during tests
   database: "_env:YESOD_SQLITE_DATABASE:wordify-webapp.sqlite3"
-  poolsize: "_env:YESOD_SQLITE_POOLSIZE:10"
+
+  # Just set to 1 to avoid concurrent writers to SQLite issues - in the unlikely event
+  # we outscale this we'd stop using SQLite
+  poolsize: "_env:YESOD_SQLITE_POOLSIZE:1"
 
 copyright: Insert copyright statement here
 #analytics: UA-YOURCODE

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Repository.SQL.Setup (runSetup, runDataMigrations) where
+module Repository.SQL.Setup (runSetup) where
 
 import Control.Monad (when)
 import Data.Text (Text)
@@ -9,15 +9,6 @@ import Database.Persist.Sql (SqlPersistT, Single, rawSql)
 import Control.Monad.IO.Class (MonadIO)
 import ClassyPrelude (not, ($))
 import ClassyPrelude (null)
-
--- | Run data migrations that must execute before 'runMigration migrateAll'.
---   These handle renames and transformations that Persistent cannot infer.
-runDataMigrations :: MonadIO m => SqlPersistT m ()
-runDataMigrations = do
-  -- Rename chat_message.game -> chat_message.chat_id (idempotent).
-  cols <- rawSql "SELECT name FROM pragma_table_info('chat_message') WHERE name = 'game'" []
-  when (not (null (cols :: [Single Text]))) $
-    rawExecute "ALTER TABLE chat_message RENAME COLUMN game TO chat_id" []
 
 -- | Run additional database setup steps (indexes, etc.) that cannot be
 --   expressed in the Persistent models file.
