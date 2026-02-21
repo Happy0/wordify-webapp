@@ -196,17 +196,16 @@ subscribeGameMessages = chanSource
 
 handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> IO ()
 handleBroadcastMessages connection liveGameMessages chatroom since = do
+  -- Subscribing to the channel comes first in case there's a race between doing so and sending the previous messages
   liveChatMessagesChan <- subscribeMessagesLive chatroom
-
   _ <-sendPreviousChatMessages connection chatroom since
-
   forever (sendBroadcastMessages connection liveChatMessagesChan liveGameMessages)
 
 sendBroadcastMessages :: C.Connection -> TChan CR.ChatMessage -> TChan GameMessage -> IO ()
 sendBroadcastMessages connection chatMessageChannel gameMessageChannel = do 
   let nextChatMessage = map toGameMessage (readTChan chatMessageChannel)
   let nextGameMessage = readTChan gameMessageChannel
-  nextMessage <- atomically (nextChatMessage `orElse` nextGameMessage)
+  nextMessage <- atomically ( nextGameMessage `orElse` nextChatMessage)
   let jsonPayload = toJSONResponse nextMessage
   C.sendTextData connection jsonPayload
 
@@ -298,7 +297,6 @@ sendPreviousDefinitions gameDefinitionController gameId since connection =
 
 sendPreviousChatMessages :: C.Connection -> Chatroom -> Maybe Int -> IO ()
 sendPreviousChatMessages connection chatroom chatMessagesSince =
-    runConduit $ getExistingChatMessages chatroom chatMessagesSince
-     .| CL.map toGameMessage
+    runConduit $ getExistingMessages chatroom chatMessagesSince
      .| CL.map toJSONResponse
      .| CL.mapM_ (liftIO . C.sendTextData connection)

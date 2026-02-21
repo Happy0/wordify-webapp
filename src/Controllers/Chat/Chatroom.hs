@@ -10,7 +10,7 @@ module Controllers.Chat.Chatroom
   )
 where
 
-import ClassyPrelude (Exception (fromException), IO, Int, Maybe (Nothing), Monoid (mconcat), Text, UTCTime, const, forever, isJust, isNothing, liftIO, pack, pure, putStrLn, show, unless, ($), (+), (.), (<$>), (<*>), undefined)
+import ClassyPrelude (Exception (fromException), IO, Int, Maybe (Nothing), Monoid (mconcat), Text, UTCTime, const, forever, isJust, isNothing, liftIO, pack, pure, putStrLn, show, unless, ($), (+), (.), (<$>), (<*>))
 import ClassyPrelude.Conduit (Maybe (Just))
 import Control.Concurrent.STM (TChan, atomically, dupTChan, newTChan, readTChan, writeTChan)
 import Control.Error (maybe)
