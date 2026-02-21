@@ -2,10 +2,11 @@ module Controllers.Chat.Chatroom
   ( ChatMessage (ChatMessage),
     Chatroom,
     subscribeMessagesLive,
+    getExistingChatMessages,
     makeChatroom,
     freezeChatroom,
     sendMessage,
-    SendMessage (SendMessage),
+    SendMessage (SendMessage)
   )
 where
 
@@ -50,12 +51,13 @@ sendMessage chatroom message = do
   thawChatroom chatroom
   atomically (writeTChan (sequenceWriteChannel chatroom) message)
 
-subscribeMessagesLive :: Chatroom -> Maybe Int -> C.ConduitT () ChatMessage IO ()
-subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) sinceMessageNumber = do
-  broadcastChannel <- liftIO $ (atomically . dupTChan) subChannel
-  let existingChatMessages = getChatMessages chatroomId sinceMessageNumber
-  let liveMessagesConduit = chanSource broadcastChannel
-  mconcat [existingChatMessages, liveMessagesConduit]
+getExistingChatMessages :: Chatroom -> Maybe Int -> C.ConduitT () ChatMessage IO ()
+getExistingChatMessages (Chatroom chatroomId _ _ _ getChatMessages _ _) =
+  getChatMessages chatroomId
+
+subscribeMessagesLive :: Chatroom -> IO (TChan ChatMessage)
+subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) = do
+  atomically (dupTChan subChannel)
 
 processNextMessage :: Chatroom -> SendMessage -> IO ()
 processNextMessage (Chatroom roomId sequenceWriteChannel broadcastChan persistChatMessage _ countChatMessages _) msg = do
