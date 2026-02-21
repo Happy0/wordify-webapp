@@ -5,7 +5,7 @@ module Handler.Game where
 
 import Control.Concurrent
 import Control.Error (ExceptT (..), lastDef, note, runExceptT)
-import Controllers.Chat.Chatroom (subscribeMessagesLive)
+import Controllers.Chat.Chatroom (subscribeMessagesLive, Chatroom, getExistingChatMessages)
 import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
 import Controllers.Common.CacheableSharedResource (getCacheableResource)
 import qualified Controllers.Definition.DefinitionClient as D
@@ -184,22 +184,31 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
           <div #wordifyround>
       |]
 
-subscribeChatGameMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage IO ()
-subscribeChatGameMessages chatroom since = subscribeMessagesLive chatroom since .| CL.map toGameMessage
-  where
-    toGameMessage :: CR.ChatMessage -> GameMessage
-    toGameMessage (CR.ChatMessage _ displayName chatMessage sentTime messageNumber) =
-      PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime messageNumber)
+getExistingMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage IO ()
+getExistingMessages chatroom since = getExistingChatMessages chatroom since .| CL.map toGameMessage
+  
+toGameMessage :: CR.ChatMessage -> GameMessage
+toGameMessage (CR.ChatMessage _ displayName chatMessage sentTime messageNumber) =
+  PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime messageNumber)
 
 subscribeGameMessages :: TChan GameMessage -> ConduitT () GameMessage IO ()
 subscribeGameMessages = chanSource
 
 handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> IO ()
-handleBroadcastMessages connection serverGame chatroom chatMessagesSince = do
-  let chatMessagesSubscription = subscribeChatGameMessages chatroom chatMessagesSince .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
-  let gameMessagesSubscription = subscribeGameMessages serverGame .| CL.map toJSONResponse .| CL.mapM_ (liftIO . C.sendTextData connection)
+handleBroadcastMessages connection liveGameMessages chatroom since = do
+  liveChatMessagesChan <- subscribeMessagesLive chatroom
 
-  race_ (runConduit chatMessagesSubscription) (runConduit gameMessagesSubscription)
+  _ <-sendPreviousChatMessages connection chatroom since
+
+  forever (sendBroadcastMessages connection liveChatMessagesChan liveGameMessages)
+
+sendBroadcastMessages :: C.Connection -> TChan CR.ChatMessage -> TChan GameMessage -> IO ()
+sendBroadcastMessages connection chatMessageChannel gameMessageChannel = do 
+  let nextChatMessage = map toGameMessage (readTChan chatMessageChannel)
+  let nextGameMessage = readTChan gameMessageChannel
+  nextMessage <- atomically (nextChatMessage `orElse` nextGameMessage)
+  let jsonPayload = toJSONResponse nextMessage
+  C.sendTextData connection jsonPayload
 
 handleInboundSocketMessages :: App -> C.Connection -> CR.Chatroom -> ServerGame -> Maybe AuthUser -> IO ()
 handleInboundSocketMessages app connection chatroom serverGame maybeUser = forever
@@ -286,3 +295,10 @@ sendPreviousDefinitions gameDefinitionController gameId since connection =
     makeDefinition :: WordDefinitionItem -> D.Definition
     makeDefinition (WordDefinitionItem partOfSpeech definition example) =
       D.Definition partOfSpeech definition example
+
+sendPreviousChatMessages :: C.Connection -> Chatroom -> Maybe Int -> IO ()
+sendPreviousChatMessages connection chatroom chatMessagesSince =
+    runConduit $ getExistingChatMessages chatroom chatMessagesSince
+     .| CL.map toGameMessage
+     .| CL.map toJSONResponse
+     .| CL.mapM_ (liftIO . C.sendTextData connection)
