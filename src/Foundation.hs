@@ -16,7 +16,7 @@ import Auth0 (auth0Provider)
 import Control.Monad.Logger (LogSource)
 import Controllers.Chat.Chatroom
 import Controllers.Common.CacheableSharedResource
-import Controllers.Definition.DefinitionService (DefinitionServiceImpl)
+
 import Controllers.Game.GameDefinitionController (GameDefinitionController)
 import Controllers.Push.PushController (PushController)
 import Controllers.Game.Model.ServerGame

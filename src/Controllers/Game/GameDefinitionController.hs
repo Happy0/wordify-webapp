@@ -5,7 +5,8 @@ import Conduit (ConduitT)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (TQueue, atomically, newTQueue, readTQueue)
 import Control.Monad (forever)
-import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, getDefinitionsImpl)
+import Controllers.Definition.DefinitionClient (Definition (Definition))
+import Controllers.Definition.DefinitionService (DefinitionService, getDefinition)
 import Data.Text (Text)
 import Repository.DefinitionRepository (DefinitionRepository (getDefinitions), DefinitionRepositoryImpl, GameWordItem, WordDefinitionItem (WordDefinitionItem), countGameWordDefinitionsImpl, getGameDefinitionsImpl, saveGameDefinitionsImpl)
 import Util.Exception (printAndIgnoreSyncException)
@@ -16,13 +17,13 @@ data DefinitionResponse = DefinitionResponse Text UTCTime [Definition] Int
 data GameDefinitionWorkItem = GameDefinitionWorkItem {gameId :: Text, word :: Text, definitions :: Either Text [Definition], withStoredResult :: DefinitionResponse -> IO ()}
 
 data GameDefinitionController = GameDefinitionController
-  { definitionService :: DefinitionServiceImpl,
+  { definitionService :: DefinitionService,
     definitionRepository :: DefinitionRepositoryImpl,
     workQueue :: TQueue GameDefinitionWorkItem,
     defintionWorker :: WorkerThread
   }
 
-makeGameDefinitionController :: DefinitionServiceImpl -> DefinitionRepositoryImpl -> IO GameDefinitionController
+makeGameDefinitionController :: DefinitionService -> DefinitionRepositoryImpl -> IO GameDefinitionController
 makeGameDefinitionController definitionService definitionRepository = do
   queue <- atomically newTQueue
   workerThread <- atomically newUnstartedWorkerThread
@@ -57,7 +58,7 @@ storeGameDefinitions worker@(GameDefinitionController definitionService _ workQu
   startIfNotStarted definitionWorker (definitionWorkerLoop worker)
 
   void $ forkIO $ do
-    defs <- getDefinitionsImpl definitionService word languageShortCode
+    defs <- getDefinition definitionService word languageShortCode
     atomically (writeTQueue workQueue (GameDefinitionWorkItem gameId word defs withStoredResultAsync))
 
 getStoredDefinitions :: GameDefinitionController -> Text -> ConduitT () GameWordItem IO ()

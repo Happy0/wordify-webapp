@@ -1,14 +1,14 @@
-module Controllers.Definition.RaeApiService (RaeApiService, makeRaeApiService) where
+module Controllers.Definition.Clients.RaeApiClient (RaeApiClient, makeRaeApiClient) where
 
 import ClassyPrelude (Bool (..), Either (Left, Right), IO, Maybe (..), Show, SomeException, concatMap, fmap, maybe, mempty, pure, try, ($))
-import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionService (getDefinitions))
+import Controllers.Definition.DefinitionClient (Definition (Definition), DefinitionClient (getDefinitions, supportedLocales))
 import Data.Aeson
 import qualified Data.Text as T
 import Network.HTTP.Req
 
--- | Service for looking up Spanish definitions from the Real Academia Española
+-- | Client for looking up Spanish definitions from the Real Academia Española
 -- (RAE) via the unofficial rae-api.com API.
-data RaeApiService = RaeApiService {apiKey :: Maybe T.Text}
+data RaeApiClient = RaeApiClient {apiKey :: Maybe T.Text}
 
 -- Internal response types
 
@@ -56,16 +56,17 @@ instance FromJSON RaeWordEntryResponse where
     dat <- obj .:? "data"
     pure $ RaeWordEntryResponse ok dat
 
-instance DefinitionService RaeApiService where
-  getDefinitions service word "es" = raeGetDefinitionsImpl service word
+instance DefinitionClient RaeApiClient where
+  getDefinitions client word "es" = raeGetDefinitionsImpl client word
   getDefinitions _ _ _ = pure (Right [])
+  supportedLocales _ = ["es"]
 
-makeRaeApiService :: Maybe T.Text -> RaeApiService
-makeRaeApiService = RaeApiService
+makeRaeApiClient :: Maybe T.Text -> RaeApiClient
+makeRaeApiClient = RaeApiClient
 
-raeGetDefinitionsImpl :: RaeApiService -> T.Text -> IO (Either T.Text [Definition])
-raeGetDefinitionsImpl service word = do
-  requestResult <- try (doRequest service word) :: IO (Either SomeException (Either T.Text RaeWordEntryResponse))
+raeGetDefinitionsImpl :: RaeApiClient -> T.Text -> IO (Either T.Text [Definition])
+raeGetDefinitionsImpl client word = do
+  requestResult <- try (doRequest client word) :: IO (Either SomeException (Either T.Text RaeWordEntryResponse))
   case requestResult of
     Right result -> pure (fmap responseToDefinitions result)
     Left _ -> pure (Left "Error while fetching definition")
@@ -85,9 +86,9 @@ senseToDefinitions :: RaeSense -> [Definition]
 senseToDefinitions (RaeSense (Just category) (Just desc)) = [Definition category desc Nothing]
 senseToDefinitions _ = []
 
-doRequest :: RaeApiService -> T.Text -> IO (Either T.Text RaeWordEntryResponse)
-doRequest service word = runReq noCheckConfig $ do
-  let queryParams = maybe mempty ("api_key" =:) (apiKey service)
+doRequest :: RaeApiClient -> T.Text -> IO (Either T.Text RaeWordEntryResponse)
+doRequest client word = runReq noCheckConfig $ do
+  let queryParams = maybe mempty ("api_key" =:) (apiKey client)
   r <- req GET (https "rae-api.com" /: "api" /: "words" /: word) NoReqBody jsonResponse queryParams
   let body = responseBody r :: Value
   let statusCode = responseStatusCode r

@@ -37,8 +37,9 @@ import Control.Monad.Trans.Except
 import Controllers.Chat.Chat (getChat)
 import Controllers.Chat.Chatroom (Chatroom, freezeChatroom)
 import Controllers.Common.CacheableSharedResource
-import Controllers.Definition.DefinitionService (DefinitionServiceImpl, toDefinitionServiceImpl)
-import Controllers.Definition.FreeDictionaryService (FreeDictionaryService (FreeDictionaryService))
+import Controllers.Definition.DefinitionService (makeDefinitionService, anyDefinitionClient)
+import Controllers.Definition.Clients.RaeApiClient (makeRaeApiClient)
+import Controllers.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
 import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
 import Controllers.Push.PushController (makePushController)
 import Web.WebPush (generateVAPIDKeys, readVAPIDKeys, vapidPublicKeyBytes, VAPIDKeys, VAPIDKeysMinDetails(..))
@@ -125,7 +126,7 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Extra.SpanishExtraRule (spanishGameExtraRules)
 import qualified Prelude as P
 import Model.GameSetup (LocalisedGameSetup (GameSetup), TileValues)
-import Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService)
+import Controllers.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient)
 import Wordify.Rules.Tile (tileValue)
 import qualified Data.Text as T
 import Controllers.Game.Model.UserEventSubscription
@@ -204,7 +205,7 @@ makeFoundation appSettings inactivityTracker = do
 
   userEventChannels <- makeGlobalResourceCache (\_ -> fmap Right newUserEventSubcriptionChannel) Nothing
 
-  let definitionService = toDefinitionServiceImpl makeWiktionaryService
+  let definitionService = makeDefinitionService [anyDefinitionClient makeWiktionaryClient, anyDefinitionClient (makeRaeApiClient Nothing)]
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
-module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktionaryService) where
+module Controllers.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient) where
     import qualified Data.Text as T
-    import Controllers.Definition.DefinitionService (DefinitionService (getDefinitions), getDefinitionsImpl, Definition(Definition))
+    import Controllers.Definition.DefinitionClient (DefinitionClient (getDefinitions, supportedLocales), Definition(Definition))
     import ClassyPrelude (IO, undefined, Maybe, ($), pure, (<$>), traverse, SomeException, (.), not, (==), (++), Bool, Bool(False), lift, rights, head, Int, join, const, mapMaybe, mapM_, print)
     import Data.Either (Either (..))
     import qualified Data.Map as M
@@ -19,7 +19,7 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     import Text.HTML.TagSoup.Match (tagOpen)
     import qualified Control.Arrow as A
 
-    data WiktionaryService = WiktionaryService
+    data WiktionaryClient = WiktionaryClient
 
     data WiktionaryDefinitionEntry = WiktionaryDefinitionEntry { definition :: T.Text, examples :: Maybe [T.Text] }
     data WiktionaryDefinition = WiktionaryDefinition {partOfSpeech :: T.Text, language :: T.Text, definitions :: [WiktionaryDefinitionEntry] }
@@ -43,9 +43,10 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
     instance FromJSON WiktionaryDefinitionResponse where
         parseJSON obj = WiktionaryDefinitionResponse <$> parseJSON obj
 
-    instance DefinitionService WiktionaryService where
-        getDefinitions :: WiktionaryService -> T.Text -> T.Text -> IO (Either T.Text [Definition])
+    instance DefinitionClient WiktionaryClient where
+        getDefinitions :: WiktionaryClient -> T.Text -> T.Text -> IO (Either T.Text [Definition])
         getDefinitions = wiktionaryGetDefinitionsImpl
+        supportedLocales _ = ["en"]
 
     stripHtml :: T.Text -> Either T.Text T.Text
     stripHtml word = do
@@ -155,7 +156,7 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
         where
             avoidAccidentallyDOSingWiktionaryDepth = 0
 
-    wiktionaryGetDefinitionsImpl :: WiktionaryService ->  T.Text -> T.Text -> IO (Either T.Text [Definition])
+    wiktionaryGetDefinitionsImpl :: WiktionaryClient ->  T.Text -> T.Text -> IO (Either T.Text [Definition])
     wiktionaryGetDefinitionsImpl _ word localeShortcode = runExceptT $ getDefinitionsWithLinkFollowingDepth word localeShortcode linkFollowingDepth
         where
             linkFollowingDepth = 1
@@ -175,5 +176,5 @@ module Controllers.Definition.WiktionaryService (WiktionaryService, makeWiktiona
                     Error err -> pure $ Left (T.pack err)
             _ -> pure $ Left (T.pack "Error while fetching definition")
 
-    makeWiktionaryService :: WiktionaryService
-    makeWiktionaryService = WiktionaryService
+    makeWiktionaryClient :: WiktionaryClient
+    makeWiktionaryClient = WiktionaryClient

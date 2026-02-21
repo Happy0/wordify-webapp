@@ -23,7 +23,7 @@ module Controllers.Game.Api
 where
 
 import Control.Applicative
-import Controllers.Definition.DefinitionService (Definition (Definition))
+import Controllers.Definition.DefinitionClient (Definition (Definition))
 import Controllers.Game.GameMessage (ChatMessage (ChatMessage), GameMessage (..), MoveSummary (..))
 import Controllers.Game.Model.ServerGame (ServerGame, ServerGameSnapshot (gameState, snapshotPlayers), getSnapshotPlayerNumber)
 import Controllers.Game.Model.ServerPlayer

@@ -12,7 +12,7 @@ import Control.Monad
 import Control.Monad.STM
 import Controllers.Chat.Chatroom
 import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom, SendMessage (SendMessage), sendMessage)
-import Controllers.Definition.DefinitionService (Definition (Definition), DefinitionServiceImpl, withDefinitionsAsync)
+import Controllers.Definition.DefinitionClient (Definition (Definition))
 import Controllers.Game.Api
 import Controllers.Game.GameDefinitionController (DefinitionResponse (..), GameDefinitionController, storeGameDefinitions)
 import Controllers.Game.Model.ServerGame

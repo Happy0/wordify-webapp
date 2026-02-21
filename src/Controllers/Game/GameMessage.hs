@@ -5,7 +5,7 @@ module Controllers.Game.GameMessage
   )
 where
 
-import Controllers.Definition.DefinitionService (Definition)
+import Controllers.Definition.DefinitionClient (Definition)
 import Data.Maybe (Maybe)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
