@@ -89,3 +89,14 @@ PushNotificationSubscription
     expirationTime UTCTime Maybe
     baseHostName Text default='http://127.0.0.1:4000'
     Primary endpoint
+
+Notification
+    userId UserId
+    createdAt UTCTime
+    readAt UTCTime Maybe
+    notificationType Text
+
+InviteNotification
+    notificationId NotificationId
+    lobbyId LobbyId
+    invitedBy UserId

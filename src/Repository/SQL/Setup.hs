@@ -20,12 +20,27 @@ runSetup = do
     "CREATE UNIQUE INDEX IF NOT EXISTS unique_username_nocase ON \"user\"(username COLLATE NOCASE)"
     []
 
-  -- Drop the old game-named index if it exists (left over from before the column rename).
-  rawExecute
-    "DROP INDEX IF EXISTS idx_chat_message_game_created_at"
-    []
-
   -- Index on chat_message for efficient lookup by chatId and ordering by creation time.
   rawExecute
     "CREATE INDEX IF NOT EXISTS idx_chat_message_chat_id_created_at ON chat_message(chat_id, created_at)"
+    []
+
+  -- Index on move for efficient lookup by game ID.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_move_game ON move(game)"
+    []
+
+  -- Index on player for efficient lookup by game ID.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_player_game_id ON player(game_id)"
+    []
+
+  -- Index on lobby_player for efficient lookup by game.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_lobby_player_game ON lobby_player(game)"
+    []
+
+  -- Index on game_definition for efficient lookup by game ID.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_game_definition_game_id ON game_definition(game_id)"
     []
