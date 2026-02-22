@@ -25,11 +25,6 @@ runSetup = do
     "CREATE INDEX IF NOT EXISTS idx_chat_message_chat_id_created_at ON chat_message(chat_id, created_at)"
     []
 
-  -- Index on move for efficient lookup by game ID.
-  rawExecute
-    "CREATE INDEX IF NOT EXISTS idx_move_game ON move(game)"
-    []
-
   -- Index on player for efficient lookup by game ID.
   rawExecute
     "CREATE INDEX IF NOT EXISTS idx_player_game_id ON player(game_id)"

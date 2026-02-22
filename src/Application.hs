@@ -113,6 +113,7 @@ import Repository.ChatRepository
 import Repository.DefinitionRepository (toDefinitionRepositoryImpl)
 import Repository.SQL.SqlChatRepository
 import Repository.SQL.SqlDefinitionRepository (DefinitionRepositorySQLBackend (DefinitionRepositorySQLBackend))
+import Repository.SQL.Migrations (runMigrations)
 import Repository.SQL.Setup (runSetup)
 import System.Environment
 import System.Log.FastLogger
@@ -181,14 +182,16 @@ makeFoundation appSettings inactivityTracker = do
     flip runLoggingT logFunc
       $ createSqlitePoolFromInfo
         ( mkSqliteConnectionInfo (sqlDatabase $ appDatabaseConf appSettings)
-            & extraPragmas .~ ["PRAGMA busy_timeout = 5000"]
+            & extraPragmas .~ ["PRAGMA busy_timeout = 5000", "PRAGMA foreign_keys = ON"]
         )
         (sqlPoolSize $ appDatabaseConf appSettings)
 
-  -- Perform database migration with foreign key checks disabled.
-  -- We use withResource to get a raw connection and avoid runSqlPool's
-  -- transaction wrapper, because SQLite's PRAGMA foreign_keys cannot be
-  -- changed inside a transaction.
+  -- Run manual migrations before Persistent's migrateAll. These handle
+  -- schema changes (e.g. primary key restructuring) that migrateAll cannot
+  -- express, and must see a consistent database state to copy data safely.
+  runLoggingT (runSqlPool runMigrations pool) logFunc
+
+  -- Perform automatic schema migration.
   runLoggingT (runSqlPool (runMigration migrateAll) pool) logFunc
 
   -- Run additional database setup (indexes, etc.)

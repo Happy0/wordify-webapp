@@ -33,12 +33,13 @@ Game
     Primary gameId
 
 Move
-    game Text
+    game GameId
     moveNumber Int
     tiles Text Maybe
     startX Int Maybe
     startY Int Maybe
     isHorizontal Bool Maybe
+    Primary game moveNumber
 
 ChatMessage
     chatId Text

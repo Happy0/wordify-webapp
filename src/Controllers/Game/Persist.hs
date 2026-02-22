@@ -116,7 +116,7 @@ getGame pool userCtrl localisedGameSetups gameId = do
       Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
       Just gameModel -> do
         players <- selectList [M.PlayerGameId ==. gameId] []
-        moves <- selectList [M.MoveGame ==. gameId] []
+        moves <- selectList [M.MoveGame ==. M.GameKey gameId] []
         return $ Right (gameModel, players, L.map entityVal moves)
 
   case dbEntries of
@@ -257,7 +257,7 @@ persistBoardMove :: Pool SqlBackend -> T.Text -> Game -> [(Pos, Tile)] -> IO ()
 persistBoardMove pool gameId gameState placed = do
   let move =
         M.Move
-          gameId
+          (M.GameKey gameId)
           moveNumber
           (Just $ tilesToDbRepresentation (L.map snd placedSorted))
           (Just $ xPos min)
@@ -274,13 +274,13 @@ persistBoardMove pool gameId gameState placed = do
 
 persistPassMove :: Pool SqlBackend -> T.Text -> Game -> IO ()
 persistPassMove pool gameId gameState = do
-  persistMoveUpdate pool gameId gameState (M.Move gameId moveNumber Nothing Nothing Nothing Nothing)
+  persistMoveUpdate pool gameId gameState (M.Move (M.GameKey gameId) moveNumber Nothing Nothing Nothing Nothing)
   where
     moveNumber = L.length (movesMade gameState)
 
 persistExchangeMove :: Pool SqlBackend -> T.Text -> Game -> [Tile] -> IO ()
 persistExchangeMove pool gameId gameState tiles = do
-  persistMoveUpdate pool gameId gameState (M.Move gameId moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing)
+  persistMoveUpdate pool gameId gameState (M.Move (M.GameKey gameId) moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing)
   where
     moveNumber = L.length (movesMade gameState)
 
