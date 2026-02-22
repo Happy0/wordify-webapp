@@ -43,11 +43,15 @@ migrateMovePrimaryKey = do
       <> ")"
       )
       []
+    -- Copy one row per (game, move_number) pair, keeping the earliest insert
+    -- (MIN(id)) to discard any duplicates that were created without a unique
+    -- constraint in the old schema.
     rawExecute
       (  "INSERT INTO move_migration_temp"
       <> " (game, move_number, tiles, start_x, start_y, is_horizontal)"
       <> " SELECT game, move_number, tiles, start_x, start_y, is_horizontal"
       <> " FROM move"
+      <> " WHERE id IN (SELECT MIN(id) FROM move GROUP BY game, move_number)"
       )
       []
     rawExecute "DROP TABLE move" []
