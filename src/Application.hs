@@ -41,7 +41,7 @@ import Controllers.Definition.DefinitionService (makeDefinitionService, anyDefin
 import Controllers.Definition.Clients.RaeApiClient (makeRaeApiClient)
 import Controllers.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
 import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
-import Controllers.Push.PushController (makePushController)
+import Modules.Notifications.Api (makeNotificationService)
 import Web.WebPush (generateVAPIDKeys, readVAPIDKeys, vapidPublicKeyBytes, VAPIDKeys, VAPIDKeysMinDetails(..))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
@@ -53,6 +53,7 @@ import qualified Data.ByteString.Base64.URL as B64URL
 import qualified Data.Text.Encoding as TE
 import Repository.PushNotificationRepository (toPushNotificationRepositoryImpl)
 import Repository.SQL.SqlPushNotificationRepository (SqlPushNotificationRepositoryBackend (SqlPushNotificationRepositoryBackend))
+import Repository.SQL.SqlNotificationRepository (SqlNotificationRepositoryBackend (SqlNotificationRepositoryBackend))
 import Repository.UserRepository (toUserRepositoryImpl)
 import Repository.SQL.SqlUserRepository (SqlUserRepositoryBackend (SqlUserRepositoryBackend))
 import Controllers.User.UserController (makeUserController, UserController)
@@ -83,6 +84,7 @@ import Handler.GameLobby
 import Handler.Home
 import Handler.Login
 import Handler.Me
+import Handler.Notifications
 import Handler.Push
 import Handler.Username
 import Import
@@ -130,7 +132,7 @@ import Model.GameSetup (LocalisedGameSetup (GameSetup), TileValues)
 import Controllers.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient)
 import Wordify.Rules.Tile (tileValue)
 import qualified Data.Text as T
-import Controllers.Game.Model.UserEventSubscription
+import Modules.UserEvent.Api (makeUserEventService)
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -166,14 +168,14 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventChannels pushController userController = App {..}
+  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventService notificationService userController = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Push controller forced in tempFoundation") (error "User controller forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Notification service forced in tempFoundation") (error "User controller forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool, setting busy_timeout on every
@@ -206,17 +208,18 @@ makeFoundation appSettings inactivityTracker = do
   games <- makeGlobalResourceCache (getGame pool userCtrl localisedGameSetups) Nothing
   gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing
 
-  userEventChannels <- makeGlobalResourceCache (\_ -> fmap Right newUserEventSubcriptionChannel) Nothing
+  userEventService <- makeUserEventService
 
   let definitionService = makeDefinitionService [anyDefinitionClient makeWiktionaryClient, anyDefinitionClient (makeRaeApiClient Nothing)]
   let definitionRepository = toDefinitionRepositoryImpl (DefinitionRepositorySQLBackend pool)
   gameDefinitionController <- makeGameDefinitionController definitionService definitionRepository
 
   let pushNotificationRepository = toPushNotificationRepositoryImpl (SqlPushNotificationRepositoryBackend pool)
-  pushCtrl <- makePushController pushNotificationRepository maybeVapidKeys appHttpManager
+  let notificationRepository = SqlNotificationRepositoryBackend pool
+  notifSvc <- makeNotificationService notificationRepository pushNotificationRepository maybeVapidKeys appHttpManager
 
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventChannels pushCtrl userCtrl
+  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventService notifSvc userCtrl
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =

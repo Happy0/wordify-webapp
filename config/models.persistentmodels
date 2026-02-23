@@ -95,6 +95,7 @@ Notification
     userId UserId
     createdAt UTCTime
     readAt UTCTime Maybe
+    expiresAt UTCTime Maybe
     notificationType Text
 
 InviteNotification

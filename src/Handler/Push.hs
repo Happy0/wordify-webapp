@@ -1,11 +1,12 @@
 module Handler.Push where
     import ClassyPrelude (Maybe(..), pure, ($), liftIO, (<>), lookup)
-    import Foundation (Handler, App (pushController), requireUsername, AuthenticatedUser(..))
+    import Foundation (Handler, App (notificationService), requireUsername, AuthenticatedUser(..))
     import Data.Aeson (FromJSON, (.:))
     import Data.Aeson.Types (FromJSON(parseJSON))
     import Data.Aeson (withObject)
     import ClassyPrelude.Yesod (requireCheckJsonBody, getYesod)
-    import Controllers.Push.PushController (PushTokenSubscription(..), subscribe)
+    import Controllers.Push.PushController (subscribe)
+    import Modules.Notifications.Api (PushTokenSubscription(..), pushNotificationRepository)
     import Yesod.Core (waiRequest)
     import Network.Wai (requestHeaders, isSecure)
     import Data.Text.Encoding (decodeUtf8)
@@ -39,4 +40,4 @@ module Handler.Push where
                 Nothing      -> if isSecure req then "https" else "http"
             baseUrl = scheme <> "://" <> hostHeader
 
-        liftIO $ subscribe (pushController app) uid baseUrl subscription
+        liftIO $ subscribe (pushNotificationRepository (notificationService app)) uid baseUrl subscription

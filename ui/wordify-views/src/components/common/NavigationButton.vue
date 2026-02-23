@@ -83,7 +83,7 @@ onUnmounted(onUnmountedHandler)
   <div
     class="nav-fab-container z-40"
     :class="{
-      'fixed bottom-4 left-4': isFixed,
+      'fixed top-4 left-4': isFixed,
       'relative': isInline
     }"
   >
@@ -91,21 +91,13 @@ onUnmounted(onUnmountedHandler)
     <Transition name="fab-menu">
       <div
         v-if="isExpanded"
-        class="absolute left-0 flex flex-col gap-2"
-        :class="{
-          'bottom-14 mb-2': isFixed,
-          'top-12 mt-2': isInline
-        }"
+        class="absolute left-0 top-14 mt-2 flex flex-col gap-2"
       >
         <TransitionGroup name="fab-item">
           <div
             v-for="(item, index) in navItems"
             :key="item.route"
-            class="flex items-center gap-2"
-            :class="{
-              'origin-bottom-left': isFixed,
-              'origin-top-left': isInline
-            }"
+            class="flex items-center gap-2 origin-top-left"
             :style="{ transitionDelay: `${index * 50}ms` }"
           >
             <Button

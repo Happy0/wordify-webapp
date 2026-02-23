@@ -7,21 +7,26 @@ import 'primeicons/primeicons.css'
 import '../style.css'
 import AppComponent from '../App.vue'
 import { useGameStore } from '../stores/gameStore'
+import { useNotificationStore } from '../stores/notificationStore'
 import { useGameController } from '../composables/useGameController'
 import type { GameState } from '../types/game'
 import type { ConnectionState, IGameCommandSender } from '../services/interfaces'
+import type { NotificationItem } from '../types/notifications'
+
 export interface RoundOptions {
   initialState: GameState
   websocketUrl?: string
   gameId?: string
   isLoggedIn?: boolean
   vapidPublicKey?: string | null
+  notifications?: NotificationItem[]
 }
 
 export interface RoundInstance {
   app: App
   unmount: () => void
   updateState: (state: GameState) => void
+  updateNotifications: (notifications: NotificationItem[]) => void
   controller: IGameCommandSender
   connectionState: Ref<ConnectionState>
   connect: (url: string) => void
@@ -62,9 +67,13 @@ export function createRound(
 
   app.mount(element)
 
-  // Initialize the store with the provided state
+  // Initialize the game store with the provided state
   const store = useGameStore()
   store.initializeGame(opts.initialState)
+
+  // Seed the notification store with any initial notifications
+  const notifStore = useNotificationStore()
+  notifStore.updateNotifications(opts.notifications ?? [])
 
   // Set the game ID if provided (used for localStorage scoping)
   if (opts.gameId) {
@@ -86,6 +95,7 @@ export function createRound(
       app.unmount()
     },
     updateState: (state: GameState) => store.initializeGame(state),
+    updateNotifications: (notifications: NotificationItem[]) => notifStore.updateNotifications(notifications),
     controller,
     connectionState,
     connect,

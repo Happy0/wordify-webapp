@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import NavigationButton from '@/components/common/NavigationButton.vue'
+import NotificationMenu from '@/components/common/NotificationMenu.vue'
 import MiniBoard from '@/components/home/MiniBoard.vue'
 import { useHomeWebSocket } from '@/composables/useHomeWebSocket'
 import type { GameSummary } from '@/lib/home'
@@ -67,6 +68,7 @@ function navigateToLogin() {
   <div class="home-view min-h-dvh bg-stone-100 flex flex-col">
     <Toast />
     <NavigationButton :is-logged-in="isLoggedIn" />
+    <NotificationMenu :is-logged-in="isLoggedIn" />
 
     <div class="flex-1 flex items-center justify-center p-4">
       <!-- Logged in with games -->

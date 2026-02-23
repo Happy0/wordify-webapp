@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import NavigationButton from '@/components/common/NavigationButton.vue'
+import NotificationMenu from '@/components/common/NotificationMenu.vue'
 
 const props = defineProps<{
   gameLobbyId: string
@@ -128,6 +129,7 @@ onUnmounted(() => {
 <template>
   <div class="game-lobby-view min-h-dvh bg-stone-100 flex flex-col">
     <NavigationButton :is-logged-in="isLoggedIn" />
+    <NotificationMenu :is-logged-in="isLoggedIn" />
 
     <div class="flex-1 flex items-center justify-center p-4">
       <Card class="w-full max-w-md">

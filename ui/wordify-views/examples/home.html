@@ -113,6 +113,43 @@
       }
     ];
 
+    // Sample notifications: two unread + one read, so the highlight difference is visible
+    const sampleNotifications = [
+      {
+        notificationId: '1',
+        notificationCreatedAt: Date.now() - 10 * 60000, // 10 minutes ago
+        notificationReadAt: undefined, // unread — bold text, blue border, blue dot
+        notificationDetails: {
+          type: 'gameInvite',
+          inviteFromUser: 'Charlie',
+          gameLobbyId: 'lobby-xyz-789'
+        },
+        url: '/games/lobby-xyz-789/invite'
+      },
+      {
+        notificationId: '2',
+        notificationCreatedAt: Date.now() - 45 * 60000, // 45 minutes ago
+        notificationReadAt: undefined, // unread
+        notificationDetails: {
+          type: 'gameInvite',
+          inviteFromUser: 'Diana',
+          gameLobbyId: 'lobby-uvw-321'
+        },
+        url: '/games/lobby-uvw-321/invite'
+      },
+      {
+        notificationId: '3',
+        notificationCreatedAt: Date.now() - 8 * 3600000, // 8 hours ago
+        notificationReadAt: Date.now() - 7 * 3600000, // read 7 hours ago — dimmed, no border
+        notificationDetails: {
+          type: 'gameInvite',
+          inviteFromUser: 'Eve',
+          gameLobbyId: 'lobby-rst-654'
+        },
+        url: '/games/lobby-rst-654/invite'
+      }
+    ];
+
     // Mount the Home view
     // Try different configurations by uncommenting the desired options:
 
@@ -120,6 +157,7 @@
     const home = Wordify.createHome('#app', {
       games: sampleGames,
       isLoggedIn: true,
+      notifications: sampleNotifications,
       tileValues: tileValues
     });
 

@@ -39,3 +39,13 @@ runSetup = do
   rawExecute
     "CREATE INDEX IF NOT EXISTS idx_game_definition_game_id ON game_definition(game_id)"
     []
+
+  -- Composite index on notification for efficient lookup by user and ordering by creation time.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_notification_user_id_created_at ON notification(user_id, created_at)"
+    []
+
+  -- Index on notification for efficient querying of notifications expiring before a given date.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_notification_expires_at ON notification(expires_at)"
+    []

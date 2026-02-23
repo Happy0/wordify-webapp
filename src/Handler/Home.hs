@@ -14,6 +14,7 @@ import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
 import Yesod.WebSockets
 import Network.WebSockets (Connection, sendTextData)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
+import Modules.UserEvent.Api (UserEventService, subscribeToUserChannel)
 import Controllers.Common.CacheableSharedResource
 import Control.Monad.Loops (iterateM_)
 import qualified Network.WebSockets.Connection as C
@@ -141,18 +142,16 @@ homeWebsocketHandler :: App -> Text -> WebSocketsT Handler ()
 homeWebsocketHandler app userIdent = do
   connection <- ask
   let gameRepository = GameRepositorySQLBackend (appConnPool app) (localisedGameSetups app)
-  let userChannels = userEventChannels app
+  let userEventSvc = userEventService app
   let gamesCache = games app
-  liftIO $ handleHomeWebsocket gameRepository gamesCache connection userIdent userChannels
+  liftIO $ handleHomeWebsocket gameRepository gamesCache connection userIdent userEventSvc
 
-handleHomeWebsocket :: (GameRepository a) => a -> ResourceCache Text ServerGame -> Connection -> Text -> ResourceCache Text (TChan UserEvent) -> IO ()
-handleHomeWebsocket gameRepository gamesCache connection userIdent userEventBroadcastChannels = runResourceT $ do
-    (_, userBroadcastChannel) <- getCacheableResource userEventBroadcastChannels userIdent
+handleHomeWebsocket :: (GameRepository a) => a -> ResourceCache Text ServerGame -> Connection -> Text -> UserEventService -> IO ()
+handleHomeWebsocket gameRepository gamesCache connection userIdent userEventSvc = runResourceT $ do
+    (_, userBroadcastChannel) <- subscribeToUserChannel userEventSvc userIdent
     case userBroadcastChannel of
       Left _ -> return ()
-      Right channel -> do
-        -- Important that we duplicate the channel first so that we don't miss any game updates after fetching from the database
-        channelSubscription <- atomically (dupTChan channel)
+      Right channelSubscription -> do
         activeGames <- liftIO $ getActiveUserGames gameRepository userIdent
         activeSummaryMap <- liftIO $ buildActiveGameSummaryMap gamesCache activeGames
         _ <- liftIO (sendGameSummaryState connection activeSummaryMap)

@@ -5,6 +5,8 @@ import Aura from '@primeuix/themes/aura'
 import 'primeicons/primeicons.css'
 import '../style.css'
 import CreateGameView from '../views/CreateGameView.vue'
+import { useNotificationStore } from '../stores/notificationStore'
+import type { NotificationItem } from '../types/notifications'
 
 export interface CreateGameOptions {
   /**
@@ -19,11 +21,17 @@ export interface CreateGameOptions {
    * Controls the Login/Logout option in navigation
    */
   isLoggedIn?: boolean
+
+  /**
+   * Array of notifications to display in the notification bell menu
+   */
+  notifications?: NotificationItem[]
 }
 
 export interface CreateGameInstance {
   app: App
   unmount: () => void
+  updateNotifications: (notifications: NotificationItem[]) => void
 }
 
 export function createCreateGame(
@@ -51,10 +59,15 @@ export function createCreateGame(
 
   app.mount(element)
 
+  // Seed the notification store with any initial notifications
+  const notifStore = useNotificationStore()
+  notifStore.updateNotifications(options.notifications ?? [])
+
   return {
     app,
     unmount: () => {
       app.unmount()
-    }
+    },
+    updateNotifications: (notifications: NotificationItem[]) => notifStore.updateNotifications(notifications)
   }
 }

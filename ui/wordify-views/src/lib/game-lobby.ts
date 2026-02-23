@@ -5,6 +5,8 @@ import Aura from '@primeuix/themes/aura'
 import 'primeicons/primeicons.css'
 import '../style.css'
 import GameLobbyView from '../views/GameLobbyView.vue'
+import { useNotificationStore } from '../stores/notificationStore'
+import type { NotificationItem } from '../types/notifications'
 
 export interface GameLobbyOptions {
   /**
@@ -38,11 +40,17 @@ export interface GameLobbyOptions {
    * The language the game is set up with
    */
   language: string
+
+  /**
+   * Array of notifications to display in the notification bell menu
+   */
+  notifications?: NotificationItem[]
 }
 
 export interface GameLobbyInstance {
   app: App
   unmount: () => void
+  updateNotifications: (notifications: NotificationItem[]) => void
 }
 
 export function createGameLobby(
@@ -74,10 +82,15 @@ export function createGameLobby(
 
   app.mount(element)
 
+  // Seed the notification store with any initial notifications
+  const notifStore = useNotificationStore()
+  notifStore.updateNotifications(options.notifications ?? [])
+
   return {
     app,
     unmount: () => {
       app.unmount()
-    }
+    },
+    updateNotifications: (notifications: NotificationItem[]) => notifStore.updateNotifications(notifications)
   }
 }

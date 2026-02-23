@@ -5,10 +5,9 @@ import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.STM
-import Controllers.Common.CacheableSharedResource (peekCacheableResource)
+import qualified Modules.UserEvent.Api as UE
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
-import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
 import Controllers.Game.Persist
 import Controllers.GameLobby.Api
 import Controllers.GameLobby.Model.GameLobby
@@ -19,7 +18,7 @@ import Data.Either
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import Foundation
-import Controllers.Push.PushController (sendGameStartedNotification)
+import Modules.Notifications.Api (sendGameStartedNotification)
 import System.Random.Shuffle
 import Wordify.Rules.Game (playerNumber)
 import Prelude
@@ -133,21 +132,17 @@ createGame gameId lobby now =
 
 notifyGameStartedPush :: App -> T.Text -> ServerGame -> IO ()
 notifyGameStartedPush app gId serverGame = do
-  let pushCtrl = pushController app
+  let pushCtrl = notificationService app
   snapshot <- atomically $ makeServerGameSnapshot serverGame
   forM_ (snapshotPlayers snapshot) $ \player ->
     sendGameStartedNotification pushCtrl (playerId player) gId
 
 notifyNewGame :: App -> ServerGame -> IO ()
 notifyNewGame app serverGame = do
-  let userChannels = userEventChannels app
+  let svc = userEventService app
   snapshot <- atomically $ makeServerGameSnapshot serverGame
   let gId = snapshotGameId snapshot
       gamePlayers = snapshotPlayers snapshot
   forM_ gamePlayers $ \player -> do
     let userIdent = playerId player
-    atomically $ do
-      maybeChannel <- peekCacheableResource userChannels userIdent
-      case maybeChannel of
-        Nothing -> return ()
-        Just chan -> writeTChan chan (NewGame gId serverGame)
+    atomically $ UE.notifyNewGame svc userIdent gId serverGame

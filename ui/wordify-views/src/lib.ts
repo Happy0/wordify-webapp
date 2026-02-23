@@ -57,6 +57,8 @@ export type {
   PlacedTile
 } from './types/game'
 
+export type { NotificationItem, NotificationDetails, GameInviteDetails } from './types/notifications'
+
 export type { ConnectionState, IGameCommandSender } from './services/interfaces'
 
 // Export constants
