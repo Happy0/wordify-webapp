@@ -35,7 +35,7 @@ data Notification = Notification
 class NotificationRepository a where
   -- | Get all notifications for a user in descending order of creation time
   getNotificationsByUserId :: a -> T.Text -> IO [Notification]
-  -- | Save a game invite notification (userId, lobbyId, invitedByUserId)
-  saveGameInviteNotification :: a -> T.Text -> T.Text -> T.Text -> IO ()
-  -- | Mark all notifications for a user created at or before the given time as read
-  markNotificationsAsReadUpTo :: a -> T.Text -> UTCTime -> IO ()
+  -- | Save a game invite notification (userId, lobbyId, invitedByUser), returning the saved Notification
+  saveGameInviteNotification :: a -> T.Text -> T.Text -> ServerUser -> IO Notification
+  -- | Mark all notifications for a user created at or before the given time as read, returning the IDs of the updated notifications
+  markNotificationsAsReadUpTo :: a -> T.Text -> UTCTime -> IO [NotificationId]

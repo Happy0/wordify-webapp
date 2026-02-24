@@ -89,7 +89,7 @@ sendLobbyInvite repo lobby notifSvc gameLobbyId invitedUsername inviterUserId in
       case result of
         InvitePlayerSuccess invitedUserId -> do
           atomically $ writeTChan (channel lobby) (PlayerInvited invitedUsername inviterUsername)
-          createInviteNotification notifSvc invitedUserId gameLobbyId inviterUserId
+          createInviteNotification notifSvc invitedUserId gameLobbyId (ServerUser inviterUserId (Just inviterUsername))
           return $ InvitePlayerSuccess invitedUserId
         InvitedUsernameNotFound -> return InvitedUsernameNotFound
         InvitedSelf -> return InvitedSelf

@@ -46,7 +46,10 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer, fromServerTile, fromServerMoveHistory)
-import Handler.Common.ClientNotificationPresentation (notificationsForUser)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate)
+import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..))
+import Modules.UserEvent.Api (subscribeToUserChannel)
+import Control.Concurrent.STM (retry)
 import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
 import Model.GameSetup (LocalisedGameSetup(..))
@@ -200,20 +203,33 @@ toGameMessage (CR.ChatMessage _ displayName chatMessage sentTime messageNumber) 
 subscribeGameMessages :: TChan GameMessage -> ConduitT () GameMessage IO ()
 subscribeGameMessages = chanSource
 
-handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> IO ()
-handleBroadcastMessages connection liveGameMessages chatroom since = do
+data OutboundMessage = GameMsg GameMessage | NotifMsg NotificationUpdate
+
+-- | Reads from the user event channel, skipping (and discarding) non-notification
+-- events until a NotificationsChanged event is found or the channel is empty.
+nextNotifFromUserChan :: TChan UserEvent -> STM OutboundMessage
+nextNotifFromUserChan chan = do
+  event <- readTChan chan
+  case event of
+    NotificationsChanged u -> return (NotifMsg u)
+    _                      -> nextNotifFromUserChan chan
+
+handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> TChan UserEvent -> IO ()
+handleBroadcastMessages connection liveGameMessages chatroom since userEventChan = do
   -- Subscribing to the channel comes first in case there's a race between doing so and sending the previous messages
   liveChatMessagesChan <- subscribeMessagesLive chatroom
-  _ <-sendPreviousChatMessages connection chatroom since
-  forever (sendBroadcastMessages connection liveChatMessagesChan liveGameMessages)
+  _ <- sendPreviousChatMessages connection chatroom since
+  forever (sendBroadcastMessages connection liveChatMessagesChan liveGameMessages userEventChan)
 
-sendBroadcastMessages :: C.Connection -> TChan CR.ChatMessage -> TChan GameMessage -> IO ()
-sendBroadcastMessages connection chatMessageChannel gameMessageChannel = do 
-  let nextChatMessage = map toGameMessage (readTChan chatMessageChannel)
-  let nextGameMessage = readTChan gameMessageChannel
-  nextMessage <- atomically ( nextGameMessage `orElse` nextChatMessage)
-  let jsonPayload = toJSONResponse nextMessage
-  C.sendTextData connection jsonPayload
+sendBroadcastMessages :: C.Connection -> TChan CR.ChatMessage -> TChan GameMessage -> TChan UserEvent -> IO ()
+sendBroadcastMessages connection chatMessageChannel gameMessageChannel userEventChan = do
+  let nextChatMessage = GameMsg . toGameMessage <$> readTChan chatMessageChannel
+  let nextGameMessage = GameMsg <$> readTChan gameMessageChannel
+  let nextNotif       = nextNotifFromUserChan userEventChan
+  nextMessage <- atomically (nextGameMessage `orElse` nextChatMessage `orElse` nextNotif)
+  case nextMessage of
+    GameMsg msg      -> C.sendTextData connection (toJSONResponse msg)
+    NotifMsg update  -> sendNotificationUpdate connection update
 
 handleInboundSocketMessages :: App -> C.Connection -> CR.Chatroom -> ServerGame -> Maybe AuthUser -> IO ()
 handleInboundSocketMessages app connection chatroom serverGame maybeUser = forever
@@ -233,21 +249,24 @@ sendInitialGameState connection serverGameSnapshot maybeUser = do
 handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> IO ()
 handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince = runResourceT $ do
   result <- runExceptT $ do
-    serverGame <- ExceptT $ snd <$> getCacheableResource (games app) gameId
-    chatId     <- liftIO  $ getChatId gameId maybeUser serverGame
-    chatroom   <- ExceptT $ snd <$> getCacheableResource (chatRooms app) chatId
-    pure (serverGame, chatroom)
+    serverGame    <- ExceptT $ snd <$> getCacheableResource (games app) gameId
+    chatId        <- liftIO  $ getChatId gameId maybeUser serverGame
+    chatroom      <- ExceptT $ snd <$> getCacheableResource (chatRooms app) chatId
+    userEventChan <- case maybeUser of
+      Nothing   -> liftIO newBroadcastTChanIO
+      Just user -> ExceptT $ snd <$> subscribeToUserChannel (userEventService app) (ident user)
+    pure (serverGame, chatroom, userEventChan)
 
   case result of
     Left err -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
-    Right (serverGame, chatroom) -> liftIO $ do
+    Right (serverGame, chatroom, userEventChan) -> liftIO $ do
       let inactivityTrackerState = inactivityTracker app
       (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
       withTrackWebsocketActivity inactivityTrackerState $ do
         withNotifyJoinAndLeave (appConnPool app) (userEventService app) serverGame maybeUser $ do
           sendInitialGameState connection gameSnapshot maybeUser
           sendPreviousDefinitions (gameDefinitionController app) gameId definitionsSince connection
-          let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince
+          let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince userEventChan
           let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
           race_ handleOutbound handleInbound
   where

@@ -7,7 +7,7 @@ import Data.Time (UTCTime, getCurrentTime, addUTCTime, nominalDay)
 import Database.Persist.Sql
 import qualified Model as M
 import Repository.NotificationRepository
-import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
+import qualified Controllers.User.Model.ServerUser as SU
 
 newtype SqlNotificationRepositoryBackend = SqlNotificationRepositoryBackend (Pool SqlBackend)
 
@@ -31,21 +31,34 @@ getNotificationsByUserIdSQL pool userId =
         , notificationCreatedAt = createdAt
         , notificationReadAt    = readAt
         , notificationExpiresAt = expiresAt
-        , notificationDetails   = GameInvite (GameInviteDetails lobbyId (ServerUser inviterIdent inviterUsername))
+        , notificationDetails   = GameInvite (GameInviteDetails lobbyId (SU.ServerUser inviterIdent inviterUsername))
         }
 
-saveGameInviteNotificationSQL :: Pool SqlBackend -> T.Text -> T.Text -> T.Text -> IO ()
-saveGameInviteNotificationSQL pool userId lobbyId invitedByUserId = do
+saveGameInviteNotificationSQL :: Pool SqlBackend -> T.Text -> T.Text -> SU.ServerUser -> IO Notification
+saveGameInviteNotificationSQL pool userId lobbyId invitedByUser = do
   now <- getCurrentTime
   withPool pool $ do
     notifKey <- insert (M.Notification (M.UserKey userId) now Nothing Nothing "game_invite")
-    insert_ (M.InviteNotification notifKey (M.LobbyKey lobbyId) (M.UserKey invitedByUserId))
+    insert_ (M.InviteNotification notifKey (M.LobbyKey lobbyId) (M.UserKey (SU.userId invitedByUser)))
+    return $ Notification
+      { notificationId        = fromSqlKey notifKey
+      , notificationUserId    = userId
+      , notificationCreatedAt = now
+      , notificationReadAt    = Nothing
+      , notificationExpiresAt = Nothing
+      , notificationDetails   = GameInvite (GameInviteDetails lobbyId invitedByUser)
+      }
 
-markNotificationsAsReadUpToSQL :: Pool SqlBackend -> T.Text -> UTCTime -> IO ()
+markNotificationsAsReadUpToSQL :: Pool SqlBackend -> T.Text -> UTCTime -> IO [NotificationId]
 markNotificationsAsReadUpToSQL pool userId upTo = do
   now <- getCurrentTime
   let sixMonthsFromNow = addUTCTime (6 * 30 * nominalDay) now
-  withPool pool $
+  withPool pool $ do
+    keys <- selectKeysList
+      [ M.NotificationUserId ==. M.UserKey userId,
+        M.NotificationCreatedAt <=. upTo
+      ]
+      []
     updateWhere
       [ M.NotificationUserId ==. M.UserKey userId,
         M.NotificationCreatedAt <=. upTo
@@ -53,5 +66,6 @@ markNotificationsAsReadUpToSQL pool userId upTo = do
       [ M.NotificationReadAt =. Just now,
         M.NotificationExpiresAt =. Just sixMonthsFromNow
       ]
+    return (map fromSqlKey keys)
 
 withPool = flip runSqlPersistMPool

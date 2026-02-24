@@ -23,7 +23,7 @@ import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), ServerGame, la
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Wordify.Rules.Board (textRepresentation)
 import Wordify.Rules.Game (board)
-import Handler.Common.ClientNotificationPresentation (notificationsForUser)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate)
 
 data OtherPlayer = OtherPlayer { playerName :: Text, playerActive :: Bool }
 
@@ -187,6 +187,9 @@ handleUserEvent _ connection (PlayerActivityChanged gId activeNames) state = do
   let newState = M.adjust (updateActivePlayers activeNames) gId state
   sendGameSummaryState connection newState
   pure newState
+handleUserEvent _ connection (NotificationsChanged notifUpdate) state = do
+  sendNotificationUpdate connection notifUpdate
+  pure state
 
 isUserToMove :: T.Text -> ServerGameSnapshot -> Bool
 isUserToMove ident snapshot = currentPlayerToMove snapshot == Just ident

@@ -217,7 +217,7 @@ makeFoundation appSettings inactivityTracker = do
 
   let pushNotificationRepository = toPushNotificationRepositoryImpl (SqlPushNotificationRepositoryBackend pool)
   let notificationRepository = SqlNotificationRepositoryBackend pool
-  notifSvc <- makeNotificationService notificationRepository pushNotificationRepository maybeVapidKeys appHttpManager
+  notifSvc <- makeNotificationService notificationRepository pushNotificationRepository maybeVapidKeys appHttpManager userEventService
 
   let lobbyRepo = SqlLobbyRepositoryBackend pool
 

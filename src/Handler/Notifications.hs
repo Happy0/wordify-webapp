@@ -3,6 +3,7 @@ module Handler.Notifications where
 import Import hiding (Notification (..))
 import Data.Aeson ((.=), object, withObject, (.:))
 import Data.Time (UTCTime)
+import Data.Int (Int64)
 import Modules.Notifications.Api (markNotificationsAsRead)
 import Handler.Common.ClientNotificationPresentation (notificationsForUser)
 
@@ -22,9 +23,10 @@ getNotificationsR = do
   notifs <- liftIO $ notificationsForUser app userId
   returnJson notifs
 
-postNotificationsR :: Handler ()
+postNotificationsR :: Handler Value
 postNotificationsR = do
   MarkNotificationsReadRequest upTo <- requireCheckJsonBody
   userId <- maybeAuthId >>= maybe notAuthenticated pure
   app <- getYesod
-  liftIO $ markNotificationsAsRead (notificationService app) userId upTo
+  updatedIds <- liftIO $ markNotificationsAsRead (notificationService app) userId upTo
+  returnJson (updatedIds :: [Int64])

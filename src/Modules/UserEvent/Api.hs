@@ -5,6 +5,8 @@ module Modules.UserEvent.Api
   , notifyGameOver
   , notifyNewGame
   , notifyPlayerActivityChanged
+  , notifyNotificationAdded
+  , notifyNotificationsRead
   , subscribeToUserChannel
   ) where
 
@@ -13,7 +15,8 @@ import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TChan (TChan, writeTChan, dupTChan)
 import Controllers.Common.CacheableSharedResource (ResourceCache, getCacheableResource, makeGlobalResourceCache, peekCacheableResource)
 import Controllers.Game.Model.ServerGame (ServerGame)
-import Controllers.Game.Model.UserEventSubscription (UserEvent (..), newUserEventSubcriptionChannel)
+import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..), newUserEventSubcriptionChannel)
+import Repository.NotificationRepository (Notification)
 import Data.Text (Text)
 import UnliftIO.Resource (MonadResource, ReleaseKey)
 
@@ -54,6 +57,20 @@ notifyPlayerActivityChanged service userId gameId activeNames = do
   case maybeChannel of
     Nothing -> return ()
     Just chan -> writeTChan chan (PlayerActivityChanged gameId activeNames)
+
+notifyNotificationAdded :: UserEventService -> Text -> Notification -> STM ()
+notifyNotificationAdded service userId notification = do
+  maybeChannel <- peekCacheableResource (userEventChannels service) userId
+  case maybeChannel of
+    Nothing -> return ()
+    Just chan -> writeTChan chan (NotificationsChanged (NotificationAdded notification))
+
+notifyNotificationsRead :: UserEventService -> Text -> [Text] -> STM ()
+notifyNotificationsRead service userId notificationIds = do
+  maybeChannel <- peekCacheableResource (userEventChannels service) userId
+  case maybeChannel of
+    Nothing -> return ()
+    Just chan -> writeTChan chan (NotificationsChanged (NotificationsRead notificationIds))
 
 subscribeToUserChannel :: MonadResource m => UserEventService -> Text -> m (ReleaseKey, Either Text (TChan UserEvent))
 subscribeToUserChannel service userId = do
