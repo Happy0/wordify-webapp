@@ -19,7 +19,7 @@ import Data.Either
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import Foundation
-import Modules.Notifications.Api (sendGameStartedNotification)
+import Modules.Notifications.Api (NotificationService, sendGameStartedNotification, createInviteNotification)
 import System.Random.Shuffle
 import Wordify.Rules.Game (playerNumber)
 import Prelude
@@ -81,15 +81,16 @@ startGame app gameId gameLanguage channel serverGame = do
     -- Send push notifications to all players
     notifyGameStartedPush app gameId serverGame
 
-sendLobbyInvite :: LobbyRepository r => r -> GameLobby -> T.Text -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
-sendLobbyInvite repo lobby gameLobbyId invitedUsername inviterUserId inviterUsername
+sendLobbyInvite :: LobbyRepository r => r -> GameLobby -> NotificationService -> T.Text -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
+sendLobbyInvite repo lobby notifSvc gameLobbyId invitedUsername inviterUserId inviterUsername
   | invitedUsername == inviterUsername = return InvitedSelf
   | otherwise = do
       result <- invitePlayer repo gameLobbyId invitedUsername inviterUserId
       case result of
-        InvitePlayerSuccess -> do
+        InvitePlayerSuccess invitedUserId -> do
           atomically $ writeTChan (channel lobby) (PlayerInvited invitedUsername inviterUsername)
-          return InvitePlayerSuccess
+          createInviteNotification notifSvc invitedUserId gameLobbyId inviterUserId
+          return $ InvitePlayerSuccess invitedUserId
         InvitedUsernameNotFound -> return InvitedUsernameNotFound
         InvitedSelf -> return InvitedSelf
 

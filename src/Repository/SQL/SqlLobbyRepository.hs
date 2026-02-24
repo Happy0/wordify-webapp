@@ -21,7 +21,7 @@ invitePlayerSQL pool gameLobbyId invitedUsername inviterUserId =
       Nothing -> return InvitedUsernameNotFound
       Just (Entity (M.UserKey invitedUserId) _) -> do
         insert_ (M.LobbyInvite (M.LobbyKey gameLobbyId) (M.UserKey inviterUserId) (M.UserKey invitedUserId))
-        return InvitePlayerSuccess
+        return $ InvitePlayerSuccess invitedUserId
 
 getLobbyInvitesSQL :: Pool SqlBackend -> T.Text -> IO [T.Text]
 getLobbyInvitesSQL pool gameLobbyId =

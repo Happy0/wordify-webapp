@@ -202,12 +202,13 @@ postGameLobbyR gameId = do
         result <- liftIO $ sendLobbyInvite
           (lobbyRepository app)
           lobby
+          (notificationService app)
           gameId
           (inviteTargetUsername req)
           (authenticatedUserId authedUser)
           (authenticatedUsername authedUser)
         lift $ case result of
-          InvitePlayerSuccess -> return ()
+          InvitePlayerSuccess _ -> return ()
           InvitedUsernameNotFound -> sendStatusJSON status422 (object ["error" .= ("username_not_found" :: Text), "message" .= ("No user with that username exists." :: Text)])
           InvitedSelf -> sendStatusJSON status422 (object ["error" .= ("cannot_invite_self" :: Text), "message" .= ("You cannot invite yourself to a game." :: Text)])
 

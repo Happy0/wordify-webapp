@@ -7,7 +7,7 @@ where
 import ClassyPrelude (IO)
 import qualified Data.Text as T
 
-data InvitePlayerResult = InvitePlayerSuccess | InvitedUsernameNotFound | InvitedSelf
+data InvitePlayerResult = InvitePlayerSuccess T.Text | InvitedUsernameNotFound | InvitedSelf
 
 class LobbyRepository a where
   -- | Invite a player to a lobby by their username. Returns InvitedUsernameNotFound if the username does not exist.
