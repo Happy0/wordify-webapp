@@ -37,6 +37,11 @@ export interface GameLobbyOptions {
   joinedPlayers: string[]
 
   /**
+   * Array of players who have been invited but haven't yet joined
+   */
+  invitedPlayers?: string[]
+
+  /**
    * The language the game is set up with
    */
   language: string
@@ -62,6 +67,7 @@ export function createGameLobby(
     websocketUrl: options.websocketUrl,
     playerCount: options.playerCount,
     joinedPlayers: options.joinedPlayers,
+    invitedPlayers: options.invitedPlayers ?? [],
     language: options.language
   })
 

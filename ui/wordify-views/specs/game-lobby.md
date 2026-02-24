@@ -14,7 +14,7 @@ It will display the players who have been invited to the lobby but haven't yet j
 
 It will have functionality to allow the user to invite other users by username. The /api/usernames endpoint can be used to autocomplete usernames as the user types them.
 
-A POST to the /games/#Text/lobby endpoint can be used to to invite a given player. The request will have a JSON body with an "invited" field with the username of the invited player.
+A POST to the /games/#Text/lobby endpoint can be used to to invite a given player. The request will have a JSON body with an "inviteTargetUsername" field with the username of the invited player.
 
 # Configuration
 
