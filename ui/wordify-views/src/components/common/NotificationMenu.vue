@@ -80,8 +80,9 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
-function navigate(url: string) {
+async function navigate(url: string) {
   isOpen.value = false
+  await markAsRead()
   window.location.href = url
 }
 
