@@ -83,6 +83,7 @@ startGame app gameId gameLanguage channel serverGame = do
 handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
 handleChannelMessage (LobbyFull gameId) = StartGame gameId
+handleChannelMessage (PlayerInvited invitedPlayer invitingPlayer) = LobbyInvite invitedPlayer invitingPlayer
 
 handleJoinClient :: App -> T.Text -> GameLobby -> ServerPlayer -> UTCTime -> STM ClientLobbyJoinResult
 handleJoinClient app gameId gameLobby serverPlayer now =
