@@ -112,7 +112,7 @@ processNotificationEvent pushController event = do
       MoveNotification user gId        -> (user, "It's your move!", gId, "")
       GameOverNotification user gId    -> (user, "Your game has ended!", gId, "")
       GameStartedNotification user gId -> (user, "Your game has started!", gId, "")
-      GameInviteNotification user gId  -> (user, "You've been invited to a game!", gId, "/invite")
+      GameInviteNotification user gId  -> (user, "You've been invited to a game!", gId, "/lobby/invite")
 
 sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> IO ()
 sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _ _) notifText notifUrl =
