@@ -25,5 +25,6 @@
 
 /choose-username ChooseUsernameR GET
 /api/username SetUsernameR POST
+/api/usernames UsernameSearchR GET
 /api/me ApiMeR GET
 /api/notifications NotificationsR GET POST

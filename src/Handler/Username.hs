@@ -3,7 +3,7 @@ module Handler.Username where
     import Import
     import Import.NoFoundation (wordifyCss, wordifyJs)
     import Data.Aeson (FromJSON, (.:), (.=), object, withObject)
-    import Controllers.User.UserController (setUsername)
+    import Controllers.User.UserController (setUsername, getUsernamesByPrefix)
     import Repository.UserRepository (SetUsernameResult(..))
     import Yesod.Core (sendStatusJSON)
     import Network.HTTP.Types.Status (status400, status409)
@@ -48,6 +48,17 @@ module Handler.Username where
                     UsernameSet -> return ()
                     UsernameTaken -> sendStatusJSON status409 (object ["error" .= ("username_taken" :: Text), "message" .= ("This username is already taken. Please choose another." :: Text)])
                     UserNotFound -> notAuthenticated
+
+    getUsernameSearchR :: Handler Value
+    getUsernameSearchR = do
+        _ <- requireAuthId
+        maybePrefix <- lookupGetParam "prefix"
+        app <- getYesod
+        case maybePrefix of
+            Nothing -> returnJson ([] :: [Text])
+            Just prefix -> do
+                usernames <- liftIO $ getUsernamesByPrefix (userController app) prefix
+                returnJson usernames
 
     validateUsername :: Text -> Maybe Text
     validateUsername uname
