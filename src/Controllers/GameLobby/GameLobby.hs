@@ -1,14 +1,14 @@
-module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage) where
+module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage, sendLobbyInvite, getInvitedPlayers, getInviterForLobby) where
 
 import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.STM
-import Controllers.Common.CacheableSharedResource (peekCacheableResource)
+import qualified Modules.UserEvent.Api as UE
+import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites, getInviterForUser), InvitePlayerResult (..))
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
-import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
 import Controllers.Game.Persist
 import Controllers.GameLobby.Api
 import Controllers.GameLobby.Model.GameLobby
@@ -19,7 +19,7 @@ import Data.Either
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import Foundation
-import Controllers.Push.PushController (sendGameStartedNotification)
+import Modules.Notifications.Api (NotificationService, sendGameStartedNotification, createInviteNotification)
 import System.Random.Shuffle
 import Wordify.Rules.Game (playerNumber)
 import Prelude
@@ -81,9 +81,29 @@ startGame app gameId gameLanguage channel serverGame = do
     -- Send push notifications to all players
     notifyGameStartedPush app gameId serverGame
 
+sendLobbyInvite :: LobbyRepository r => r -> GameLobby -> NotificationService -> T.Text -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
+sendLobbyInvite repo lobby notifSvc gameLobbyId invitedUsername inviterUserId inviterUsername
+  | invitedUsername == inviterUsername = return InvitedSelf
+  | otherwise = do
+      result <- invitePlayer repo gameLobbyId invitedUsername inviterUserId
+      case result of
+        InvitePlayerSuccess invitedUserId -> do
+          atomically $ writeTChan (channel lobby) (PlayerInvited invitedUsername inviterUsername)
+          createInviteNotification notifSvc invitedUserId gameLobbyId (ServerUser inviterUserId (Just inviterUsername))
+          return $ InvitePlayerSuccess invitedUserId
+        InvitedUsernameNotFound -> return InvitedUsernameNotFound
+        InvitedSelf -> return InvitedSelf
+
+getInvitedPlayers :: LobbyRepository r => r -> T.Text -> IO [T.Text]
+getInvitedPlayers repo = getLobbyInvites repo
+
+getInviterForLobby :: LobbyRepository r => r -> T.Text -> T.Text -> IO (Maybe T.Text)
+getInviterForLobby repo = getInviterForUser repo
+
 handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
 handleChannelMessage (LobbyFull gameId) = StartGame gameId
+handleChannelMessage (PlayerInvited invitedPlayer invitingPlayer) = LobbyInvite invitedPlayer invitingPlayer
 
 handleJoinClient :: App -> T.Text -> GameLobby -> ServerPlayer -> UTCTime -> STM ClientLobbyJoinResult
 handleJoinClient app gameId gameLobby serverPlayer now =
@@ -133,21 +153,17 @@ createGame gameId lobby now =
 
 notifyGameStartedPush :: App -> T.Text -> ServerGame -> IO ()
 notifyGameStartedPush app gId serverGame = do
-  let pushCtrl = pushController app
+  let pushCtrl = notificationService app
   snapshot <- atomically $ makeServerGameSnapshot serverGame
   forM_ (snapshotPlayers snapshot) $ \player ->
     sendGameStartedNotification pushCtrl (playerId player) gId
 
 notifyNewGame :: App -> ServerGame -> IO ()
 notifyNewGame app serverGame = do
-  let userChannels = userEventChannels app
+  let svc = userEventService app
   snapshot <- atomically $ makeServerGameSnapshot serverGame
   let gId = snapshotGameId snapshot
       gamePlayers = snapshotPlayers snapshot
   forM_ gamePlayers $ \player -> do
     let userIdent = playerId player
-    atomically $ do
-      maybeChannel <- peekCacheableResource userChannels userIdent
-      case maybeChannel of
-        Nothing -> return ()
-        Just chan -> writeTChan chan (NewGame gId serverGame)
+    atomically $ UE.notifyNewGame svc userIdent gId serverGame

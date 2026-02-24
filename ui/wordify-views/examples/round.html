@@ -97,10 +97,48 @@
       tileValues: tileValues
     };
 
+    // Sample notifications: two unread + one read, so the highlight difference is visible
+    const sampleNotifications = [
+      {
+        notificationId: '1',
+        notificationCreatedAt: Date.now() - 5 * 60000, // 5 minutes ago
+        notificationReadAt: undefined, // unread — bold text, blue border, blue dot
+        notificationDetails: {
+          type: 'gameInvite',
+          inviteFromUser: 'Alice',
+          gameLobbyId: 'lobby-abc-123'
+        },
+        url: '/games/lobby-abc-123/invite'
+      },
+      {
+        notificationId: '2',
+        notificationCreatedAt: Date.now() - 30 * 60000, // 30 minutes ago
+        notificationReadAt: undefined, // unread
+        notificationDetails: {
+          type: 'gameInvite',
+          inviteFromUser: 'Bob',
+          gameLobbyId: 'lobby-def-456'
+        },
+        url: '/games/lobby-def-456/invite'
+      },
+      {
+        notificationId: '3',
+        notificationCreatedAt: Date.now() - 5 * 3600000, // 5 hours ago
+        notificationReadAt: Date.now() - 4 * 3600000, // read 4 hours ago — dimmed, no border
+        notificationDetails: {
+          type: 'gameInvite',
+          inviteFromUser: 'Carol',
+          gameLobbyId: 'lobby-ghi-789'
+        },
+        url: '/games/lobby-ghi-789/invite'
+      }
+    ];
+
     // Mount the Wordify game using the options object format
     const game = Wordify.createRound('#game-container', {
       initialState: initialState,
-      isLoggedIn: true
+      isLoggedIn: true,
+      notifications: sampleNotifications
       // websocketUrl: 'wss://example.com/game/123'  // Uncomment to connect to a websocket
     });
 

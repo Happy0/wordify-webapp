@@ -20,7 +20,9 @@ import Button from 'primevue/button'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import NavigationButton from '@/components/common/NavigationButton.vue'
+import NotificationMenu from '@/components/common/NotificationMenu.vue'
 import { usePushNotifications } from '@/composables/usePushNotifications'
+import { useNotificationSocketMessages } from '@/composables/useNotificationSocketMessages'
 
 // Props for SSR initialization
 const props = defineProps<{
@@ -30,7 +32,8 @@ const props = defineProps<{
 
 const store = useGameStore()
 const { lastError, candidateTilesOnBoard, lastChatMessageReceived, chatMessages, myPlayer, gameId, isMyTurn, gameEnded } = storeToRefs(store)
-const { controller, connect, connectionState } = useGameController()
+const { controller, connect, connectionState, transport } = useGameController()
+useNotificationSocketMessages(transport)
 const toast = useToast()
 
 // Inject isLoggedIn from the app-level provider
@@ -551,8 +554,9 @@ provide('onRackDrop', handleRackDrop)
 <template>
   <div class="game-view h-dvh flex flex-col bg-stone-100 overflow-hidden">
     <Toast />
-    <!-- Desktop: Fixed FAB navigation -->
+    <!-- Desktop: Fixed FAB navigation + notifications -->
     <NavigationButton :is-logged-in="isLoggedIn" class="hidden lg:block" />
+    <NotificationMenu :is-logged-in="isLoggedIn" class="hidden lg:block" />
 
     <!-- Connection status banner (only show after initial connection) -->
     <Transition name="banner">
@@ -656,6 +660,7 @@ provide('onRackDrop', handleRackDrop)
       <div class="flex justify-between items-center px-2 py-2 bg-white shadow-sm">
         <div class="flex items-center gap-2">
           <NavigationButton :is-logged-in="isLoggedIn" position="inline" />
+          <NotificationMenu :is-logged-in="isLoggedIn" position="inline" />
           <PotentialScore />
         </div>
         <div class="flex gap-2">

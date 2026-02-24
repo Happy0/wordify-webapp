@@ -6,7 +6,9 @@ import Aura from '@primeuix/themes/aura'
 import 'primeicons/primeicons.css'
 import '../style.css'
 import HomeView from '../views/HomeView.vue'
+import { useNotificationStore } from '../stores/notificationStore'
 import type { TileValueMap } from '../common/tile-value-map'
+import type { NotificationItem } from '../types/notifications'
 
 export interface GameSummary {
   /**
@@ -59,11 +61,17 @@ export interface HomeOptions {
    * If omitted, the client will fetch auth state from /api/me
    */
   isLoggedIn: boolean
+
+  /**
+   * Array of notifications to display in the notification bell menu
+   */
+  notifications?: NotificationItem[]
 }
 
 export interface HomeInstance {
   app: App
   unmount: () => void
+  updateNotifications: (notifications: NotificationItem[]) => void
 }
 
 export function createHome(
@@ -92,10 +100,15 @@ export function createHome(
 
   app.mount(element)
 
+  // Seed the notification store with any initial notifications
+  const notifStore = useNotificationStore()
+  notifStore.updateNotifications(options.notifications ?? [])
+
   return {
     app,
     unmount: () => {
       app.unmount()
-    }
+    },
+    updateNotifications: (notifications: NotificationItem[]) => notifStore.updateNotifications(notifications)
   }
 }

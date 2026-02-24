@@ -44,6 +44,13 @@ export {
   type ChooseUsernameInstance
 } from './lib/choose-username'
 
+// Game Invite view
+export {
+  createGameInvite,
+  type GameInviteOptions,
+  type GameInviteInstance
+} from './lib/game-invite'
+
 // Re-export types for TypeScript users
 export type {
   GameState,
@@ -56,6 +63,8 @@ export type {
   SquareType,
   PlacedTile
 } from './types/game'
+
+export type { NotificationItem, NotificationDetails, GameInviteDetails } from './types/notifications'
 
 export type { ConnectionState, IGameCommandSender } from './services/interfaces'
 

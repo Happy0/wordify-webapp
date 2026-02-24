@@ -14,6 +14,7 @@ import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
 import Yesod.WebSockets
 import Network.WebSockets (Connection, sendTextData)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
+import Modules.UserEvent.Api (UserEventService, subscribeToUserChannel)
 import Controllers.Common.CacheableSharedResource
 import Control.Monad.Loops (iterateM_)
 import qualified Network.WebSockets.Connection as C
@@ -22,6 +23,7 @@ import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), ServerGame, la
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Wordify.Rules.Board (textRepresentation)
 import Wordify.Rules.Game (board)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate)
 
 data OtherPlayer = OtherPlayer { playerName :: Text, playerActive :: Bool }
 
@@ -87,6 +89,7 @@ renderActiveGamePage :: (GameRepository a) => App -> a -> T.Text -> Handler Html
 renderActiveGamePage app gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
   summaries <- liftIO $ buildActiveGameSummaries (games app) activeGames
+  notifs <- liftIO $ notificationsForUser app userId
   gamePagelayout $ do
     addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
@@ -99,7 +102,8 @@ renderActiveGamePage app gameRepository userId = do
         const lobby = Wordify.createHome('#home', {
           isLoggedIn: true,
           games: #{toJSON summaries},
-          tileValues: {}
+          tileValues: {},
+          notifications: #{toJSON notifs}
         });
       |]
 
@@ -141,18 +145,16 @@ homeWebsocketHandler :: App -> Text -> WebSocketsT Handler ()
 homeWebsocketHandler app userIdent = do
   connection <- ask
   let gameRepository = GameRepositorySQLBackend (appConnPool app) (localisedGameSetups app)
-  let userChannels = userEventChannels app
+  let userEventSvc = userEventService app
   let gamesCache = games app
-  liftIO $ handleHomeWebsocket gameRepository gamesCache connection userIdent userChannels
+  liftIO $ handleHomeWebsocket gameRepository gamesCache connection userIdent userEventSvc
 
-handleHomeWebsocket :: (GameRepository a) => a -> ResourceCache Text ServerGame -> Connection -> Text -> ResourceCache Text (TChan UserEvent) -> IO ()
-handleHomeWebsocket gameRepository gamesCache connection userIdent userEventBroadcastChannels = runResourceT $ do
-    (_, userBroadcastChannel) <- getCacheableResource userEventBroadcastChannels userIdent
+handleHomeWebsocket :: (GameRepository a) => a -> ResourceCache Text ServerGame -> Connection -> Text -> UserEventService -> IO ()
+handleHomeWebsocket gameRepository gamesCache connection userIdent userEventSvc = runResourceT $ do
+    (_, userBroadcastChannel) <- subscribeToUserChannel userEventSvc userIdent
     case userBroadcastChannel of
       Left _ -> return ()
-      Right channel -> do
-        -- Important that we duplicate the channel first so that we don't miss any game updates after fetching from the database
-        channelSubscription <- atomically (dupTChan channel)
+      Right channelSubscription -> do
         activeGames <- liftIO $ getActiveUserGames gameRepository userIdent
         activeSummaryMap <- liftIO $ buildActiveGameSummaryMap gamesCache activeGames
         _ <- liftIO (sendGameSummaryState connection activeSummaryMap)
@@ -185,6 +187,9 @@ handleUserEvent _ connection (PlayerActivityChanged gId activeNames) state = do
   let newState = M.adjust (updateActivePlayers activeNames) gId state
   sendGameSummaryState connection newState
   pure newState
+handleUserEvent _ connection (NotificationsChanged notifUpdate) state = do
+  sendNotificationUpdate connection notifUpdate
+  pure state
 
 isUserToMove :: T.Text -> ServerGameSnapshot -> Bool
 isUserToMove ident snapshot = currentPlayerToMove snapshot == Just ident

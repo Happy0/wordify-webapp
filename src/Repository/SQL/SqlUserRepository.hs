@@ -1,14 +1,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Repository.SQL.SqlUserRepository (SqlUserRepositoryBackend (SqlUserRepositoryBackend)) where
 
-import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), flip, return, ($), (.))
+import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), flip, return, ($), (.), (<), (<>))
 import Control.Exception (SomeException, try)
 import Data.Pool (Pool)
 import qualified Data.Text as T
 import Database.Persist.Sql
 import qualified Model as M
 import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
-import Repository.UserRepository (UserRepository (createUserIfNotExists, getUser, setUsername), SetUsernameResult (..))
+import Repository.UserRepository (UserRepository (createUserIfNotExists, getUser, setUsername, getUsernamesByPrefix), SetUsernameResult (..))
 
 newtype SqlUserRepositoryBackend = SqlUserRepositoryBackend (Pool SqlBackend)
 
@@ -16,6 +16,7 @@ instance UserRepository SqlUserRepositoryBackend where
   createUserIfNotExists (SqlUserRepositoryBackend pool) = createUserIfNotExistsSQL pool
   getUser (SqlUserRepositoryBackend pool) = getUserSQL pool
   setUsername (SqlUserRepositoryBackend pool) = setUsernameSQL pool
+  getUsernamesByPrefix (SqlUserRepositoryBackend pool) = getUsernamesByPrefixSQL pool
 
 createUserIfNotExistsSQL :: Pool SqlBackend -> T.Text -> Maybe T.Text -> IO ()
 createUserIfNotExistsSQL pool visitorId maybeNickname = do
@@ -45,5 +46,15 @@ setUsernameSQL pool visitorId uname = do
   case result of
     Left (_ :: SomeException) -> return UsernameTaken
     Right outcome -> return outcome
+
+getUsernamesByPrefixSQL :: Pool SqlBackend -> T.Text -> IO [T.Text]
+getUsernamesByPrefixSQL pool prefix =
+  if T.length prefix < 3
+    then return []
+    else withPool pool $ do
+      results <- rawSql
+        "SELECT username FROM \"user\" WHERE username LIKE ?"
+        [PersistText (prefix <> "%")]
+      return [u | Single (Just u) <- results]
 
 withPool = flip runSqlPersistMPool

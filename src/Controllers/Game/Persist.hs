@@ -44,8 +44,10 @@ import Model.GameSetup (LocalisedGameSetup(..))
 deleteLobby :: App -> T.Text -> IO ()
 deleteLobby app gameId = do
   withPool (appConnPool app) $ do
-    deleteWhere [M.LobbyGameId ==. gameId]
+    deleteWhere [M.InviteNotificationLobbyId ==. M.LobbyKey gameId]
+    deleteWhere [M.LobbyInviteLobby ==. M.LobbyKey gameId]
     deleteWhere [M.LobbyPlayerGame ==. gameId]
+    deleteWhere [M.LobbyGameId ==. gameId]
 
 getLobby :: ConnectionPool -> UserController -> LocalisedGameSetups -> T.Text -> IO (Either T.Text GameLobby)
 getLobby pool userCtrl localisedGameSetups gameId = do

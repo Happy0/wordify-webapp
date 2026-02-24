@@ -17,12 +17,14 @@ transport.onStateChange((state) => {
 export function useGameController(): {
   controller: IGameCommandSender
   connectionState: Readonly<typeof connectionState>
+  transport: typeof transport
   connect: (url: string) => void
   disconnect: () => void
 } {
   return {
     controller,
     connectionState: readonly(connectionState),
+    transport,
     connect: (url: string) => {
       controller.connect(url)
     },

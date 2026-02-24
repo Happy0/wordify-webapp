@@ -2,15 +2,20 @@
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import AutoComplete from 'primevue/autocomplete'
 import NavigationButton from '@/components/common/NavigationButton.vue'
+import NotificationMenu from '@/components/common/NotificationMenu.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   gameLobbyId: string
   websocketUrl: string
   playerCount: number
   joinedPlayers: string[]
+  invitedPlayers?: string[]
   language: string
-}>()
+}>(), {
+  invitedPlayers: () => []
+})
 
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
 
@@ -21,12 +26,21 @@ const connectionState = ref<'disconnected' | 'connecting' | 'connected' | 'error
 // Player state - tracks players who have joined (starts with initial joined players)
 const players = ref<string[]>([...props.joinedPlayers])
 
+// Invited (but not yet joined) players state
+const invitedPlayers = ref<string[]>([...props.invitedPlayers])
+
 // Computed values for display
 const playersNeeded = computed(() => props.playerCount - players.value.length)
 
 // UI state
 const copied = ref(false)
 const copyTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
+
+// Invite username state
+const inviteUsername = ref('')
+const usernameSuggestions = ref<string[]>([])
+const inviteLoading = ref(false)
+const inviteError = ref<string | null>(null)
 
 // Generate the shareable link
 const shareLink = computed(() => {
@@ -47,6 +61,12 @@ function handleMessage(event: MessageEvent) {
       case 'joined':
         if (data.payload?.name) {
           players.value.push(data.payload.name)
+          invitedPlayers.value = invitedPlayers.value.filter(p => p !== data.payload.name)
+        }
+        break
+      case 'playerInvited':
+        if (data.payload?.invitedPlayer && !invitedPlayers.value.includes(data.payload.invitedPlayer)) {
+          invitedPlayers.value.push(data.payload.invitedPlayer)
         }
         break
     }
@@ -110,6 +130,46 @@ async function copyLink() {
   }
 }
 
+// Autocomplete usernames from API
+async function searchUsernames(event: { query: string }) {
+  try {
+    const response = await fetch(`/api/usernames?prefix=${encodeURIComponent(event.query)}`)
+    if (response.ok) {
+      usernameSuggestions.value = await response.json()
+    } else {
+      usernameSuggestions.value = []
+    }
+  } catch {
+    usernameSuggestions.value = []
+  }
+}
+
+// Send invite to a player by username
+async function sendInvite() {
+  if (!inviteUsername.value) return
+
+  inviteLoading.value = true
+  inviteError.value = null
+
+  try {
+    const response = await fetch(`/games/${props.gameLobbyId}/lobby`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inviteTargetUsername: inviteUsername.value })
+    })
+
+    if (response.ok) {
+      inviteUsername.value = ''
+    } else {
+      inviteError.value = 'Failed to send invite. Please try again.'
+    }
+  } catch {
+    inviteError.value = 'Failed to send invite. Please try again.'
+  } finally {
+    inviteLoading.value = false
+  }
+}
+
 onMounted(() => {
   connect()
 })
@@ -128,6 +188,7 @@ onUnmounted(() => {
 <template>
   <div class="game-lobby-view min-h-dvh bg-stone-100 flex flex-col">
     <NavigationButton :is-logged-in="isLoggedIn" />
+    <NotificationMenu :is-logged-in="isLoggedIn" />
 
     <div class="flex-1 flex items-center justify-center p-4">
       <Card class="w-full max-w-md">
@@ -165,6 +226,44 @@ onUnmounted(() => {
               <p v-else class="text-sm text-green-600 font-medium">
                 All players have joined! Starting game...
               </p>
+            </div>
+
+            <!-- Invited players section -->
+            <div v-if="invitedPlayers.length > 0" class="bg-gray-50 rounded-lg p-4">
+              <h3 class="font-medium text-gray-700 mb-3">Invited</h3>
+              <ul class="space-y-2">
+                <li
+                  v-for="(player, index) in invitedPlayers"
+                  :key="index"
+                  class="flex items-center gap-2 text-gray-500"
+                >
+                  <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                  {{ player }}
+                </li>
+              </ul>
+            </div>
+
+            <!-- Invite by username -->
+            <div class="flex flex-col gap-2">
+              <h3 class="font-medium text-gray-700">Invite a player</h3>
+              <div class="flex gap-2">
+                <AutoComplete
+                  v-model="inviteUsername"
+                  :suggestions="usernameSuggestions"
+                  placeholder="Enter username..."
+                  class="flex-1"
+                  input-class="w-full"
+                  @complete="searchUsernames"
+                />
+                <Button
+                  label="Invite"
+                  icon="pi pi-user-plus"
+                  :loading="inviteLoading"
+                  :disabled="!inviteUsername"
+                  @click="sendInvite"
+                />
+              </div>
+              <p v-if="inviteError" class="text-sm text-red-600">{{ inviteError }}</p>
             </div>
 
             <!-- Instructions -->

@@ -5,7 +5,6 @@ module Handler.GameLobby where
 
 import Control.Applicative
 import Control.Concurrent
-import qualified Control.Monad as CM
 import Control.Monad.Loops
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import Controllers.Game.Api
@@ -17,6 +16,7 @@ import Controllers.GameLobby.GameLobby
 import Controllers.GameLobby.Model.GameLobby
 import qualified Controllers.GameLobby.Model.GameLobby as GL
 import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
+import Repository.LobbyRepository (InvitePlayerResult (..))
 import Data.Aeson
 import Data.Either
 import qualified Data.Map as M
@@ -32,6 +32,8 @@ import System.Random
 import Web.Cookie
 import Yesod.Core
 import Yesod.WebSockets
+import Network.HTTP.Types.Status (status404, status422)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser)
 
 getCreateGamePageR :: Handler Html
 getCreateGamePageR = do
@@ -41,7 +43,8 @@ getCreateGamePageR = do
     case maid of
       Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
       Just _ -> do
-        _ <- requireUsername
+        authedUser <- requireUsername
+        notifs <- liftIO $ notificationsForUser app (authenticatedUserId authedUser)
         gamePagelayout $ do
           addStylesheet $ (StaticR wordifyCss)
           addScript $ StaticR wordifyJs
@@ -57,7 +60,8 @@ getCreateGamePageR = do
                   "English": "en",
                   "Spanish (FISE)": "es_fise"
                 },
-                isLoggedIn: true
+                isLoggedIn: true,
+                notifications: #{toJSON notifs}
               });
             |]
 
@@ -128,16 +132,18 @@ handlerLobbyAuthenticated gameId userId =
         Left _ -> lift $ redirectHandler gameId
         Right gameLobby -> do
           join <- liftIO $ joinClient app gameLobby gameId userId
-          lift $ renderLobbyPage join gameId
+          invitedPlayers <- liftIO $ getInvitedPlayers (lobbyRepository app) gameId
+          notifs <- liftIO $ notificationsForUser app userId
+          lift $ renderLobbyPage join invitedPlayers notifs gameId
 
 redirectHandler :: Text -> Handler Html
 redirectHandler gameId = redirect (GameR gameId)
 
-renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> Text -> Handler Html
-renderLobbyPage (Left InvalidPlayerID) gameId = invalidArgs ["Invalid player ID given by browser"]
-renderLobbyPage (Left _) gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) gameId = gamePagelayout $ do
+renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> [Text] -> [Value] -> Text -> Handler Html
+renderLobbyPage (Left InvalidPlayerID) _ _ gameId = invalidArgs ["Invalid player ID given by browser"]
+renderLobbyPage (Left _) _ _ gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) _ _ gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) invitedPlayers notifs gameId = gamePagelayout $ do
   let joinedPlayerNames = map playerUsername (snapshotLobbyPlayers lobbySnapshot)
 
   addStylesheet $ (StaticR wordifyCss)
@@ -155,9 +161,11 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnaps
         playerCount: #{toJSON (snapshotAwaiting lobbySnapshot)},
         gameLobbyId: #{toJSON gameId},
         joinedPlayers: #{toJSON joinedPlayerNames},
+        invitedPlayers: #{toJSON invitedPlayers},
         language: #{toJSON (snapShotgameLanguage lobbySnapshot) },
         websocketUrl: webSocketUrl,
-        isLoggedIn: true
+        isLoggedIn: true,
+        notifications: #{toJSON notifs}
       });
     |]
 
@@ -178,6 +186,78 @@ lobbyWebSocketHandler app gameId playerId = do
             race_
               (forever $ atomically (toJSONResponse . handleChannelMessage <$> readTChan lobbyChannel) >>= C.sendTextData connection)
               (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
+
+newtype LobbyInviteRequest = LobbyInviteRequest { inviteTargetUsername :: Text }
+
+instance FromJSON LobbyInviteRequest where
+  parseJSON = withObject "LobbyInviteRequest" $ \obj ->
+    LobbyInviteRequest <$> obj .: "inviteTargetUsername"
+
+postGameLobbyR :: Text -> Handler ()
+postGameLobbyR gameId = do
+  app <- getYesod
+  authedUser <- requireUsername
+  req <- requireCheckJsonBody :: Handler LobbyInviteRequest
+  runResourceT $ do
+    (_, eitherLobby) <- getCacheableResource (gameLobbies app) gameId
+    case eitherLobby of
+      Left _ ->
+        lift $ sendStatusJSON status404 (object ["error" .= ("lobby_not_found" :: Text), "message" .= ("The game lobby was not found." :: Text)])
+      Right lobby -> do
+        result <- liftIO $ sendLobbyInvite
+          (lobbyRepository app)
+          lobby
+          (notificationService app)
+          gameId
+          (inviteTargetUsername req)
+          (authenticatedUserId authedUser)
+          (authenticatedUsername authedUser)
+        lift $ case result of
+          InvitePlayerSuccess _ -> return ()
+          InvitedUsernameNotFound -> sendStatusJSON status422 (object ["error" .= ("username_not_found" :: Text), "message" .= ("No user with that username exists." :: Text)])
+          InvitedSelf -> sendStatusJSON status422 (object ["error" .= ("cannot_invite_self" :: Text), "message" .= ("You cannot invite yourself to a game." :: Text)])
+
+getGameLobbyInviteR :: Text -> Handler Html
+getGameLobbyInviteR gameId = do
+  app <- getYesod
+  liftIO $ trackRequestReceivedActivity (inactivityTracker app)
+  maid <- maybeAuthId
+  case maid of
+    Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to accept the invite"
+    Just _ -> do
+      authedUser <- requireUsername
+      let userId = authenticatedUserId authedUser
+      runResourceT $ do
+        (_, lobby) <- getCacheableResource (gameLobbies app) gameId
+        case lobby of
+          Left _ -> lift $ redirect (GameR gameId)
+          Right gameLobby -> do
+            lobbySnapshot <- liftIO $ atomically (takeLobbySnapshot gameLobby)
+            inviterUsername <- liftIO $ getInviterForLobby (lobbyRepository app) gameId userId
+            notifs <- liftIO $ notificationsForUser app userId
+            lift $ renderGameInvitePage gameId (snapShotgameLanguage lobbySnapshot) inviterUsername notifs
+
+renderGameInvitePage :: Text -> Text -> Maybe Text -> [Value] -> Handler Html
+renderGameInvitePage gameId locale inviterUsername notifs = gamePagelayout $ do
+  addStylesheet $ (StaticR wordifyCss)
+  addScript $ StaticR wordifyJs
+  [whamlet|
+    <div #gameinvite>
+      |]
+  toWidget
+    [julius|
+      var url = document.URL;
+      var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
+
+      const invite = Wordify.createGameInvite('#gameinvite', {
+        websocketUrl: webSocketUrl,
+        gameLobbyId: #{toJSON gameId},
+        locale: #{toJSON locale},
+        invitedByUsername: #{toJSON (fromMaybe "Unknown" inviterUsername)},
+        isLoggedIn: true,
+        notifications: #{toJSON notifs}
+      });
+    |]
 
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html

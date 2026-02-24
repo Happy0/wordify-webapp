@@ -14,6 +14,29 @@
     const res = await fetch('/api/me');
     const auth = await res.json();
 
+    function transformNotification(n) {
+      return {
+        notificationId: String(n.id),
+        notificationCreatedAt: new Date(n.createdAt).getTime(),
+        notificationReadAt: n.readAt ? new Date(n.readAt).getTime() : undefined,
+        notificationDetails: n.details.type === 'game_invite'
+          ? { type: 'gameInvite', inviteFromUser: n.details.invitedByUserId, gameLobbyId: n.details.lobbyId }
+          : n.details,
+        url: n.details.type === 'game_invite' ? `/games/${n.details.lobbyId}/invite` : '/'
+      };
+    }
+
+    let notifications = [];
+    if (auth.loggedIn) {
+      try {
+        const notifRes = await fetch('/api/notifications');
+        if (notifRes.ok) {
+          const raw = await notifRes.json();
+          notifications = raw.map(transformNotification);
+        }
+      } catch {}
+    }
+
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const websocketUrl = `${wsProtocol}//${window.location.host}${window.location.pathname}`;
 
@@ -44,6 +67,7 @@
       websocketUrl: websocketUrl,
       gameId: gameId,
       isLoggedIn: auth.loggedIn,
+      notifications: notifications,
     });
   </script>
 </body>

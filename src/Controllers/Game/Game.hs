@@ -44,53 +44,49 @@ import Prelude
 import Model.GameSetup (extraRules, LocalisedGameSetup (gameLanguageShortCode))
 import qualified Control.Arrow as A
 import Wordify.Rules.Extra.ExtraRule (applyExtraRules, finalTransition, RuleApplicationsResult (finalTransition), RuleApplicationResult (transition))
-import Controllers.Common.CacheableSharedResource (ResourceCache, peekCacheableResource)
-import Controllers.Game.Model.UserEventSubscription
-import Controllers.Push.PushController
+import Modules.Notifications.Api (NotificationService, sendMoveNotification, sendGameOverNotification, sendGameStartedNotification)
+import Modules.UserEvent.Api (UserEventService, notifyMove, notifyGameOver, notifyPlayerActivityChanged)
 
-handlePlayerConnect :: Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerConnect :: Pool SqlBackend -> UserEventService -> ServerGame -> Maybe AuthUser -> IO ()
 handlePlayerConnect pool _ serverGame Nothing = pure ()
-handlePlayerConnect pool userEventChannelSubscriptions serverGame (Just user) = do
+handlePlayerConnect pool userEventSvc serverGame (Just user) = do
   now <- getCurrentTime
   persistPlayerLastSeen pool user (gameId serverGame) now
   atomically $ do
     newConnectionCount <- increasePlayerConnections serverGame user now
     when (isFirstConnection newConnectionCount) $ do
       notifyPlayerConnect serverGame user now
-      notifyUserChannelsPlayerActivity userEventChannelSubscriptions serverGame
+      notifyUserChannelsPlayerActivity userEventSvc serverGame
 
   where
     isFirstConnection :: Maybe Int -> Bool
     isFirstConnection (Just connectionCount) = connectionCount == 1
     isFirstConnection Nothing = False
 
-handlePlayerDisconnect :: Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> ServerGame -> Maybe AuthUser -> IO ()
+handlePlayerDisconnect :: Pool SqlBackend -> UserEventService -> ServerGame -> Maybe AuthUser -> IO ()
 handlePlayerDisconnect pool _ serverGame Nothing = pure ()
-handlePlayerDisconnect pool userEventChannelSubscriptions serverGame (Just user) = do
+handlePlayerDisconnect pool userEventSvc serverGame (Just user) = do
   now <- getCurrentTime
   persistPlayerLastSeen pool user (gameId serverGame) now
   atomically $ do
     newConnectionCount <- decreasePlayerConnections serverGame user now
     when (isLastConnection newConnectionCount) $ do
       notifyPlayerDisconnect serverGame user now
-      notifyUserChannelsPlayerActivity userEventChannelSubscriptions serverGame
+      notifyUserChannelsPlayerActivity userEventSvc serverGame
 
   where
     isLastConnection :: Maybe Int -> Bool
     isLastConnection (Just connectionCount) = connectionCount == 0
     isLastConnection Nothing = False
 
-notifyUserChannelsPlayerActivity :: ResourceCache Text (TChan UserEvent) -> ServerGame -> STM ()
-notifyUserChannelsPlayerActivity userEventChannelSubscriptions serverGame = do
+notifyUserChannelsPlayerActivity :: UserEventService -> ServerGame -> STM ()
+notifyUserChannelsPlayerActivity userEventSvc serverGame = do
   players <- mapM (readTVar . snd) (playing serverGame)
   let activeNames = [ defaultPlayerName i p | (i, p) <- Prelude.zip [1..] players, SP.numConnections p > 0 ]
       gId = gameId serverGame
   forM_ players $ \player -> do
     let userIdent = SP.playerId player
-    maybeChannel <- peekCacheableResource userEventChannelSubscriptions userIdent
-    case maybeChannel of
-      Nothing -> return ()
-      Just channel -> writeTChan channel (PlayerActivityChanged gId activeNames)
+    notifyPlayerActivityChanged userEventSvc userIdent gId activeNames
 
 notifyPlayerConnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
 notifyPlayerConnect serverGame user@(AuthUser userid _) now = do
@@ -105,21 +101,21 @@ notifyPlayerDisconnect serverGame user now = do
 persistPlayerLastSeen :: Pool SqlBackend -> AuthUser -> Text -> UTCTime -> IO ()
 persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen pool gameId userId
 
-withNotifyJoinAndLeave :: Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
-withNotifyJoinAndLeave pool userEventChannels serverGame maybeUser = bracket_ (handlePlayerConnect pool userEventChannels serverGame maybeUser) (handlePlayerDisconnect pool userEventChannels serverGame maybeUser)
+withNotifyJoinAndLeave :: Pool SqlBackend -> UserEventService -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
+withNotifyJoinAndLeave pool userEventSvc serverGame maybeUser = bracket_ (handlePlayerConnect pool userEventSvc serverGame maybeUser) (handlePlayerDisconnect pool userEventSvc serverGame maybeUser)
 
-performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Pool SqlBackend -> ResourceCache Text (TChan UserEvent) -> PushController -> UserController -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
-performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl _ player (BoardMove placed) =
-  handleBoardMove serverGame pool userChannelSubscriptions pushCtrl (player >>= getPlayerNumber serverGame) placed
-performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl _ player (ExchangeMove exchanged) =
-  handleExchangeMove serverGame pool userChannelSubscriptions pushCtrl (player >>= getPlayerNumber serverGame) exchanged
-performRequest serverGame _ _ pool userChannelSubscriptions pushCtrl _ player PassMove =
-  handlePassMove serverGame pool userChannelSubscriptions pushCtrl (player >>= getPlayerNumber serverGame)
+performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Pool SqlBackend -> UserEventService -> NotificationService -> UserController -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
+performRequest serverGame _ _ pool userEventSvc pushCtrl _ player (BoardMove placed) =
+  handleBoardMove serverGame pool userEventSvc pushCtrl (player >>= getPlayerNumber serverGame) placed
+performRequest serverGame _ _ pool userEventSvc pushCtrl _ player (ExchangeMove exchanged) =
+  handleExchangeMove serverGame pool userEventSvc pushCtrl (player >>= getPlayerNumber serverGame) exchanged
+performRequest serverGame _ _ pool userEventSvc pushCtrl _ player PassMove =
+  handlePassMove serverGame pool userEventSvc pushCtrl (player >>= getPlayerNumber serverGame)
 performRequest serverGame chatroom _ _ _ _ userCtrl player (SendChatMessage msg) =
   handleChatMessage serverGame chatroom userCtrl player msg
 performRequest serverGame _ _ _ _ _ _ player (AskPotentialScore placed) =
   handlePotentialScore serverGame placed
-performRequest serverGame _ gameDefinitionWorker _ userChannelSubscriptions _ _ player (AskDefinition word) =
+performRequest serverGame _ gameDefinitionWorker _ userEventSvc _ _ player (AskDefinition word) =
   handleAskDefinition gameDefinitionWorker serverGame (player >>= getPlayerNumber serverGame) word
 
 handleAskDefinition :: GameDefinitionController -> ServerGame -> Maybe Int -> Text -> IO ServerResponse
@@ -158,13 +154,13 @@ handlePotentialScore serverGame placedTiles =
 handleMove ::
   ServerGame ->
   Pool SqlBackend ->
-  ResourceCache Text (TChan UserEvent) ->
-  PushController ->
+  UserEventService ->
+  NotificationService ->
   Int ->
   Move ->
   (Either Text GameTransition -> ServerResponse) ->
   IO ServerResponse
-handleMove serverGame pool userEventChannelSubscriptions pushCtrl playerMoving move moveOutcomeHandler =
+handleMove serverGame pool userEventSvc pushCtrl playerMoving move moveOutcomeHandler =
   do
     now <- getCurrentTime
     moveResult <- atomically $ do
@@ -196,7 +192,7 @@ handleMove serverGame pool userEventChannelSubscriptions pushCtrl playerMoving m
               GameFinished _ _ -> True
               _ -> False
 
-        updateUserChannelsOfMove userEventChannelSubscriptions serverGame newSnapshot isGameOver
+        updateUserChannelsOfMove userEventSvc serverGame newSnapshot isGameOver
         sendMovePushNotification pushCtrl newSnapshot transition (currentPlayerToMove newSnapshot)
 
         -- TODO: Think of how to handle this if it fails... Could end up with a corrupted game state if next move succeeds (missing move)
@@ -205,7 +201,7 @@ handleMove serverGame pool userEventChannelSubscriptions pushCtrl playerMoving m
 
         return $ moveOutcomeHandler moveOutcome
 
-sendMovePushNotification :: PushController -> ServerGameSnapshot -> GameTransition -> Maybe Text -> IO ()
+sendMovePushNotification :: NotificationService -> ServerGameSnapshot -> GameTransition -> Maybe Text -> IO ()
 sendMovePushNotification pushCtrl snapshot (GameFinished _ _) _ =
   forM_ (snapshotPlayers snapshot) $ \player ->
     sendGameOverNotification pushCtrl (SP.playerId player) (snapshotGameId snapshot)
@@ -213,18 +209,16 @@ sendMovePushNotification _ _ _ Nothing = pure ()
 sendMovePushNotification pushCtrl snapshot _ (Just nextPlayerId) =
   sendMoveNotification pushCtrl nextPlayerId (snapshotGameId snapshot)
 
-updateUserChannelsOfMove :: ResourceCache Text (TChan UserEvent) -> ServerGame -> ServerGameSnapshot -> Bool -> IO ()
-updateUserChannelsOfMove userEventChannelSubscriptions serverGame snapshot gameOver = do
+updateUserChannelsOfMove :: UserEventService -> ServerGame -> ServerGameSnapshot -> Bool -> IO ()
+updateUserChannelsOfMove userEventSvc serverGame snapshot gameOver = do
   let players = snapshotPlayers snapshot
       gId = snapshotGameId snapshot
   forM_ players $ \player -> do
     let userIdent = SP.playerId player
-    atomically $ do
-      maybeChannel <- peekCacheableResource userEventChannelSubscriptions userIdent
-      case (maybeChannel, gameOver) of
-        (Nothing, _) -> return ()
-        (Just channel, True) -> writeTChan channel (GameOver gId serverGame)
-        (Just channel, False) -> writeTChan channel (MoveInUserGame gId serverGame)
+    atomically $
+      if gameOver
+        then notifyGameOver userEventSvc userIdent gId serverGame
+        else notifyMove userEventSvc userIdent gId serverGame
 
 applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameTransition
 applyLocalisedRules gameTransition localisedGameSetup =
@@ -233,13 +227,13 @@ applyLocalisedRules gameTransition localisedGameSetup =
   in let resultWithTransformedError = A.left (pack. show) ruleApplicationResult
   in finalTransition <$> resultWithTransformedError
 
-handleBoardMove :: ServerGame -> Pool SqlBackend ->  ResourceCache Text (TChan UserEvent) -> PushController -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
+handleBoardMove :: ServerGame -> Pool SqlBackend -> UserEventService -> NotificationService -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
 handleBoardMove _ _ _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"
-handleBoardMove sharedServerGame pool userChannelSubscriptions pushCtrl (Just playerNo) placed =
+handleBoardMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) placed =
   handleMove
     sharedServerGame
     pool
-    userChannelSubscriptions
+    userEventSvc
     pushCtrl
     playerNo
     (PlaceTiles $ M.fromList placed)
@@ -249,13 +243,13 @@ handleBoardMove sharedServerGame pool userChannelSubscriptions pushCtrl (Just pl
     moveOutcomeHandler (Right (MoveTransition newPlayer _ _)) = BoardMoveSuccess (tilesOnRack newPlayer)
     moveOutcomeHandler (Right _) = BoardMoveSuccess []
 
-handleExchangeMove :: ServerGame -> Pool SqlBackend ->  ResourceCache Text (TChan UserEvent) -> PushController -> Maybe Int -> [Tile] -> IO ServerResponse
+handleExchangeMove :: ServerGame -> Pool SqlBackend -> UserEventService -> NotificationService -> Maybe Int -> [Tile] -> IO ServerResponse
 handleExchangeMove _ _ _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"
-handleExchangeMove sharedServerGame pool userchannelSubscriptions pushCtrl (Just playerNo) exchanged =
+handleExchangeMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) exchanged =
   handleMove
     sharedServerGame
     pool
-    userchannelSubscriptions
+    userEventSvc
     pushCtrl
     playerNo
     (Exchange exchanged)
@@ -265,10 +259,10 @@ handleExchangeMove sharedServerGame pool userchannelSubscriptions pushCtrl (Just
     moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer _)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
     moveOutcomeHandler _ = InvalidCommand "internal server error, unexpected transition"
 
-handlePassMove :: ServerGame -> Pool SqlBackend ->  ResourceCache Text (TChan UserEvent) -> PushController -> Maybe Int -> IO ServerResponse
+handlePassMove :: ServerGame -> Pool SqlBackend -> UserEventService -> NotificationService -> Maybe Int -> IO ServerResponse
 handlePassMove _ _ _ _ Nothing = return $ InvalidCommand "Observers cannot move"
-handlePassMove sharedServerGame pool userChannelSubscriptions pushCtrl (Just playerNo) =
-  handleMove sharedServerGame pool userChannelSubscriptions pushCtrl playerNo Pass moveOutcomeHandler
+handlePassMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) =
+  handleMove sharedServerGame pool userEventSvc pushCtrl playerNo Pass moveOutcomeHandler
   where
     moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right _) = PassMoveSuccess

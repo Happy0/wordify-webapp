@@ -18,11 +18,14 @@
 /create-lobby CreateGamePageR GET
 
 /games CreateGameR POST
-/games/#Text/lobby GameLobbyR GET
+/games/#Text/lobby GameLobbyR GET POST
+/games/#Text/lobby/invite GameLobbyInviteR GET
 /games/#Text GameR GET
 
 /push/subscribe SubscribeR POST
 
 /choose-username ChooseUsernameR GET
 /api/username SetUsernameR POST
+/api/usernames UsernameSearchR GET
 /api/me ApiMeR GET
+/api/notifications NotificationsR GET POST

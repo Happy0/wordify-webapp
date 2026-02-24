@@ -18,11 +18,12 @@ import Controllers.Chat.Chatroom
 import Controllers.Common.CacheableSharedResource
 
 import Controllers.Game.GameDefinitionController (GameDefinitionController)
-import Controllers.Push.PushController (PushController)
+import Modules.Notifications.Api (NotificationService)
 import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
 import Controllers.User.UserController (UserController)
+import Repository.SQL.SqlLobbyRepository (SqlLobbyRepositoryBackend)
 import qualified Controllers.User.UserController as UC
 import qualified Controllers.User.Model.ServerUser as SU
 import qualified Data.CaseInsensitive as CI
@@ -46,7 +47,7 @@ import Yesod.Core.Types (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
 import Yesod.Default.Util (addStaticContentExternal)
 import Model.GameSetup (LocalisedGameSetup)
-import Controllers.Game.Model.UserEventSubscription
+import Modules.UserEvent.Api (UserEventService)
 
 data AuthDetails = AuthDetails
   { clientId :: Text,
@@ -74,14 +75,15 @@ data App = App
     gameLobbies :: ResourceCache Text GameLobby,
     games :: ResourceCache Text ServerGame,
     chatRooms :: ResourceCache Text Chatroom,
-    userEventChannels :: ResourceCache Text (TChan UserEvent),
+    userEventService :: UserEventService,
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,
     inactivityTracker :: TVar InactivityTracker,
     gameDefinitionController :: GameDefinitionController,
-    pushController :: PushController,
+    notificationService :: NotificationService,
     vapidPublicKey :: Maybe Text,
-    userController :: UserController
+    userController :: UserController,
+    lobbyRepository :: SqlLobbyRepositoryBackend
   }
 
 data MenuItem = MenuItem

@@ -95,9 +95,15 @@ Notification
     userId UserId
     createdAt UTCTime
     readAt UTCTime Maybe
+    expiresAt UTCTime Maybe
     notificationType Text
 
 InviteNotification
     notificationId NotificationId
     lobbyId LobbyId
     invitedBy UserId
+
+LobbyInvite
+    lobby LobbyId
+    inviteFrom UserId
+    inviteTo UserId

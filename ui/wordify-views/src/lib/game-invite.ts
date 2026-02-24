@@ -4,17 +4,15 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import 'primeicons/primeicons.css'
 import '../style.css'
-import CreateGameView from '../views/CreateGameView.vue'
+import GameInviteView from '../views/GameInviteView.vue'
 import { useNotificationStore } from '../stores/notificationStore'
 import type { NotificationItem } from '../types/notifications'
 
-export interface CreateGameOptions {
+export interface GameInviteOptions {
   /**
-   * Map of locale display names to locale values
-   * Key: Display name shown to user (e.g., "English (US)")
-   * Value: Locale code sent to server (e.g., "en_us")
+   * WebSocket URL to connect to
    */
-  locales: Record<string, string>
+  websocketUrl: string
 
   /**
    * Whether the user is currently logged in
@@ -23,23 +21,41 @@ export interface CreateGameOptions {
   isLoggedIn?: boolean
 
   /**
+   * The unique identifier for the game lobby the user has been invited to
+   */
+  gameLobbyId: string
+
+  /**
+   * The locale/language the game is set up with
+   */
+  locale: string
+
+  /**
+   * The username of the person who sent the invite
+   */
+  invitedByUsername: string
+
+  /**
    * Array of notifications to display in the notification bell menu
    */
   notifications?: NotificationItem[]
 }
 
-export interface CreateGameInstance {
+export interface GameInviteInstance {
   app: App
   unmount: () => void
   updateNotifications: (notifications: NotificationItem[]) => void
 }
 
-export function createCreateGame(
+export function createGameInvite(
   element: string | HTMLElement,
-  options: CreateGameOptions
-): CreateGameInstance {
-  const app = createApp(CreateGameView, {
-    locales: options.locales
+  options: GameInviteOptions
+): GameInviteInstance {
+  const app = createApp(GameInviteView, {
+    websocketUrl: options.websocketUrl,
+    gameLobbyId: options.gameLobbyId,
+    locale: options.locale,
+    invitedByUsername: options.invitedByUsername
   })
 
   const pinia = createPinia()
