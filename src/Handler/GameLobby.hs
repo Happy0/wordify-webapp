@@ -5,7 +5,6 @@ module Handler.GameLobby where
 
 import Control.Applicative
 import Control.Concurrent
-import qualified Control.Monad as CM
 import Control.Monad.Loops
 import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
 import Controllers.Game.Api
@@ -130,16 +129,17 @@ handlerLobbyAuthenticated gameId userId =
         Left _ -> lift $ redirectHandler gameId
         Right gameLobby -> do
           join <- liftIO $ joinClient app gameLobby gameId userId
-          lift $ renderLobbyPage join gameId
+          invitedPlayers <- liftIO $ getInvitedPlayers (lobbyRepository app) gameId
+          lift $ renderLobbyPage join invitedPlayers gameId
 
 redirectHandler :: Text -> Handler Html
 redirectHandler gameId = redirect (GameR gameId)
 
-renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> Text -> Handler Html
-renderLobbyPage (Left InvalidPlayerID) gameId = invalidArgs ["Invalid player ID given by browser"]
-renderLobbyPage (Left _) gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) gameId = gamePagelayout $ do
+renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> [Text] -> Text -> Handler Html
+renderLobbyPage (Left InvalidPlayerID) _ gameId = invalidArgs ["Invalid player ID given by browser"]
+renderLobbyPage (Left _) _ gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) _ gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) invitedPlayers gameId = gamePagelayout $ do
   let joinedPlayerNames = map playerUsername (snapshotLobbyPlayers lobbySnapshot)
 
   addStylesheet $ (StaticR wordifyCss)
@@ -157,6 +157,7 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnaps
         playerCount: #{toJSON (snapshotAwaiting lobbySnapshot)},
         gameLobbyId: #{toJSON gameId},
         joinedPlayers: #{toJSON joinedPlayerNames},
+        invitedPlayers: #{toJSON invitedPlayers},
         language: #{toJSON (snapShotgameLanguage lobbySnapshot) },
         websocketUrl: webSocketUrl,
         isLoggedIn: true
@@ -185,7 +186,7 @@ newtype LobbyInviteRequest = LobbyInviteRequest { inviteTargetUsername :: Text }
 
 instance FromJSON LobbyInviteRequest where
   parseJSON = withObject "LobbyInviteRequest" $ \obj ->
-    LobbyInviteRequest <$> obj .: "invitedUsername"
+    LobbyInviteRequest <$> obj .: "inviteTargetUsername"
 
 postGameLobbyR :: Text -> Handler ()
 postGameLobbyR gameId = do
@@ -208,6 +209,7 @@ postGameLobbyR gameId = do
         lift $ case result of
           InvitePlayerSuccess -> return ()
           InvitedUsernameNotFound -> sendStatusJSON status422 (object ["error" .= ("username_not_found" :: Text), "message" .= ("No user with that username exists." :: Text)])
+          InvitedSelf -> sendStatusJSON status422 (object ["error" .= ("cannot_invite_self" :: Text), "message" .= ("You cannot invite yourself to a game." :: Text)])
 
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html

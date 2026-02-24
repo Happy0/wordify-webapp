@@ -5,7 +5,7 @@ import Data.Pool (Pool)
 import qualified Data.Text as T
 import Database.Persist.Sql
 import qualified Model as M
-import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites), LobbyInvite (..), InvitePlayerResult (..))
+import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites), InvitePlayerResult (..))
 
 newtype SqlLobbyRepositoryBackend = SqlLobbyRepositoryBackend (Pool SqlBackend)
 
@@ -23,13 +23,12 @@ invitePlayerSQL pool gameLobbyId invitedUsername inviterUserId =
         insert_ (M.LobbyInvite (M.LobbyKey gameLobbyId) (M.UserKey inviterUserId) (M.UserKey invitedUserId))
         return InvitePlayerSuccess
 
-getLobbyInvitesSQL :: Pool SqlBackend -> T.Text -> IO [LobbyInvite]
+getLobbyInvitesSQL :: Pool SqlBackend -> T.Text -> IO [T.Text]
 getLobbyInvitesSQL pool gameLobbyId =
   withPool pool $ do
-    inviteEntities <- selectList [M.LobbyInviteLobby ==. M.LobbyKey gameLobbyId] []
-    return $ fmap inviteFromEntity inviteEntities
-  where
-    inviteFromEntity (Entity _ (M.LobbyInvite (M.LobbyKey lobbyId) (M.UserKey fromId) (M.UserKey toId))) =
-      LobbyInvite lobbyId fromId toId
+    results <- rawSql
+      "SELECT u.username FROM lobby_invite li JOIN \"user\" u ON u.ident = li.invite_to WHERE li.lobby = ? AND u.username IS NOT NULL"
+      [PersistText gameLobbyId]
+    return [uname | Single (Just uname) <- results]
 
 withPool = flip runSqlPersistMPool

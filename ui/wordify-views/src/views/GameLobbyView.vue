@@ -133,7 +133,7 @@ async function copyLink() {
 // Autocomplete usernames from API
 async function searchUsernames(event: { query: string }) {
   try {
-    const response = await fetch(`/api/usernames?query=${encodeURIComponent(event.query)}`)
+    const response = await fetch(`/api/usernames?prefix=${encodeURIComponent(event.query)}`)
     if (response.ok) {
       usernameSuggestions.value = await response.json()
     } else {

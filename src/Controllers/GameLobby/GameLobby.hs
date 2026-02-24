@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage, sendLobbyInvite) where
+module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage, sendLobbyInvite, getInvitedPlayers) where
 
 import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
@@ -6,7 +6,7 @@ import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.STM
 import qualified Modules.UserEvent.Api as UE
-import Repository.LobbyRepository (LobbyRepository (invitePlayer), InvitePlayerResult (..))
+import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites), InvitePlayerResult (..))
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
@@ -82,13 +82,19 @@ startGame app gameId gameLanguage channel serverGame = do
     notifyGameStartedPush app gameId serverGame
 
 sendLobbyInvite :: LobbyRepository r => r -> GameLobby -> T.Text -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
-sendLobbyInvite repo lobby gameLobbyId invitedUsername inviterUserId inviterUsername = do
-  result <- invitePlayer repo gameLobbyId invitedUsername inviterUserId
-  case result of
-    InvitePlayerSuccess -> do
-      atomically $ writeTChan (channel lobby) (PlayerInvited invitedUsername inviterUsername)
-      return InvitePlayerSuccess
-    InvitedUsernameNotFound -> return InvitedUsernameNotFound
+sendLobbyInvite repo lobby gameLobbyId invitedUsername inviterUserId inviterUsername
+  | invitedUsername == inviterUsername = return InvitedSelf
+  | otherwise = do
+      result <- invitePlayer repo gameLobbyId invitedUsername inviterUserId
+      case result of
+        InvitePlayerSuccess -> do
+          atomically $ writeTChan (channel lobby) (PlayerInvited invitedUsername inviterUsername)
+          return InvitePlayerSuccess
+        InvitedUsernameNotFound -> return InvitedUsernameNotFound
+        InvitedSelf -> return InvitedSelf
+
+getInvitedPlayers :: LobbyRepository r => r -> T.Text -> IO [T.Text]
+getInvitedPlayers repo = getLobbyInvites repo
 
 handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
