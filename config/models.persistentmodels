@@ -102,3 +102,8 @@ InviteNotification
     notificationId NotificationId
     lobbyId LobbyId
     invitedBy UserId
+
+LobbyInvite
+    lobby LobbyId
+    inviteFrom UserId
+    inviteTo UserId
