@@ -217,6 +217,48 @@ postGameLobbyR gameId = do
           InvitedUsernameNotFound -> sendStatusJSON status422 (object ["error" .= ("username_not_found" :: Text), "message" .= ("No user with that username exists." :: Text)])
           InvitedSelf -> sendStatusJSON status422 (object ["error" .= ("cannot_invite_self" :: Text), "message" .= ("You cannot invite yourself to a game." :: Text)])
 
+getGameLobbyInviteR :: Text -> Handler Html
+getGameLobbyInviteR gameId = do
+  app <- getYesod
+  liftIO $ trackRequestReceivedActivity (inactivityTracker app)
+  maid <- maybeAuthId
+  case maid of
+    Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to accept the invite"
+    Just _ -> do
+      authedUser <- requireUsername
+      let userId = authenticatedUserId authedUser
+      runResourceT $ do
+        (_, lobby) <- getCacheableResource (gameLobbies app) gameId
+        case lobby of
+          Left _ -> lift $ redirect (GameR gameId)
+          Right gameLobby -> do
+            lobbySnapshot <- liftIO $ atomically (takeLobbySnapshot gameLobby)
+            inviterUsername <- liftIO $ getInviterForLobby (lobbyRepository app) gameId userId
+            notifs <- liftIO $ notificationsForUser app userId
+            lift $ renderGameInvitePage gameId (snapShotgameLanguage lobbySnapshot) inviterUsername notifs
+
+renderGameInvitePage :: Text -> Text -> Maybe Text -> [Value] -> Handler Html
+renderGameInvitePage gameId locale inviterUsername notifs = gamePagelayout $ do
+  addStylesheet $ (StaticR wordifyCss)
+  addScript $ StaticR wordifyJs
+  [whamlet|
+    <div #gameinvite>
+      |]
+  toWidget
+    [julius|
+      var url = document.URL;
+      var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
+
+      const invite = Wordify.createGameInvite('#gameinvite', {
+        websocketUrl: webSocketUrl,
+        gameLobbyId: #{toJSON gameId},
+        locale: #{toJSON locale},
+        invitedByUsername: #{toJSON (fromMaybe "Unknown" inviterUsername)},
+        isLoggedIn: true,
+        notifications: #{toJSON notifs}
+      });
+    |]
+
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html
 gamePagelayout widget = do

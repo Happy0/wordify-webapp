@@ -19,6 +19,7 @@
 
 /games CreateGameR POST
 /games/#Text/lobby GameLobbyR GET POST
+/games/#Text/lobby/invite GameLobbyInviteR GET
 /games/#Text GameR GET
 
 /push/subscribe SubscribeR POST

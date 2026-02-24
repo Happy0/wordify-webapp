@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage, sendLobbyInvite, getInvitedPlayers) where
+module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage, sendLobbyInvite, getInvitedPlayers, getInviterForLobby) where
 
 import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
@@ -6,7 +6,7 @@ import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.STM
 import qualified Modules.UserEvent.Api as UE
-import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites), InvitePlayerResult (..))
+import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites, getInviterForUser), InvitePlayerResult (..))
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
@@ -96,6 +96,9 @@ sendLobbyInvite repo lobby notifSvc gameLobbyId invitedUsername inviterUserId in
 
 getInvitedPlayers :: LobbyRepository r => r -> T.Text -> IO [T.Text]
 getInvitedPlayers repo = getLobbyInvites repo
+
+getInviterForLobby :: LobbyRepository r => r -> T.Text -> T.Text -> IO (Maybe T.Text)
+getInviterForLobby repo = getInviterForUser repo
 
 handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer
