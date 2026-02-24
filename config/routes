@@ -18,7 +18,7 @@
 /create-lobby CreateGamePageR GET
 
 /games CreateGameR POST
-/games/#Text/lobby GameLobbyR GET
+/games/#Text/lobby GameLobbyR GET POST
 /games/#Text GameR GET
 
 /push/subscribe SubscribeR POST

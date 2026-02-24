@@ -1,4 +1,4 @@
-module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage) where
+module Controllers.GameLobby.GameLobby (joinClient, handleChannelMessage, sendLobbyInvite) where
 
 import ClassyPrelude (UTCTime)
 import Control.Concurrent.STM.TChan
@@ -6,6 +6,7 @@ import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.STM
 import qualified Modules.UserEvent.Api as UE
+import Repository.LobbyRepository (LobbyRepository (invitePlayer), InvitePlayerResult (..))
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.Game.Persist
@@ -79,6 +80,15 @@ startGame app gameId gameLanguage channel serverGame = do
     notifyNewGame app serverGame
     -- Send push notifications to all players
     notifyGameStartedPush app gameId serverGame
+
+sendLobbyInvite :: LobbyRepository r => r -> GameLobby -> T.Text -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
+sendLobbyInvite repo lobby gameLobbyId invitedUsername inviterUserId inviterUsername = do
+  result <- invitePlayer repo gameLobbyId invitedUsername inviterUserId
+  case result of
+    InvitePlayerSuccess -> do
+      atomically $ writeTChan (channel lobby) (PlayerInvited invitedUsername inviterUsername)
+      return InvitePlayerSuccess
+    InvitedUsernameNotFound -> return InvitedUsernameNotFound
 
 handleChannelMessage :: LobbyMessage -> LobbyResponse
 handleChannelMessage (PlayerJoined serverPlayer) = Joined serverPlayer

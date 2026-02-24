@@ -17,6 +17,7 @@ import Controllers.GameLobby.GameLobby
 import Controllers.GameLobby.Model.GameLobby
 import qualified Controllers.GameLobby.Model.GameLobby as GL
 import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
+import Repository.LobbyRepository (InvitePlayerResult (..))
 import Data.Aeson
 import Data.Either
 import qualified Data.Map as M
@@ -32,6 +33,7 @@ import System.Random
 import Web.Cookie
 import Yesod.Core
 import Yesod.WebSockets
+import Network.HTTP.Types.Status (status404, status422)
 
 getCreateGamePageR :: Handler Html
 getCreateGamePageR = do
@@ -178,6 +180,34 @@ lobbyWebSocketHandler app gameId playerId = do
             race_
               (forever $ atomically (toJSONResponse . handleChannelMessage <$> readTChan lobbyChannel) >>= C.sendTextData connection)
               (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
+
+newtype LobbyInviteRequest = LobbyInviteRequest { inviteTargetUsername :: Text }
+
+instance FromJSON LobbyInviteRequest where
+  parseJSON = withObject "LobbyInviteRequest" $ \obj ->
+    LobbyInviteRequest <$> obj .: "invitedUsername"
+
+postGameLobbyR :: Text -> Handler ()
+postGameLobbyR gameId = do
+  app <- getYesod
+  authedUser <- requireUsername
+  req <- requireCheckJsonBody :: Handler LobbyInviteRequest
+  runResourceT $ do
+    (_, eitherLobby) <- getCacheableResource (gameLobbies app) gameId
+    case eitherLobby of
+      Left _ ->
+        lift $ sendStatusJSON status404 (object ["error" .= ("lobby_not_found" :: Text), "message" .= ("The game lobby was not found." :: Text)])
+      Right lobby -> do
+        result <- liftIO $ sendLobbyInvite
+          (lobbyRepository app)
+          lobby
+          gameId
+          (inviteTargetUsername req)
+          (authenticatedUserId authedUser)
+          (authenticatedUsername authedUser)
+        lift $ case result of
+          InvitePlayerSuccess -> return ()
+          InvitedUsernameNotFound -> sendStatusJSON status422 (object ["error" .= ("username_not_found" :: Text), "message" .= ("No user with that username exists." :: Text)])
 
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html

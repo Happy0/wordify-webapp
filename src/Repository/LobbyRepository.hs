@@ -1,6 +1,7 @@
 module Repository.LobbyRepository
   ( LobbyRepository (invitePlayer, getLobbyInvites),
     LobbyInvite (..),
+    InvitePlayerResult (..),
   )
 where
 
@@ -13,8 +14,10 @@ data LobbyInvite = LobbyInvite
     inviteToUserId :: T.Text
   }
 
+data InvitePlayerResult = InvitePlayerSuccess | InvitedUsernameNotFound
+
 class LobbyRepository a where
-  -- | Invite a player to a lobby by their username. Does nothing if the username does not exist.
-  invitePlayer :: a -> T.Text -> T.Text -> T.Text -> IO ()
+  -- | Invite a player to a lobby by their username. Returns InvitedUsernameNotFound if the username does not exist.
+  invitePlayer :: a -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
   -- | Get all invites for a given lobby.
   getLobbyInvites :: a -> T.Text -> IO [LobbyInvite]

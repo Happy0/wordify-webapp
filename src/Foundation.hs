@@ -23,6 +23,7 @@ import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
 import Controllers.User.UserController (UserController)
+import Repository.SQL.SqlLobbyRepository (SqlLobbyRepositoryBackend)
 import qualified Controllers.User.UserController as UC
 import qualified Controllers.User.Model.ServerUser as SU
 import qualified Data.CaseInsensitive as CI
@@ -81,7 +82,8 @@ data App = App
     gameDefinitionController :: GameDefinitionController,
     notificationService :: NotificationService,
     vapidPublicKey :: Maybe Text,
-    userController :: UserController
+    userController :: UserController,
+    lobbyRepository :: SqlLobbyRepositoryBackend
   }
 
 data MenuItem = MenuItem

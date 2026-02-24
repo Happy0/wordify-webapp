@@ -5,7 +5,7 @@ import Data.Pool (Pool)
 import qualified Data.Text as T
 import Database.Persist.Sql
 import qualified Model as M
-import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites), LobbyInvite (..))
+import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites), LobbyInvite (..), InvitePlayerResult (..))
 
 newtype SqlLobbyRepositoryBackend = SqlLobbyRepositoryBackend (Pool SqlBackend)
 
@@ -13,14 +13,15 @@ instance LobbyRepository SqlLobbyRepositoryBackend where
   invitePlayer (SqlLobbyRepositoryBackend pool) = invitePlayerSQL pool
   getLobbyInvites (SqlLobbyRepositoryBackend pool) = getLobbyInvitesSQL pool
 
-invitePlayerSQL :: Pool SqlBackend -> T.Text -> T.Text -> T.Text -> IO ()
+invitePlayerSQL :: Pool SqlBackend -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
 invitePlayerSQL pool gameLobbyId invitedUsername inviterUserId =
   withPool pool $ do
     maybeUser <- selectFirst [M.UserUsername ==. Just invitedUsername] []
     case maybeUser of
-      Nothing -> return ()
-      Just (Entity (M.UserKey invitedUserId) _) ->
+      Nothing -> return InvitedUsernameNotFound
+      Just (Entity (M.UserKey invitedUserId) _) -> do
         insert_ (M.LobbyInvite (M.LobbyKey gameLobbyId) (M.UserKey inviterUserId) (M.UserKey invitedUserId))
+        return InvitePlayerSuccess
 
 getLobbyInvitesSQL :: Pool SqlBackend -> T.Text -> IO [LobbyInvite]
 getLobbyInvitesSQL pool gameLobbyId =
