@@ -22,6 +22,7 @@ import { useToast } from 'primevue/usetoast'
 import NavigationButton from '@/components/common/NavigationButton.vue'
 import NotificationMenu from '@/components/common/NotificationMenu.vue'
 import { usePushNotifications } from '@/composables/usePushNotifications'
+import { useNotificationSocketMessages } from '@/composables/useNotificationSocketMessages'
 
 // Props for SSR initialization
 const props = defineProps<{
@@ -31,7 +32,8 @@ const props = defineProps<{
 
 const store = useGameStore()
 const { lastError, candidateTilesOnBoard, lastChatMessageReceived, chatMessages, myPlayer, gameId, isMyTurn, gameEnded } = storeToRefs(store)
-const { controller, connect, connectionState } = useGameController()
+const { controller, connect, connectionState, transport } = useGameController()
+useNotificationSocketMessages(transport)
 const toast = useToast()
 
 // Inject isLoggedIn from the app-level provider

@@ -5,7 +5,7 @@ import type { IGameTransport, ConnectionState, ReconnectParams } from './interfa
 export class WebSocketTransport implements IGameTransport {
   private ws: WebSocket | null = null
   private state: ConnectionState = 'disconnected'
-  private messageHandler: ((message: string) => void) | null = null
+  private messageHandlers: Array<(message: string) => void> = []
   private stateChangeHandler: ((state: ConnectionState) => void) | null = null
   private reconnectDelay = 5000 // Fixed 5 second delay between reconnect attempts
   private url: string | null = null
@@ -52,8 +52,8 @@ export class WebSocketTransport implements IGameTransport {
       }
 
       this.ws.onmessage = (event) => {
-        if (this.messageHandler) {
-          this.messageHandler(event.data)
+        for (const handler of this.messageHandlers) {
+          handler(event.data)
         }
       }
 
@@ -104,7 +104,7 @@ export class WebSocketTransport implements IGameTransport {
   }
 
   onMessage(handler: (message: string) => void): void {
-    this.messageHandler = handler
+    this.messageHandlers.push(handler)
   }
 
   onStateChange(handler: (state: ConnectionState) => void): void {

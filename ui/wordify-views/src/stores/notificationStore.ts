@@ -9,5 +9,17 @@ export const useNotificationStore = defineStore('notifications', () => {
     notifications.value = incoming
   }
 
-  return { notifications, updateNotifications }
+  function addNotification(n: NotificationItem) {
+    notifications.value = [n, ...notifications.value].slice(0, 5)
+  }
+
+  function markNotificationsAsRead(ids: string[]) {
+    const idSet = new Set(ids)
+    const readAt = Date.now()
+    notifications.value = notifications.value.map((n) =>
+      idSet.has(n.notificationId) ? { ...n, notificationReadAt: readAt } : n
+    )
+  }
+
+  return { notifications, updateNotifications, addNotification, markNotificationsAsRead }
 })

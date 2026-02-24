@@ -8,6 +8,7 @@ import NavigationButton from '@/components/common/NavigationButton.vue'
 import NotificationMenu from '@/components/common/NotificationMenu.vue'
 import MiniBoard from '@/components/home/MiniBoard.vue'
 import { useHomeWebSocket } from '@/composables/useHomeWebSocket'
+import { useNotificationSocketMessages } from '@/composables/useNotificationSocketMessages'
 import type { GameSummary } from '@/lib/home'
 
 const props = defineProps<{
@@ -17,7 +18,8 @@ const props = defineProps<{
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
 const toast = useToast()
 
-const { games, connectionState, connect, disconnect } = useHomeWebSocket(props.games)
+const { games, connectionState, transport, connect, disconnect } = useHomeWebSocket(props.games)
+useNotificationSocketMessages(transport)
 
 const hasGames = computed(() => games.value.length > 0)
 

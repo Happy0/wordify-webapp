@@ -38,6 +38,7 @@ export function useHomeWebSocket(initialGames: GameSummary[]) {
   return {
     games: games as Ref<GameSummary[]>,
     connectionState: readonly(connectionState),
+    transport,
     connect,
     disconnect
   }
