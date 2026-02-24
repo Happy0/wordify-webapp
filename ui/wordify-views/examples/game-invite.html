@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordify Game Invite Example</title>
+  <!-- Load the bundled CSS -->
+  <link rel="stylesheet" href="../dist/wordify-ui.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Load the UMD bundle -->
+  <script src="../dist/wordify.umd.js"></script>
+  <script>
+    // Check if Wordify loaded correctly
+    if (typeof Wordify === 'undefined') {
+      console.error('Wordify failed to load - check that dist/wordify.umd.js exists');
+      document.body.innerHTML = '<h1>Error: Wordify library not loaded</h1><p>Run "npm run build" first, then serve this file with a local server (e.g., "npx serve .")</p>';
+      throw new Error('Wordify not loaded');
+    }
+    console.log('Wordify loaded:', Object.keys(Wordify));
+  </script>
+  <script>
+    // Mount the Game Invite view
+    const gameInvite = Wordify.createGameInvite('#app', {
+      // WebSocket URL for real-time updates (using a mock URL for this example)
+      websocketUrl: 'wss://example.com/invite/abc123-example-lobby',
+      // The lobby ID the user is being invited to
+      gameLobbyId: 'abc123-example-lobby',
+      // The locale/language the game will be played in
+      locale: 'English (US)',
+      // The username of the person who sent the invite
+      invitedByUsername: 'Alice',
+      // Controls whether Login or Logout is shown in navigation
+      isLoggedIn: true
+    });
+
+    // Clean up when done:
+    // gameInvite.unmount();
+
+    console.log('Game Invite view mounted successfully!');
+  </script>
+</body>
+</html>
