@@ -11,12 +11,13 @@ import ClassyPrelude (IO, Maybe)
 import qualified Data.Text as T
 import Data.Time (UTCTime)
 import Data.Int (Int64)
+import Controllers.User.Model.ServerUser (ServerUser)
 
 type NotificationId = Int64
 
 data GameInviteDetails = GameInviteDetails
   { inviteLobbyId :: T.Text,
-    invitedByUserId :: T.Text
+    invitedByUser :: ServerUser
   }
 
 data NotificationDetails

@@ -1,13 +1,13 @@
 module Repository.SQL.SqlNotificationRepository (SqlNotificationRepositoryBackend (SqlNotificationRepositoryBackend)) where
 
-import ClassyPrelude (IO, Maybe (Just, Nothing), ($), (*), fmap, flip, mapM, return)
-import Data.Maybe (catMaybes)
+import ClassyPrelude (IO, Maybe (Just, Nothing), map, ($), (*), flip, return)
 import Data.Pool (Pool)
 import qualified Data.Text as T
 import Data.Time (UTCTime, getCurrentTime, addUTCTime, nominalDay)
 import Database.Persist.Sql
 import qualified Model as M
 import Repository.NotificationRepository
+import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
 
 newtype SqlNotificationRepositoryBackend = SqlNotificationRepositoryBackend (Pool SqlBackend)
 
@@ -19,25 +19,20 @@ instance NotificationRepository SqlNotificationRepositoryBackend where
 getNotificationsByUserIdSQL :: Pool SqlBackend -> T.Text -> IO [Notification]
 getNotificationsByUserIdSQL pool userId =
   withPool pool $ do
-    notifEntities <- selectList [M.NotificationUserId ==. M.UserKey userId] [Desc M.NotificationCreatedAt]
-    fmap catMaybes $ mapM notificationFromEntity notifEntities
+    results <- rawSql
+      "SELECT n.id, n.created_at, n.read_at, n.expires_at, inv.lobby_id, u.ident, u.username FROM notification n JOIN invite_notification inv ON inv.notification_id = n.id JOIN \"user\" u ON u.ident = inv.invited_by WHERE n.user_id = ? AND n.notification_type = 'game_invite' ORDER BY n.created_at DESC"
+      [PersistText userId]
+    return $ map (rowToNotification userId) results
   where
-    notificationFromEntity (Entity notifKey (M.Notification _ createdAt readAt expiresAt notifType)) =
-      case notifType of
-        "game_invite" -> do
-          maybeInvite <- selectFirst [M.InviteNotificationNotificationId ==. notifKey] []
-          return $ case maybeInvite of
-            Nothing -> Nothing
-            Just (Entity _ (M.InviteNotification _ (M.LobbyKey lobbyId) (M.UserKey invitedById))) ->
-              Just Notification
-                { notificationId = fromSqlKey notifKey,
-                  notificationUserId = userId,
-                  notificationCreatedAt = createdAt,
-                  notificationReadAt = readAt,
-                  notificationExpiresAt = expiresAt,
-                  notificationDetails = GameInvite (GameInviteDetails lobbyId invitedById)
-                }
-        _ -> return Nothing
+    rowToNotification uid (Single nId, Single createdAt, Single readAt, Single expiresAt, Single lobbyId, Single inviterIdent, Single inviterUsername) =
+      Notification
+        { notificationId        = nId
+        , notificationUserId    = uid
+        , notificationCreatedAt = createdAt
+        , notificationReadAt    = readAt
+        , notificationExpiresAt = expiresAt
+        , notificationDetails   = GameInvite (GameInviteDetails lobbyId (ServerUser inviterIdent inviterUsername))
+        }
 
 saveGameInviteNotificationSQL :: Pool SqlBackend -> T.Text -> T.Text -> T.Text -> IO ()
 saveGameInviteNotificationSQL pool userId lobbyId invitedByUserId = do

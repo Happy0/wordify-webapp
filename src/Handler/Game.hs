@@ -46,6 +46,7 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer, fromServerTile, fromServerMoveHistory)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser)
 import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
 import Model.GameSetup (LocalisedGameSetup(..))
@@ -142,6 +143,10 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
   let summaries = fromServerMoveHistory (fromRight [] gameMoveSummaries)
 
+  notifs <- case maybeUser of
+    Nothing   -> return []
+    Just user -> liftIO $ notificationsForUser app (ident user)
+
   gamePagelayout $ do
     addStylesheet $ StaticR wordifyCss
     addScript $ StaticR wordifyJs
@@ -176,7 +181,8 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
                 websocketUrl: webSocketUrl,
                 gameId: #{toJSON gameId},
                 isLoggedIn: #{toJSON isLoggedIn},
-                vapidPublicKey: #{toJSON (vapidPublicKey app)}
+                vapidPublicKey: #{toJSON (vapidPublicKey app)},
+                notifications: #{toJSON notifs}
               });
              
           |]

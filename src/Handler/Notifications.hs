@@ -3,8 +3,8 @@ module Handler.Notifications where
 import Import hiding (Notification (..))
 import Data.Aeson ((.=), object, withObject, (.:))
 import Data.Time (UTCTime)
-import Modules.Notifications.Api (getRecentNotifications, markNotificationsAsRead)
-import Repository.NotificationRepository (Notification (..), NotificationDetails (..), GameInviteDetails (..))
+import Modules.Notifications.Api (markNotificationsAsRead)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser)
 
 -- | POST /api/notifications request body
 data MarkNotificationsReadRequest = MarkNotificationsReadRequest
@@ -19,8 +19,8 @@ getNotificationsR :: Handler Value
 getNotificationsR = do
   userId <- maybeAuthId >>= maybe notAuthenticated pure
   app <- getYesod
-  notifications <- liftIO $ getRecentNotifications (notificationService app) userId
-  returnJson (map notificationToJson notifications)
+  notifs <- liftIO $ notificationsForUser app userId
+  returnJson notifs
 
 postNotificationsR :: Handler ()
 postNotificationsR = do
@@ -28,19 +28,3 @@ postNotificationsR = do
   userId <- maybeAuthId >>= maybe notAuthenticated pure
   app <- getYesod
   liftIO $ markNotificationsAsRead (notificationService app) userId upTo
-
-notificationToJson :: Notification -> Value
-notificationToJson n = object
-  [ "id"        .= notificationId n
-  , "createdAt" .= notificationCreatedAt n
-  , "readAt"    .= notificationReadAt n
-  , "expiresAt" .= notificationExpiresAt n
-  , "details"   .= detailsToJson (notificationDetails n)
-  ]
-
-detailsToJson :: NotificationDetails -> Value
-detailsToJson (GameInvite GameInviteDetails {..}) = object
-  [ "type"            .= ("game_invite" :: Text)
-  , "lobbyId"         .= inviteLobbyId
-  , "invitedByUserId" .= invitedByUserId
-  ]

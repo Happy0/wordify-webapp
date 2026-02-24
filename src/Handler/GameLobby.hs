@@ -33,6 +33,7 @@ import Web.Cookie
 import Yesod.Core
 import Yesod.WebSockets
 import Network.HTTP.Types.Status (status404, status422)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser)
 
 getCreateGamePageR :: Handler Html
 getCreateGamePageR = do
@@ -42,7 +43,8 @@ getCreateGamePageR = do
     case maid of
       Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
       Just _ -> do
-        _ <- requireUsername
+        authedUser <- requireUsername
+        notifs <- liftIO $ notificationsForUser app (authenticatedUserId authedUser)
         gamePagelayout $ do
           addStylesheet $ (StaticR wordifyCss)
           addScript $ StaticR wordifyJs
@@ -58,7 +60,8 @@ getCreateGamePageR = do
                   "English": "en",
                   "Spanish (FISE)": "es_fise"
                 },
-                isLoggedIn: true
+                isLoggedIn: true,
+                notifications: #{toJSON notifs}
               });
             |]
 
@@ -130,16 +133,17 @@ handlerLobbyAuthenticated gameId userId =
         Right gameLobby -> do
           join <- liftIO $ joinClient app gameLobby gameId userId
           invitedPlayers <- liftIO $ getInvitedPlayers (lobbyRepository app) gameId
-          lift $ renderLobbyPage join invitedPlayers gameId
+          notifs <- liftIO $ notificationsForUser app userId
+          lift $ renderLobbyPage join invitedPlayers notifs gameId
 
 redirectHandler :: Text -> Handler Html
 redirectHandler gameId = redirect (GameR gameId)
 
-renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> [Text] -> Text -> Handler Html
-renderLobbyPage (Left InvalidPlayerID) _ gameId = invalidArgs ["Invalid player ID given by browser"]
-renderLobbyPage (Left _) _ gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) _ gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) invitedPlayers gameId = gamePagelayout $ do
+renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> [Text] -> [Value] -> Text -> Handler Html
+renderLobbyPage (Left InvalidPlayerID) _ _ gameId = invalidArgs ["Invalid player ID given by browser"]
+renderLobbyPage (Left _) _ _ gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) _ _ gameId = redirectHandler gameId
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) invitedPlayers notifs gameId = gamePagelayout $ do
   let joinedPlayerNames = map playerUsername (snapshotLobbyPlayers lobbySnapshot)
 
   addStylesheet $ (StaticR wordifyCss)
@@ -160,7 +164,8 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnaps
         invitedPlayers: #{toJSON invitedPlayers},
         language: #{toJSON (snapShotgameLanguage lobbySnapshot) },
         websocketUrl: webSocketUrl,
-        isLoggedIn: true
+        isLoggedIn: true,
+        notifications: #{toJSON notifs}
       });
     |]
 

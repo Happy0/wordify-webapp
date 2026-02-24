@@ -23,6 +23,7 @@ import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), ServerGame, la
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Wordify.Rules.Board (textRepresentation)
 import Wordify.Rules.Game (board)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser)
 
 data OtherPlayer = OtherPlayer { playerName :: Text, playerActive :: Bool }
 
@@ -88,6 +89,7 @@ renderActiveGamePage :: (GameRepository a) => App -> a -> T.Text -> Handler Html
 renderActiveGamePage app gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
   summaries <- liftIO $ buildActiveGameSummaries (games app) activeGames
+  notifs <- liftIO $ notificationsForUser app userId
   gamePagelayout $ do
     addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
@@ -100,7 +102,8 @@ renderActiveGamePage app gameRepository userId = do
         const lobby = Wordify.createHome('#home', {
           isLoggedIn: true,
           games: #{toJSON summaries},
-          tileValues: {}
+          tileValues: {},
+          notifications: #{toJSON notifs}
         });
       |]
 
