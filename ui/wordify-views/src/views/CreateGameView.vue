@@ -1,16 +1,56 @@
 <script setup lang="ts">
-import { ref, inject, computed } from 'vue'
+import { ref, inject, computed, onMounted, onUnmounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Card from 'primevue/card'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
 import NavigationButton from '@/components/common/NavigationButton.vue'
 import NotificationMenu from '@/components/common/NotificationMenu.vue'
+import { useCreateGameWebSocket } from '@/composables/useCreateGameWebSocket'
+import { useNotificationSocketMessages } from '@/composables/useNotificationSocketMessages'
 
 const props = defineProps<{
   locales: Record<string, string>
 }>()
 
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
+const toast = useToast()
+
+const { connectionState, transport, connect, disconnect } = useCreateGameWebSocket()
+useNotificationSocketMessages(transport)
+
+const hasBeenConnected = ref(false)
+const wasDisconnected = ref(false)
+
+watch(connectionState, (newState) => {
+  if (newState === 'connected') {
+    if (wasDisconnected.value) {
+      toast.add({
+        severity: 'success',
+        summary: 'Connected',
+        detail: 'Connection restored',
+        life: 3000
+      })
+    }
+    hasBeenConnected.value = true
+    wasDisconnected.value = false
+  }
+
+  if (hasBeenConnected.value && (newState === 'disconnected' || newState === 'error')) {
+    wasDisconnected.value = true
+  }
+})
+
+onMounted(() => {
+  if (isLoggedIn) {
+    connect()
+  }
+})
+
+onUnmounted(() => {
+  disconnect()
+})
 
 // Form state
 const numPlayers = ref(2)
@@ -75,6 +115,7 @@ async function handleCreate() {
 
 <template>
   <div class="create-game-view min-h-dvh bg-stone-100 flex flex-col">
+    <Toast />
     <NavigationButton :is-logged-in="isLoggedIn" />
     <NotificationMenu :is-logged-in="isLoggedIn" />
 

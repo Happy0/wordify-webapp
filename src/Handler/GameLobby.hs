@@ -6,7 +6,7 @@ module Handler.GameLobby where
 import Control.Applicative
 import Control.Concurrent
 import Control.Monad.Loops
-import Controllers.Common.CacheableSharedResource (getCacheableResource, withCacheableResource)
+import Controllers.Common.CacheableSharedResource (getCacheableResource)
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
@@ -33,7 +33,8 @@ import Web.Cookie
 import Yesod.Core
 import Yesod.WebSockets
 import Network.HTTP.Types.Status (status404, status422)
-import Handler.Common.ClientNotificationPresentation (notificationsForUser)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, nextNotifUpdateFromUserChan, withUserEventChan, notificationsWebSocketHandler)
+import Controllers.Game.Model.UserEventSubscription (NotificationUpdate)
 
 getCreateGamePageR :: Handler Html
 getCreateGamePageR = do
@@ -44,6 +45,7 @@ getCreateGamePageR = do
       Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
       Just _ -> do
         authedUser <- requireUsername
+        webSockets $ notificationsWebSocketHandler app (authenticatedUserId authedUser)
         notifs <- liftIO $ notificationsForUser app (authenticatedUserId authedUser)
         gamePagelayout $ do
           addStylesheet $ (StaticR wordifyCss)
@@ -169,6 +171,8 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnaps
       });
     |]
 
+data LobbyOutboundMessage = LobbyMsg LobbyResponse | LobbyNotifMsg NotificationUpdate
+
 lobbyWebSocketHandler :: App -> T.Text -> T.Text -> WebSocketsT Handler ()
 lobbyWebSocketHandler app gameId playerId = do
   {-
@@ -177,14 +181,21 @@ lobbyWebSocketHandler app gameId playerId = do
   -}
   connection <- ask
   liftIO $
-    withTrackWebsocketActivity (inactivityTracker app) $
-      withCacheableResource (gameLobbies app) gameId $ \lobby ->
-        case lobby of
-          Left err -> putStrLn err >> return ()
-          Right lobby -> do
+    withTrackWebsocketActivity (inactivityTracker app) $ runResourceT $ do
+      (_, eitherLobby) <- getCacheableResource (gameLobbies app) gameId
+      case eitherLobby of
+        Left err    -> liftIO $ putStrLn err
+        Right lobby ->
+          withUserEventChan (userEventService app) playerId $ \userEventChan -> do
             lobbyChannel <- atomically $ dupTChan (channel lobby)
+            let nextLobbyMsg = LobbyMsg . handleChannelMessage <$> readTChan lobbyChannel
+            let nextNotif    = LobbyNotifMsg <$> nextNotifUpdateFromUserChan userEventChan
             race_
-              (forever $ atomically (toJSONResponse . handleChannelMessage <$> readTChan lobbyChannel) >>= C.sendTextData connection)
+              (forever $ do
+                msg <- atomically (nextLobbyMsg `orElse` nextNotif)
+                case msg of
+                  LobbyMsg lobbyResp   -> C.sendTextData connection (toJSONResponse lobbyResp)
+                  LobbyNotifMsg update -> sendNotificationUpdate connection update)
               (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
 
 newtype LobbyInviteRequest = LobbyInviteRequest { inviteTargetUsername :: Text }
@@ -227,6 +238,7 @@ getGameLobbyInviteR gameId = do
     Just _ -> do
       authedUser <- requireUsername
       let userId = authenticatedUserId authedUser
+      webSockets $ notificationsWebSocketHandler app userId
       runResourceT $ do
         (_, lobby) <- getCacheableResource (gameLobbies app) gameId
         case lobby of

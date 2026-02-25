@@ -1,6 +1,7 @@
 import { createApp, type App } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import Aura from '@primeuix/themes/aura'
 import 'primeicons/primeicons.css'
 import '../style.css'
@@ -45,6 +46,7 @@ export function createCreateGame(
   const pinia = createPinia()
 
   app.use(pinia)
+  app.use(ToastService)
   app.use(PrimeVue, {
     theme: {
       preset: Aura,

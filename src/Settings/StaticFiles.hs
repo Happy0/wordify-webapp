@@ -24,7 +24,7 @@ staticFiles (appStaticDir compileTimeAppSettings)
 -- time to include a timestamp suffix, so browsers always fetch the latest version
 -- instead of serving a stale cached copy.
 wordifyJs :: StaticRoute
-wordifyJs = StaticRoute ["js", "wordify_20260224_221401.js"] []
+wordifyJs = StaticRoute ["js", "wordify_20260225_223049.js"] []
 
 wordifyCss :: StaticRoute
-wordifyCss = StaticRoute ["css", "wordify_20260224_221401.css"] []
+wordifyCss = StaticRoute ["css", "wordify_20260225_223049.css"] []

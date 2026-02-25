@@ -46,7 +46,7 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer, fromServerTile, fromServerMoveHistory)
-import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, nextNotifUpdateFromUserChan)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..))
 import Modules.UserEvent.Api (subscribeToUserChannel)
 import Control.Concurrent.STM (retry)
@@ -205,15 +205,6 @@ subscribeGameMessages = chanSource
 
 data OutboundMessage = GameMsg GameMessage | NotifMsg NotificationUpdate
 
--- | Reads from the user event channel, skipping (and discarding) non-notification
--- events until a NotificationsChanged event is found or the channel is empty.
-nextNotifFromUserChan :: TChan UserEvent -> STM OutboundMessage
-nextNotifFromUserChan chan = do
-  event <- readTChan chan
-  case event of
-    NotificationsChanged u -> return (NotifMsg u)
-    _                      -> nextNotifFromUserChan chan
-
 handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> TChan UserEvent -> IO ()
 handleBroadcastMessages connection liveGameMessages chatroom since userEventChan = do
   -- Subscribing to the channel comes first in case there's a race between doing so and sending the previous messages
@@ -225,7 +216,7 @@ sendBroadcastMessages :: C.Connection -> TChan CR.ChatMessage -> TChan GameMessa
 sendBroadcastMessages connection chatMessageChannel gameMessageChannel userEventChan = do
   let nextChatMessage = GameMsg . toGameMessage <$> readTChan chatMessageChannel
   let nextGameMessage = GameMsg <$> readTChan gameMessageChannel
-  let nextNotif       = nextNotifFromUserChan userEventChan
+  let nextNotif       = NotifMsg <$> nextNotifUpdateFromUserChan userEventChan
   nextMessage <- atomically (nextGameMessage `orElse` nextChatMessage `orElse` nextNotif)
   case nextMessage of
     GameMsg msg      -> C.sendTextData connection (toJSONResponse msg)

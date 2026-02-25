@@ -5,6 +5,8 @@ import Button from 'primevue/button'
 import AutoComplete from 'primevue/autocomplete'
 import NavigationButton from '@/components/common/NavigationButton.vue'
 import NotificationMenu from '@/components/common/NotificationMenu.vue'
+import { useGameLobbyWebSocket } from '@/composables/useGameLobbyWebSocket'
+import { useNotificationSocketMessages } from '@/composables/useNotificationSocketMessages'
 
 const props = withDefaults(defineProps<{
   gameLobbyId: string
@@ -19,15 +21,10 @@ const props = withDefaults(defineProps<{
 
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
 
-// Websocket state
-const ws = ref<WebSocket | null>(null)
-const connectionState = ref<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
+const { players, invitedPlayers, connectionState, transport, connect, disconnect } =
+  useGameLobbyWebSocket(props.joinedPlayers, props.invitedPlayers)
 
-// Player state - tracks players who have joined (starts with initial joined players)
-const players = ref<string[]>([...props.joinedPlayers])
-
-// Invited (but not yet joined) players state
-const invitedPlayers = ref<string[]>([...props.invitedPlayers])
+useNotificationSocketMessages(transport)
 
 // Computed values for display
 const playersNeeded = computed(() => props.playerCount - players.value.length)
@@ -46,71 +43,6 @@ const inviteError = ref<string | null>(null)
 const shareLink = computed(() => {
   return `${window.location.origin}/games/${props.gameLobbyId}/lobby`
 })
-
-// Handle websocket messages
-function handleMessage(event: MessageEvent) {
-  try {
-    const data = JSON.parse(event.data)
-
-    switch (data.command) {
-      case 'startGame':
-        if (data.payload?.gameId) {
-          window.location.href = `/games/${data.payload.gameId}`
-        }
-        break
-      case 'joined':
-        if (data.payload?.name) {
-          players.value.push(data.payload.name)
-          invitedPlayers.value = invitedPlayers.value.filter(p => p !== data.payload.name)
-        }
-        break
-      case 'playerInvited':
-        if (data.payload?.invitedPlayer && !invitedPlayers.value.includes(data.payload.invitedPlayer)) {
-          invitedPlayers.value.push(data.payload.invitedPlayer)
-        }
-        break
-    }
-  } catch (err) {
-    console.error('Failed to parse websocket message:', err)
-  }
-}
-
-// Connect to websocket
-function connect() {
-  if (ws.value) {
-    ws.value.close()
-  }
-
-  connectionState.value = 'connecting'
-
-  try {
-    ws.value = new WebSocket(props.websocketUrl)
-
-    ws.value.onopen = () => {
-      connectionState.value = 'connected'
-    }
-
-    ws.value.onmessage = handleMessage
-
-    ws.value.onerror = () => {
-      connectionState.value = 'error'
-    }
-
-    ws.value.onclose = () => {
-      if (connectionState.value !== 'error') {
-        connectionState.value = 'disconnected'
-      }
-      // Attempt to reconnect after 5 seconds
-      setTimeout(() => {
-        if (connectionState.value === 'disconnected' || connectionState.value === 'error') {
-          connect()
-        }
-      }, 5000)
-    }
-  } catch {
-    connectionState.value = 'error'
-  }
-}
 
 // Copy link to clipboard
 async function copyLink() {
@@ -171,14 +103,11 @@ async function sendInvite() {
 }
 
 onMounted(() => {
-  connect()
+  connect(props.websocketUrl)
 })
 
 onUnmounted(() => {
-  if (ws.value) {
-    ws.value.close()
-    ws.value = null
-  }
+  disconnect()
   if (copyTimeout.value) {
     clearTimeout(copyTimeout.value)
   }
