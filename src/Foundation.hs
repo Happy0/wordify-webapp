@@ -14,8 +14,8 @@ module Foundation where
 
 import Auth0 (auth0Provider)
 import Control.Monad.Logger (LogSource)
-import Controllers.Chat.Chatroom
 import Controllers.Common.CacheableSharedResource
+import Modules.Chats.Api (ChatService)
 
 import Controllers.Game.GameDefinitionController (GameDefinitionController)
 import Modules.Notifications.Api (NotificationService)
@@ -74,7 +74,7 @@ data App = App
     localisedGameSetups :: LocalisedGameSetups,
     gameLobbies :: ResourceCache Text GameLobby,
     games :: ResourceCache Text ServerGame,
-    chatRooms :: ResourceCache Text Chatroom,
+    chatService :: ChatService,
     userEventService :: UserEventService,
     randomGenerator :: TVar StdGen,
     authDetails :: Either Text OAuthDetails,

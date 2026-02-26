@@ -34,9 +34,8 @@ import Control.Error.Util
 import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
-import Controllers.Chat.Chat (getChat)
-import Controllers.Chat.Chatroom (Chatroom, freezeChatroom)
 import Controllers.Common.CacheableSharedResource
+import Modules.Chats.Api (makeChatService, ChatService)
 import Controllers.Definition.DefinitionService (makeDefinitionService, anyDefinitionClient)
 import Controllers.Definition.Clients.RaeApiClient (makeRaeApiClient)
 import Controllers.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
@@ -169,14 +168,14 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatRooms userEventService notificationService userController lobbyRepository = App {..}
+  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatService userEventService notificationService userController lobbyRepository = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chatroom cache forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Notification service forced in tempFoundation") (error "User controller forced in tempFoundation") (error "Lobby repository forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chat service forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Notification service forced in tempFoundation") (error "User controller forced in tempFoundation") (error "Lobby repository forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool, setting busy_timeout on every
@@ -201,7 +200,7 @@ makeFoundation appSettings inactivityTracker = do
   runLoggingT (runSqlPool runSetup pool) logFunc
 
   let chatRepository = toChatRepositoryImpl (SqlChatRepositoryBackend pool)
-  chatrooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
+  chatService <- makeChatService chatRepository
 
   let userRepo = toUserRepositoryImpl (SqlUserRepositoryBackend pool)
   let userCtrl = makeUserController userRepo
@@ -222,7 +221,7 @@ makeFoundation appSettings inactivityTracker = do
   let lobbyRepo = SqlLobbyRepositoryBackend pool
 
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies gameDefinitionController chatrooms userEventService notifSvc userCtrl lobbyRepo
+  return $ mkFoundation pool games gameLobbies gameDefinitionController chatService userEventService notifSvc userCtrl lobbyRepo
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =

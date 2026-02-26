@@ -5,9 +5,9 @@ module Handler.Game where
 
 import Control.Concurrent
 import Control.Error (ExceptT (..), lastDef, note, runExceptT)
-import Controllers.Chat.Chatroom (subscribeMessagesLive, Chatroom, getExistingChatMessages)
-import qualified Controllers.Chat.Chatroom as CR (ChatMessage (ChatMessage), Chatroom)
 import Controllers.Common.CacheableSharedResource (getCacheableResource)
+import Modules.Chats.Api (ChatService, getChatroom, subscribeMessagesLive, Chatroom, getExistingChatMessages)
+import qualified Modules.Chats.Api as CR (ChatMessage (ChatMessage), Chatroom)
 import qualified Controllers.Definition.DefinitionClient as D
 import Controllers.Game.Api
 import Controllers.Game.Api (initialSocketMessage)
@@ -242,9 +242,9 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSin
   result <- runExceptT $ do
     serverGame    <- ExceptT $ snd <$> getCacheableResource (games app) gameId
     chatId        <- liftIO  $ getChatId gameId maybeUser serverGame
-    chatroom      <- ExceptT $ snd <$> getCacheableResource (chatRooms app) chatId
+    chatroom      <- ExceptT $ getChatroom (chatService app) chatId
     userEventChan <- case maybeUser of
-      Nothing   -> liftIO newBroadcastTChanIO
+      Nothing   -> liftIO $ newBroadcastTChanIO >>= atomically . dupTChan
       Just user -> ExceptT $ snd <$> subscribeToUserChannel (userEventService app) (ident user)
     pure (serverGame, chatroom, userEventChan)
 
