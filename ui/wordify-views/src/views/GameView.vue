@@ -82,7 +82,7 @@ const hasUnreadMessages = computed(() => {
   // Don't light up if the most recent message was sent by us
   // (e.g. we sent it from another device)
   const lastMessage = chatMessages.value[chatMessages.value.length - 1]
-  if (lastMessage && lastMessage.type === 'message' && lastMessage.user === myPlayer.value?.name) {
+  if (lastMessage && lastMessage.type === 'text' && lastMessage.user === myPlayer.value?.name) {
     return false
   }
 
@@ -256,14 +256,6 @@ function handleExchange(tileIds: string[]) {
 
 function handlePass() {
   controller.submitPassMove()
-}
-
-function handleSendMessage(message: string) {
-  controller.sendChatMessage(message)
-}
-
-function handleRequestDefinition(word: string) {
-  controller.requestDefinition(word)
 }
 
 // Mobile panel handlers
@@ -646,11 +638,7 @@ provide('onRackDrop', handleRackDrop)
 
       <!-- Right sidebar: Chat -->
       <div class="w-80 min-h-0">
-        <GameChat
-          class="h-full"
-          @send-message="handleSendMessage"
-          @request-definition="handleRequestDefinition"
-        />
+        <GameChat class="h-full" />
       </div>
     </div>
 
@@ -746,12 +734,7 @@ provide('onRackDrop', handleRackDrop)
           <div class="flex-1 p-4 min-h-0 overflow-auto">
             <ScoreBoard v-if="activeMobilePanel === 'scores'" />
             <MoveHistory v-if="activeMobilePanel === 'history'" class="h-full" />
-            <GameChat
-              v-if="activeMobilePanel === 'chat'"
-              class="h-full"
-              @send-message="handleSendMessage"
-              @request-definition="handleRequestDefinition"
-            />
+            <GameChat v-if="activeMobilePanel === 'chat'" class="h-full" />
           </div>
         </div>
       </Transition>

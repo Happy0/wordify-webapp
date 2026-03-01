@@ -1,4 +1,6 @@
 import type { TileValueMap } from '../common/tile-value-map'
+import type { TextChatMessage } from './chat'
+export type { TextChatMessage } from './chat'
 
 // Player summary type representing a player's state in the game
 export type PlayerSummary = {
@@ -32,14 +34,8 @@ export type MoveSummary = {
   }[]
 }
 
-// Chat message types
-export type ChatMessage = {
-  type: 'message'
-  user: string
-  message: string
-  // Timestamp when the message was received (ISO 8601 string)
-  when: string
-} | {
+// Word definition message - game-specific chat item
+export type DefinitionMessage = {
   type: 'definition'
   word: string
   // Noun, verb, etc
@@ -51,6 +47,10 @@ export type ChatMessage = {
   // Timestamp when the definition was received (ISO 8601 string)
   when: string
 }
+
+// Chat message types stored in the game state
+// TextChatMessage (type: 'text') covers player chat; DefinitionMessage covers lookups
+export type ChatMessage = TextChatMessage | DefinitionMessage
 
 // Input tile types for initialization (id and candidate are internal concerns)
 export type BlankTileInput = {

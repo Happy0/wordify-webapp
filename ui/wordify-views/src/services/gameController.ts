@@ -534,9 +534,9 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
   }): void {
     const store = useGameStore()
     store.addChatMessage({
-      type: 'message',
+      type: 'text',
       user: data.player,
-      message: data.message,
+      text: data.message,
       when: data.when
     })
     store.updateLastChatMessageReceived(data.messageNumber)
