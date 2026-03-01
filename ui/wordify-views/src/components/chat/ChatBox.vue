@@ -8,6 +8,7 @@ const props = withDefaults(
     messages: T[]
     placeholder?: string
     title?: string
+    historyHint?: string
   }>(),
   {
     placeholder: 'Type a message...',
@@ -61,6 +62,9 @@ function handleKeyDown(e: KeyboardEvent) {
 
     <!-- Messages container -->
     <div ref="chatContainer" class="flex-1 overflow-y-auto space-y-2 min-h-0 mb-3">
+      <!-- History hint sits at the top of the scroll area so it's only visible when scrolled up -->
+      <p v-if="props.historyHint" class="text-xs text-gray-400 italic text-center pb-2">{{ props.historyHint }}</p>
+
       <template v-if="messages.length === 0">
         <!-- Customise empty-state per view -->
         <slot name="empty-state">
@@ -90,6 +94,7 @@ function handleKeyDown(e: KeyboardEvent) {
       <Button
         icon="pi pi-send"
         severity="primary"
+        class="flex-shrink-0"
         :disabled="!messageInput.trim()"
         @click="handleSubmit"
       />

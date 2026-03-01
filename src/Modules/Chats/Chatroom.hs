@@ -3,6 +3,7 @@ module Modules.Chats.Chatroom
     Chatroom,
     subscribeMessagesLive,
     getExistingChatMessages,
+    getMessagesSinceTime,
     makeChatroom,
     freezeChatroom,
     sendMessage,
@@ -18,7 +19,10 @@ import Control.Exception (SomeException, throw, try)
 import Control.Exception.Base (AsyncException)
 import Control.Monad (Monad ((>>)), when)
 import Data.Bool (Bool, not)
+import Data.Ord ((>=))
 import qualified Data.Conduit as C (ConduitT)
+import Data.Conduit ((.|))
+import qualified Data.Conduit.List as CL (filter)
 import Data.Either (Either (Left, Right))
 import Data.Time.Clock (getCurrentTime)
 import Util.ConduitChan (chanSource)
@@ -54,6 +58,10 @@ sendMessage chatroom message = do
 getExistingChatMessages :: Chatroom -> Maybe Int -> C.ConduitT () ChatMessage IO ()
 getExistingChatMessages (Chatroom chatroomId _ _ _ getChatMessages _ _) =
   getChatMessages chatroomId
+
+getMessagesSinceTime :: Chatroom -> UTCTime -> C.ConduitT () ChatMessage IO ()
+getMessagesSinceTime (Chatroom chatroomId _ _ _ getChatMessages _ _) since =
+  getChatMessages chatroomId Nothing .| CL.filter (\msg -> sentTime msg >= since)
 
 subscribeMessagesLive :: Chatroom -> IO (TChan ChatMessage)
 subscribeMessagesLive (Chatroom chatroomId _ subChannel _ getChatMessages _ _) = do

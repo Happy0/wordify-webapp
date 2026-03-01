@@ -5,6 +5,7 @@ module Modules.Chats.Api
     Chatroom,
     subscribeMessagesLive,
     getExistingChatMessages,
+    getMessagesSinceTime,
     sendMessage,
     SendMessage (SendMessage),
     ChatMessage (ChatMessage),
