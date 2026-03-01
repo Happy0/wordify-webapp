@@ -7,7 +7,7 @@ module Handler.Username where
     import Repository.UserRepository (SetUsernameResult(..))
     import Yesod.Core (sendStatusJSON)
     import Network.HTTP.Types.Status (status400, status409)
-    import Handler.Home (gamePagelayout)
+    import Handler.Home.Home (gamePagelayout)
     import qualified Data.Text as T
     import Data.Char (isAlphaNum)
 

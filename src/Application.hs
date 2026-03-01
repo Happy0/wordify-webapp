@@ -81,7 +81,7 @@ import Handler.AuthTest
 import Handler.Common
 import Handler.Game
 import Handler.GameLobby
-import Handler.Home
+import Handler.Home.Home
 import Handler.Login
 import Handler.Me
 import Handler.Notifications
