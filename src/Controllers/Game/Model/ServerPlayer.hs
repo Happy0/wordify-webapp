@@ -54,4 +54,4 @@ makeGameStatePlayers numPlayers
   | numPlayers == 2 = Right (G.makePlayer "player1", G.makePlayer "player2", Nothing)
   | numPlayers == 3 = Right (G.makePlayer "player1", G.makePlayer "player2", Just (G.makePlayer "player3", Nothing))
   | numPlayers == 4 = Right (G.makePlayer "player1", G.makePlayer "player2", Just (G.makePlayer "player3", Just (G.makePlayer "player4")))
-  | otherwise = Left $ T.concat ["Invalid number of players: ", pack (show numPlayers)]
+  | otherwise = Left $ T.concat ["Invalid number of players: ", pack (Prelude.show numPlayers)]

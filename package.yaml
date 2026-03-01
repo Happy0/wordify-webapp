@@ -14,7 +14,7 @@ dependencies:
   - classy-prelude-yesod >=1.5 && <1.6
   - bytestring >=0.12.1.0 && <0.13.0.0
   - text >= 2.1.1 && <2.2.0
-  - persistent >=2.14.6.3 && <2.15.0.0
+  - persistent >=2.14.6.3 && <2.18.0.0
   - persistent-sqlite >=2.13.3.0 && < 2.14.0.0
   - persistent-template >=2.12.0.0 && <2.13.0.0
   - template-haskell

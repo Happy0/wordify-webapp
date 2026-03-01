@@ -192,7 +192,7 @@ getMoveCommandMessages :: G.Game -> [Move] -> Either Text [GameMessage]
 getMoveCommandMessages _ [] = Right []
 getMoveCommandMessages initialGameState moves =
   case restoreGame initialGameState $ NE.fromList (toList moves) of
-    Left err -> Left $ T.pack (show err)
+    Left err -> Left $ T.pack (Prelude.show err)
     Right transitions -> Right (NE.toList (NE.map transitionToMessage transitions))
 
 initialSocketMessage :: ServerGameSnapshot -> Maybe AuthUser -> Either Text ServerResponse
@@ -201,7 +201,7 @@ initialSocketMessage serverGameSnapshot authUser = do
   let (G.History originalBag moves) = G.history gameSoFar
   playersState <- makeGameStatePlayers (L.length $ G.players gameSoFar)
   emptyGame <- case G.makeGame playersState originalBag (G.dictionary gameSoFar) of
-    Left err -> Left (T.pack (show err))
+    Left err -> Left (T.pack (Prelude.show err))
     Right x -> Right x
 
   moveCommands <- getMoveCommandMessages emptyGame (toList moves)

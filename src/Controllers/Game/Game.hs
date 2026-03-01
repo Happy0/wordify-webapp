@@ -168,7 +168,7 @@ handleMove serverGame pool userEventSvc pushCtrl playerMoving move moveOutcomeHa
       if playerNumber currentGameState /= playerMoving
         then return $ Left "Not your move"
         else do
-          let moveOutcome = A.left (pack . show) (makeMove currentGameState move)
+          let moveOutcome = A.left (pack . Prelude.show) (makeMove currentGameState move)
           let moveWithLocalisedRulesOutcome = moveOutcome >>= flip applyLocalisedRules (gameSetup serverGame)
 
           case moveWithLocalisedRulesOutcome of
@@ -224,7 +224,7 @@ applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameT
 applyLocalisedRules gameTransition localisedGameSetup =
   let extraLocalisationGameRules = extraRules localisedGameSetup
   in let ruleApplicationResult = applyExtraRules gameTransition extraLocalisationGameRules
-  in let resultWithTransformedError = A.left (pack. show) ruleApplicationResult
+  in let resultWithTransformedError = A.left (pack . Prelude.show) ruleApplicationResult
   in finalTransition <$> resultWithTransformedError
 
 handleBoardMove :: ServerGame -> Pool SqlBackend -> UserEventService -> NotificationService -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
@@ -280,4 +280,4 @@ handleChatMessage serverGame chatroom userCtrl (Just user) messageText = do
     Just name -> sendMessage chatroom (CR.SendMessage userId name messageText) >> return ChatSuccess
 
 defaultPlayerName :: Int -> SP.ServerPlayer -> Text
-defaultPlayerName n player = fromMaybe (pack ("Player " ++ show n)) (SP.playerUsername player)
+defaultPlayerName n player = fromMaybe (pack ("Player " ++ Prelude.show n)) (SP.playerUsername player)

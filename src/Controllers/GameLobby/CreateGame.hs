@@ -62,7 +62,7 @@ setupGame localisedGameSetup numPlayers =
 
     -- Convert a error into a string to return to the client if we failed to create the game
     -- This should never happen when setting up a new game
-    hoistEither $ first (T.pack . show) $ makeGame players shuffledLetterbag (localisedDictionary localisedGameSetup)
+    hoistEither $ first (T.pack . Prelude.show) $ makeGame players shuffledLetterbag (localisedDictionary localisedGameSetup)
 
 getLocaleSetup :: Locale -> LocalisedGameSetups -> Either Text LocalisedGameSetup
 getLocaleSetup locale setups =
@@ -73,4 +73,4 @@ createPlayers numPlayers
   | numPlayers == 2 = Right (makePlayer "player1", makePlayer "player2", Nothing)
   | numPlayers == 3 = Right (makePlayer "player1", makePlayer "player2", Just (makePlayer "player3", Nothing))
   | numPlayers == 4 = Right (makePlayer "player1", makePlayer "player2", Just (makePlayer "player3", Just (makePlayer "player4")))
-  | otherwise = Left $ T.concat ["Invalid number of players: ", pack (show numPlayers)]
+  | otherwise = Left $ T.concat ["Invalid number of players: ", pack (Prelude.show numPlayers)]
