@@ -46,6 +46,8 @@ import Wordify.Rules.Player (Player (endBonus))
 import qualified Wordify.Rules.Player as P
 import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer, fromServerTile, fromServerMoveHistory)
+import qualified Handler.Common.Chat as HC
+import Handler.Common.Chat (sendChatUpdate)
 import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, nextNotifUpdateFromUserChan)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..))
 import Modules.UserEvent.Api (subscribeToUserChannel)
@@ -193,17 +195,14 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
           <div #wordifyround>
       |]
 
-getExistingMessages :: CR.Chatroom -> Maybe Int -> ConduitT () GameMessage IO ()
-getExistingMessages chatroom since = getExistingChatMessages chatroom since .| CL.map toGameMessage
-  
-toGameMessage :: CR.ChatMessage -> GameMessage
-toGameMessage (CR.ChatMessage _ displayName chatMessage sentTime messageNumber) =
-  PlayerChat (Controllers.Game.Api.ChatMessage displayName chatMessage sentTime messageNumber)
+toChatMessage :: CR.ChatMessage -> HC.ChatMessage
+toChatMessage (CR.ChatMessage _ displayName chatMessage sentTime messageNumber) =
+  HC.ChatMessage displayName chatMessage sentTime messageNumber
 
 subscribeGameMessages :: TChan GameMessage -> ConduitT () GameMessage IO ()
 subscribeGameMessages = chanSource
 
-data OutboundMessage = GameMsg GameMessage | NotifMsg NotificationUpdate
+data OutboundMessage = GameMsg GameMessage | ChatMsg HC.ChatMessage | NotifMsg NotificationUpdate
 
 handleBroadcastMessages :: C.Connection -> TChan GameMessage -> CR.Chatroom -> Maybe Int -> TChan UserEvent -> IO ()
 handleBroadcastMessages connection liveGameMessages chatroom since userEventChan = do
@@ -214,12 +213,13 @@ handleBroadcastMessages connection liveGameMessages chatroom since userEventChan
 
 sendBroadcastMessages :: C.Connection -> TChan CR.ChatMessage -> TChan GameMessage -> TChan UserEvent -> IO ()
 sendBroadcastMessages connection chatMessageChannel gameMessageChannel userEventChan = do
-  let nextChatMessage = GameMsg . toGameMessage <$> readTChan chatMessageChannel
+  let nextChatMessage = ChatMsg . toChatMessage <$> readTChan chatMessageChannel
   let nextGameMessage = GameMsg <$> readTChan gameMessageChannel
   let nextNotif       = NotifMsg <$> nextNotifUpdateFromUserChan userEventChan
   nextMessage <- atomically (nextGameMessage `orElse` nextChatMessage `orElse` nextNotif)
   case nextMessage of
     GameMsg msg      -> C.sendTextData connection (toJSONResponse msg)
+    ChatMsg msg      -> sendChatUpdate connection msg
     NotifMsg update  -> sendNotificationUpdate connection update
 
 handleInboundSocketMessages :: App -> C.Connection -> CR.Chatroom -> ServerGame -> Maybe AuthUser -> IO ()
@@ -313,6 +313,6 @@ sendPreviousDefinitions gameDefinitionController gameId since connection =
 
 sendPreviousChatMessages :: C.Connection -> Chatroom -> Maybe Int -> IO ()
 sendPreviousChatMessages connection chatroom chatMessagesSince =
-    runConduit $ getExistingMessages chatroom chatMessagesSince
-     .| CL.map toJSONResponse
-     .| CL.mapM_ (liftIO . C.sendTextData connection)
+    runConduit $ getExistingChatMessages chatroom chatMessagesSince
+     .| CL.map toChatMessage
+     .| CL.mapM_ (liftIO . sendChatUpdate connection)

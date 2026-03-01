@@ -9,12 +9,11 @@ import Controllers.Definition.DefinitionClient (Definition)
 import Data.Maybe (Maybe)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
+import Handler.Common.Chat (ChatMessage (ChatMessage))
 import Wordify.Rules.Player (Player)
 import Wordify.Rules.Pos
 import Wordify.Rules.Tile (Tile)
 import Prelude (Int)
-
-data ChatMessage = ChatMessage {user :: Text, message :: Text, when :: UTCTime, messageNumber :: Int}
 
 data MoveSummary
   = BoardMoveSummary

@@ -82,9 +82,6 @@ data ServerResponse
 
 data ConnectionStatus = ConnectionStatus Int Bool (Maybe UTCTime)
 
-instance ToJSON ChatMessage where
-  toJSON (ChatMessage user message when messageNumber) = object ["player" .= user, "message" .= message, "when" .= when, "messageNumber" .= messageNumber]
-
 toWord :: Direction -> Text
 toWord Horizontal = "horizontal"
 toWord Vertical = "vertical"
