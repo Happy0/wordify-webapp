@@ -48,6 +48,14 @@ export interface GameSummary {
   otherPlayers: { name: string; active: boolean }[]
 }
 
+export interface TvGameSummary {
+  gameId: string
+  boardString: string
+  lastActivity: string
+  tileValues: TileValueMap
+  players: { name: string; active: boolean }[]
+}
+
 export interface HomeOptions {
   /**
    * Array of games the user has in progress
@@ -66,6 +74,11 @@ export interface HomeOptions {
    * Array of notifications to display in the notification bell menu
    */
   notifications?: NotificationItem[]
+
+  /**
+   * The current game being shown on the home TV, if any
+   */
+  initialHomeTvGame: TvGameSummary | null
 }
 
 export interface HomeInstance {

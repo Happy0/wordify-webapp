@@ -34,7 +34,8 @@ export {
   createHome,
   type HomeOptions,
   type HomeInstance,
-  type GameSummary
+  type GameSummary,
+  type TvGameSummary
 } from './lib/home'
 
 // Choose Username view

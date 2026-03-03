@@ -48,6 +48,7 @@ import qualified Yesod.Core.Unsafe as Unsafe
 import Yesod.Default.Util (addStaticContentExternal)
 import Model.GameSetup (LocalisedGameSetup)
 import Modules.UserEvent.Api (UserEventService)
+import Modules.TV.Api (TvService)
 
 data AuthDetails = AuthDetails
   { clientId :: Text,
@@ -83,7 +84,8 @@ data App = App
     notificationService :: NotificationService,
     vapidPublicKey :: Maybe Text,
     userController :: UserController,
-    lobbyRepository :: SqlLobbyRepositoryBackend
+    lobbyRepository :: SqlLobbyRepositoryBackend,
+    tvService :: TvService
   }
 
 data MenuItem = MenuItem

@@ -2,6 +2,7 @@ module Handler.Home.Model.Outbound where
 
 import ClassyPrelude
 import Data.Aeson (ToJSON (..), (.=), object)
+import Data.Time.Clock (UTCTime)
 import Model.GameSetup (TileValues)
 
 data OtherPlayer = OtherPlayer { playerName :: Text, playerActive :: Bool }
@@ -29,6 +30,23 @@ instance ToJSON ActiveGameSummary where
     , "lastActivity" .= lastAct
     , "tileValues"   .= tVals
     , "otherPlayers" .= oPlayers
+    ]
+
+data TvActiveGameSummary = TvActiveGameSummary
+  { tvGameId      :: Text
+  , tvBoardString :: Text
+  , tvLastActivity :: UTCTime
+  , tvTileValues  :: TileValues
+  , tvPlayers     :: [OtherPlayer]
+  }
+
+instance ToJSON TvActiveGameSummary where
+  toJSON (TvActiveGameSummary gId bStr lastAct tVals players) = object
+    [ "gameId"       .= gId
+    , "boardString"  .= bStr
+    , "lastActivity" .= lastAct
+    , "tileValues"   .= tVals
+    , "players"      .= players
     ]
 
 data OutboundHomeMessage

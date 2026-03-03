@@ -33,6 +33,7 @@ import qualified Handler.Common.Chat as HC
 import Handler.Common.Chat (sendChatUpdate)
 import Handler.Home.Model.Outbound
 import Handler.Home.Model.Inbound
+import Modules.TV.Api (currentHomeTVState)
 
 mapGameSummary :: GameSummary -> [Text] -> ActiveGameSummary
 mapGameSummary (GameSummary gameId latestActivity myMove boardString localisedGameSetup otherPlayerNames) activePlayerNames =
@@ -52,8 +53,22 @@ buildActiveGameSummary gameSummary (Just serverGame) = do
   let activeNames = [ defaultPlayerName i p | (i, p) <- zip [1..] players, SP.numConnections p > 0 ]
   pure $ mapGameSummary gameSummary activeNames
 
+snapshotToTvSummary :: ServerGameSnapshot -> TvActiveGameSummary
+snapshotToTvSummary snapshot =
+  let players = zipWith (\i p -> OtherPlayer (defaultPlayerName i p) (SP.numConnections p > 0))
+                  [1..] (snapshotPlayers snapshot)
+  in TvActiveGameSummary
+      (snapshotGameId snapshot)
+      (T.pack (textRepresentation (board (gameState snapshot))))
+      (lastMove snapshot)
+      (tileLettersToValueMap (gameLocalisation snapshot))
+      players
+
 renderNotLoggedInPage :: Handler Html
-renderNotLoggedInPage =
+renderNotLoggedInPage = do
+  app <- getYesod
+  maybeTvGame <- liftIO $ currentHomeTVState (tvService app)
+  let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
   gamePagelayout $ do
     addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
@@ -66,7 +81,8 @@ renderNotLoggedInPage =
         const lobby = Wordify.createHome('#home', {
           isLoggedIn: false,
           games: [],
-          tileValues: {}
+          tileValues: {},
+          initialHomeTvGame: #{tvGameJson}
         });
       |]
 
@@ -79,6 +95,8 @@ renderActiveGamePage app gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
   summaries <- liftIO $ buildActiveGameSummaries (gameService app) activeGames
   notifs <- liftIO $ notificationsForUser app userId
+  maybeTvGame <- liftIO $ currentHomeTVState (tvService app)
+  let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
   gamePagelayout $ do
     addStylesheet $ (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
@@ -92,7 +110,8 @@ renderActiveGamePage app gameRepository userId = do
           isLoggedIn: true,
           games: #{toJSON summaries},
           tileValues: {},
-          notifications: #{toJSON notifs}
+          notifications: #{toJSON notifs},
+          initialHomeTvGame: #{tvGameJson}
         });
       |]
 

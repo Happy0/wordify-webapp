@@ -2,6 +2,7 @@
 
 module Modules.TV.Home
   ( HomeTvService,
+    HomeTvUpdate,
     makeHomeTvService,
     subscribeHomeTV,
     currentTVState
