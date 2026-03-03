@@ -92,7 +92,8 @@ export function createHome(
   options: HomeOptions
 ): HomeInstance {
   const app = createApp(HomeView, {
-    games: options.games
+    games: options.games,
+    initialHomeTvGame: options.initialHomeTvGame
   })
 
   const pinia = createPinia()

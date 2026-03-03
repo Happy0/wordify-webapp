@@ -2,7 +2,7 @@
 
 module Modules.TV.Home
   ( HomeTvService,
-    HomeTvUpdate,
+    HomeTvUpdate(..),
     makeHomeTvService,
     subscribeHomeTV,
     currentTVState
@@ -61,13 +61,13 @@ sendCurrentTvGameUpdates repository gameService homeBroadcastChannel currentGame
     -- No active games, return after a minute to see if there's been any new games started
     Nothing -> liftIO (threadDelay (1000000 * 60))
     Just serverGame-> do
-      _ <- atomically (makeServerGameSnapshot serverGame >>= writeTVar currentGameVar . Just)
       gameChannel <- liftIO (atomically (dupTChan (broadcastChannel serverGame)))
-      liftIO (keepHomeChannelUpdated serverGame gameChannel homeBroadcastChannel)
+      liftIO (keepHomeChannelUpdated serverGame gameChannel homeBroadcastChannel currentGameVar)
 
-keepHomeChannelUpdated :: ServerGame -> TChan GameMessage -> TChan HomeTvUpdate -> IO ()
-keepHomeChannelUpdated serverGame gameChannel broadcastChannel = do
+keepHomeChannelUpdated :: ServerGame -> TChan GameMessage -> TChan HomeTvUpdate -> TVar (Maybe ServerGameSnapshot) -> IO ()
+keepHomeChannelUpdated serverGame gameChannel broadcastChannel currentGameVar = do
   nextSnapshot <- atomically (makeServerGameSnapshot serverGame)
+  _ <- atomically (makeServerGameSnapshot serverGame >>= writeTVar currentGameVar . Just)
   let game = gameState nextSnapshot
 
   case gameStatus game of 
@@ -80,7 +80,7 @@ keepHomeChannelUpdated serverGame gameChannel broadcastChannel = do
       sendUpdate broadcastChannel nextSnapshot
       -- Wait for next update
       _ <- atomically (readTChan gameChannel)
-      keepHomeChannelUpdated serverGame gameChannel broadcastChannel
+      keepHomeChannelUpdated serverGame gameChannel broadcastChannel currentGameVar
   where
     sendUpdate ::  TChan HomeTvUpdate -> ServerGameSnapshot-> IO ()
     sendUpdate chan = atomically . writeTChan chan . HomeTVUpdate 

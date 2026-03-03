@@ -33,7 +33,8 @@ import qualified Handler.Common.Chat as HC
 import Handler.Common.Chat (sendChatUpdate)
 import Handler.Home.Model.Outbound
 import Handler.Home.Model.Inbound
-import Modules.TV.Api (currentHomeTVState)
+import Modules.TV.Api (TvService, currentHomeTVState, subscribeHomeTV)
+import Modules.TV.Home (HomeTvUpdate(..))
 
 mapGameSummary :: GameSummary -> [Text] -> ActiveGameSummary
 mapGameSummary (GameSummary gameId latestActivity myMove boardString localisedGameSetup otherPlayerNames) activePlayerNames =
@@ -154,6 +155,7 @@ gamePagelayout widget = do
 data HomeOutboundMessage
   = HomeUserEventMsg UserEvent
   | HomeChatMessage HC.ChatMessage
+  | HomeTvMsg HomeTvUpdate
 
 toChatMessage :: CR.ChatMessage -> HC.ChatMessage
 toChatMessage (CR.ChatMessage _ displayName msg sentTime messageNumber) =
@@ -171,23 +173,27 @@ homeWebsocketHandler app userIdent displayName = do
     case (userBroadcastChannelResult, chatroomResult) of
       (Right userEventChan, Right chatroom) -> liftIO $ do
         liveChatChan <- subscribeMessagesLive chatroom
-        let handleOutbound = handleOutboundHomeWebsocket gameRepository (gameService app) connection userIdent chatroom userEventChan liveChatChan
+        tvChan <- subscribeHomeTV (tvService app)
+        let handleOutbound = handleOutboundHomeWebsocket gameRepository (gameService app) (tvService app) connection userIdent chatroom userEventChan liveChatChan tvChan
             handleInbound  = handleInboundHomeWebsocket connection chatroom userIdent displayName
         race_ handleOutbound handleInbound
       _ -> return ()
 
-handleOutboundHomeWebsocket :: (GameRepository a) => a -> GameService -> C.Connection -> Text -> CR.Chatroom -> TChan UserEvent -> TChan CR.ChatMessage -> IO ()
-handleOutboundHomeWebsocket gameRepository gamesCache connection userIdent chatroom userEventChan liveChatChan = do
+handleOutboundHomeWebsocket :: (GameRepository a) => a -> GameService -> TvService -> C.Connection -> Text -> CR.Chatroom -> TChan UserEvent -> TChan CR.ChatMessage -> TChan HomeTvUpdate -> IO ()
+handleOutboundHomeWebsocket gameRepository gamesCache tvSvc connection userIdent chatroom userEventChan liveChatChan tvChan = do
   activeGames <- getActiveUserGames gameRepository userIdent
   activeSummaryMap <- buildActiveGameSummaryMap gamesCache activeGames
   sendGameSummaryState connection activeSummaryMap
   now <- getCurrentTime
   let twoMonthsAgo = addUTCTime (negate $ 60 * 60 * 24 * 61) now
   sendPreviousHomeChatMessages connection chatroom twoMonthsAgo
+  maybeTvState <- currentHomeTVState tvSvc
+  mapM_ (\snapshot -> C.sendTextData connection (encode (TvUpdate (snapshotToTvSummary snapshot)))) maybeTvState
   flip iterateM_ activeSummaryMap $ \currentState -> do
     let nextUserEvent = HomeUserEventMsg <$> readTChan userEventChan
         nextChatMsg   = HomeChatMessage . toChatMessage <$> readTChan liveChatChan
-    nextMessage <- atomically (nextUserEvent `orElse` nextChatMsg)
+        nextTvMsg     = HomeTvMsg <$> readTChan tvChan
+    nextMessage <- atomically (nextUserEvent `orElse` nextChatMsg `orElse` nextTvMsg)
     handleHomeOutboundMessage userIdent connection nextMessage currentState
 
 handleInboundHomeWebsocket :: C.Connection -> CR.Chatroom -> Text -> Text -> IO ()
@@ -203,6 +209,9 @@ handleHomeOutboundMessage userIdent connection (HomeUserEventMsg event) state =
   handleUserEvent userIdent connection event state
 handleHomeOutboundMessage _ connection (HomeChatMessage chatMsg) state = do
   sendChatUpdate connection chatMsg
+  pure state
+handleHomeOutboundMessage _ connection (HomeTvMsg (HomeTVUpdate snapshot)) state = do
+  C.sendTextData connection (encode (TvUpdate (snapshotToTvSummary snapshot)))
   pure state
 
 handleUserEvent :: T.Text -> C.Connection -> UserEvent -> Map Text ActiveGameSummary -> IO (Map Text ActiveGameSummary)

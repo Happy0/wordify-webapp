@@ -51,9 +51,14 @@ instance ToJSON TvActiveGameSummary where
 
 data OutboundHomeMessage
   = GamesUpdate [ActiveGameSummary]
+  | TvUpdate TvActiveGameSummary
 
 instance ToJSON OutboundHomeMessage where
   toJSON (GamesUpdate summaries) = object
     [ "command" .= ("gamesUpdate" :: Text)
     , "payload" .= summaries
+    ]
+  toJSON (TvUpdate summary) = object
+    [ "command" .= ("tvUpdate" :: Text)
+    , "payload" .= summary
     ]

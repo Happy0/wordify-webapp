@@ -7,20 +7,22 @@ import { useToast } from 'primevue/usetoast'
 import NavigationButton from '@/components/common/NavigationButton.vue'
 import NotificationMenu from '@/components/common/NotificationMenu.vue'
 import MiniBoard from '@/components/home/MiniBoard.vue'
+import TvMiniBoard from '@/components/home/TvMiniBoard.vue'
 import ChatBox from '@/components/chat/ChatBox.vue'
 import { useHomeWebSocket } from '@/composables/useHomeWebSocket'
 import { useNotificationSocketMessages } from '@/composables/useNotificationSocketMessages'
 import { useHomeChatService } from '@/composables/useHomeChatService'
-import type { GameSummary } from '@/lib/home'
+import type { GameSummary, TvGameSummary } from '@/lib/home'
 
 const props = defineProps<{
   games: GameSummary[]
+  initialHomeTvGame: TvGameSummary | null
 }>()
 
 const isLoggedIn = inject<boolean>('isLoggedIn', false)
 const toast = useToast()
 
-const { games, connectionState, transport, connect, disconnect } = useHomeWebSocket(props.games)
+const { games, tvGame, connectionState, transport, connect, disconnect } = useHomeWebSocket(props.games, props.initialHomeTvGame)
 useNotificationSocketMessages(transport)
 const chatService = useHomeChatService(transport)
 
@@ -137,18 +139,32 @@ function navigateToLogin() {
     <NavigationButton :is-logged-in="isLoggedIn" />
     <NotificationMenu :is-logged-in="isLoggedIn" />
 
-    <!-- Main layout: content + desktop chat column -->
+    <!-- Main layout: TV column + content + desktop chat column -->
     <!-- max-w-7xl keeps the chat from drifting too far right on ultra-wide screens -->
-    <div class="flex-1 flex max-w-7xl mx-auto w-full">
+    <div class="flex-1 flex max-w-screen-2xl mx-auto w-full px-6">
+
+      <!-- Left TV column (xl+ only, mirrors chat column width to keep main content centred) -->
+      <div class="hidden xl:flex w-[22rem] flex-shrink-0 justify-center items-start pt-[38vh]">
+        <div v-if="tvGame" class="sticky top-[38vh] w-[220px]">
+          <TvMiniBoard
+            :board-string="tvGame.boardString"
+            :last-activity="tvGame.lastActivity"
+            :game-id="tvGame.gameId"
+            :tile-values="tvGame.tileValues"
+            :players="tvGame.players"
+          />
+        </div>
+      </div>
+
       <!-- Main content area -->
-      <div class="flex-1 flex items-center justify-center p-4">
+      <div class="flex-1 min-w-0 flex items-center justify-center p-4">
         <!-- Logged in with games -->
         <!-- Fixed size on desktop (lg:w-[56rem] fits 4 mini-boards; lg:h-[93vh] = 25% taller than chat).   -->
         <!-- On mobile the card is full-width with natural height and no internal scroll.                     -->
         <div
           v-if="isLoggedIn && hasGames"
           class="bg-white rounded-lg shadow p-6
-                 w-full lg:w-[56rem]
+                 w-full lg:max-w-[56rem]
                  flex flex-col
                  lg:h-[93vh]"
         >
@@ -180,7 +196,7 @@ function navigateToLogin() {
         <div
           v-else-if="isLoggedIn && !hasGames"
           class="bg-white rounded-lg shadow p-6
-                 w-full lg:w-[56rem]
+                 w-full lg:max-w-[56rem]
                  flex flex-col items-center justify-center
                  lg:h-[93vh]"
         >
@@ -225,8 +241,8 @@ function navigateToLogin() {
 
       <!-- Desktop chat column (logged in only) -->
       <!-- pt-[12.5vh] positions the chat centred on initial load; sticky top-[12.5vh] keeps it there while scrolling -->
-      <div v-if="isLoggedIn" class="hidden lg:flex w-96 flex-shrink-0 justify-center items-start pt-[12.5vh]">
-        <div class="sticky top-[12.5vh] w-[22rem]">
+      <div v-if="isLoggedIn" class="hidden lg:flex w-[22rem] flex-shrink-0 justify-center items-start pt-[12.5vh]">
+        <div class="sticky top-[12.5vh] w-full">
           <div class="h-[75vh]">
             <ChatBox
               class="h-full"
