@@ -223,7 +223,7 @@ makeFoundation appSettings inactivityTracker = do
 
   let lobbyRepo = SqlLobbyRepositoryBackend pool
 
-  tvSvc <- makeTvService (GameRepositorySQLBackend pool localisedGameSetups) gameService 30
+  tvSvc <- makeTvService (GameRepositorySQLBackend pool localisedGameSetups) gameService 5
 
   -- Return the foundation
   return $ mkFoundation pool gameService gameLobbies gameDefinitionController chatService userEventService notifSvc userCtrl lobbyRepo tvSvc
