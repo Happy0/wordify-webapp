@@ -1,6 +1,6 @@
-module Repository.GameRepository (UserId, GameSummary (GameSummary), OtherPlayerNames, GameRepository (getActiveUserGames), gameSummaryGameId) where
+module Repository.GameRepository (UserId, GameSummary (GameSummary), OtherPlayerNames, GameRepository (getActiveUserGames, getRecentlyActiveGames), gameSummaryGameId) where
 
-import ClassyPrelude (Bool, UTCTime)
+import ClassyPrelude (Bool, UTCTime, Int)
 import Data.Maybe
 import qualified Data.Text as T
 import System.IO
@@ -18,6 +18,7 @@ data GameSummary = GameSummary GameId LatestActivity MyMove BoardString Localise
 
 class GameRepository a where
   getActiveUserGames :: a -> UserId -> IO [GameSummary]
+  getRecentlyActiveGames :: a -> Int -> IO [GameSummary]
 
 gameSummaryGameId :: GameSummary -> T.Text
 gameSummaryGameId (GameSummary gameId _ _ _ _ _) = gameId

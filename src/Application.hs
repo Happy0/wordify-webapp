@@ -40,6 +40,7 @@ import Controllers.Definition.DefinitionService (makeDefinitionService, anyDefin
 import Controllers.Definition.Clients.RaeApiClient (makeRaeApiClient)
 import Controllers.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
 import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
+import Modules.Games.Api (makeGameService)
 import Modules.Notifications.Api (makeNotificationService)
 import Web.WebPush (generateVAPIDKeys, readVAPIDKeys, vapidPublicKeyBytes, VAPIDKeys, VAPIDKeysMinDetails(..))
 import qualified Data.Aeson as A
@@ -168,7 +169,7 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool games gameLobbies gameDefinitionController chatService userEventService notificationService userController lobbyRepository = App {..}
+  let mkFoundation appConnPool gameService gameLobbies gameDefinitionController chatService userEventService notificationService userController lobbyRepository = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
@@ -205,7 +206,7 @@ makeFoundation appSettings inactivityTracker = do
   let userRepo = toUserRepositoryImpl (SqlUserRepositoryBackend pool)
   let userCtrl = makeUserController userRepo
 
-  games <- makeGlobalResourceCache (getGame pool userCtrl localisedGameSetups) Nothing
+  gameService <- makeGameService (getGame pool userCtrl localisedGameSetups)
   gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing
 
   userEventService <- makeUserEventService
@@ -221,7 +222,7 @@ makeFoundation appSettings inactivityTracker = do
   let lobbyRepo = SqlLobbyRepositoryBackend pool
 
   -- Return the foundation
-  return $ mkFoundation pool games gameLobbies gameDefinitionController chatService userEventService notifSvc userCtrl lobbyRepo
+  return $ mkFoundation pool gameService gameLobbies gameDefinitionController chatService userEventService notifSvc userCtrl lobbyRepo
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =

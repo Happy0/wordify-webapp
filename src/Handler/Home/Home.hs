@@ -15,7 +15,7 @@ import Yesod.WebSockets
 import Network.WebSockets (Connection, sendTextData)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
 import Modules.UserEvent.Api (UserEventService, subscribeToUserChannel)
-import Controllers.Common.CacheableSharedResource
+import Modules.Games.Api (GameService, peekGame)
 import Control.Monad.Loops (iterateM_)
 import qualified Network.WebSockets.Connection as C
 import Data.Aeson (encode, eitherDecode)
@@ -77,7 +77,7 @@ renderPlayerMoveNote True = [whamlet| <span> (Your move) |]
 renderActiveGamePage :: (GameRepository a) => App -> a -> T.Text -> Handler Html
 renderActiveGamePage app gameRepository userId = do
   activeGames <- liftIO $ getActiveUserGames gameRepository userId
-  summaries <- liftIO $ buildActiveGameSummaries (games app) activeGames
+  summaries <- liftIO $ buildActiveGameSummaries (gameService app) activeGames
   notifs <- liftIO $ notificationsForUser app userId
   gamePagelayout $ do
     addStylesheet $ (StaticR wordifyCss)
@@ -152,12 +152,12 @@ homeWebsocketHandler app userIdent displayName = do
     case (userBroadcastChannelResult, chatroomResult) of
       (Right userEventChan, Right chatroom) -> liftIO $ do
         liveChatChan <- subscribeMessagesLive chatroom
-        let handleOutbound = handleOutboundHomeWebsocket gameRepository (games app) connection userIdent chatroom userEventChan liveChatChan
+        let handleOutbound = handleOutboundHomeWebsocket gameRepository (gameService app) connection userIdent chatroom userEventChan liveChatChan
             handleInbound  = handleInboundHomeWebsocket connection chatroom userIdent displayName
         race_ handleOutbound handleInbound
       _ -> return ()
 
-handleOutboundHomeWebsocket :: (GameRepository a) => a -> ResourceCache Text ServerGame -> C.Connection -> Text -> CR.Chatroom -> TChan UserEvent -> TChan CR.ChatMessage -> IO ()
+handleOutboundHomeWebsocket :: (GameRepository a) => a -> GameService -> C.Connection -> Text -> CR.Chatroom -> TChan UserEvent -> TChan CR.ChatMessage -> IO ()
 handleOutboundHomeWebsocket gameRepository gamesCache connection userIdent chatroom userEventChan liveChatChan = do
   activeGames <- getActiveUserGames gameRepository userIdent
   activeSummaryMap <- buildActiveGameSummaryMap gamesCache activeGames
@@ -247,13 +247,13 @@ activePlayerNamesFromSnapshot :: ServerGameSnapshot -> [Text]
 activePlayerNamesFromSnapshot snapshot =
   [ defaultPlayerName i p | (i, p) <- zip [1..] (snapshotPlayers snapshot), SP.numConnections p > 0 ]
 
-buildActiveGameSummaries :: ResourceCache Text ServerGame -> [GameSummary] -> IO [ActiveGameSummary]
+buildActiveGameSummaries :: GameService -> [GameSummary] -> IO [ActiveGameSummary]
 buildActiveGameSummaries gamesCache gameSummaries =
   forM gameSummaries $ \g -> do
-    maybeServerGame <- atomically $ peekCacheableResource gamesCache (gameSummaryGameId g)
+    maybeServerGame <- atomically $ peekGame gamesCache (gameSummaryGameId g)
     buildActiveGameSummary g maybeServerGame
 
-buildActiveGameSummaryMap :: ResourceCache Text ServerGame -> [GameSummary] -> IO (Map Text ActiveGameSummary)
+buildActiveGameSummaryMap :: GameService -> [GameSummary] -> IO (Map Text ActiveGameSummary)
 buildActiveGameSummaryMap gamesCache gameSummaries = do
   summaries <- buildActiveGameSummaries gamesCache gameSummaries
   let gameIds = map gameSummaryGameId gameSummaries

@@ -18,8 +18,8 @@ import Controllers.Common.CacheableSharedResource
 import Modules.Chats.Api (ChatService)
 
 import Controllers.Game.GameDefinitionController (GameDefinitionController)
+import Modules.Games.Api (GameService)
 import Modules.Notifications.Api (NotificationService)
-import Controllers.Game.Model.ServerGame
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.AuthUser (AuthUser (AuthUser))
 import Controllers.User.UserController (UserController)
@@ -73,7 +73,7 @@ data App = App
     appLogger :: Logger,
     localisedGameSetups :: LocalisedGameSetups,
     gameLobbies :: ResourceCache Text GameLobby,
-    games :: ResourceCache Text ServerGame,
+    gameService :: GameService,
     chatService :: ChatService,
     userEventService :: UserEventService,
     randomGenerator :: TVar StdGen,

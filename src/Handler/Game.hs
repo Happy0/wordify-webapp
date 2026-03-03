@@ -5,17 +5,15 @@ module Handler.Game where
 
 import Control.Concurrent
 import Control.Error (ExceptT (..), lastDef, note, runExceptT)
-import Controllers.Common.CacheableSharedResource (getCacheableResource)
+import Modules.Games.Api (getGame)
 import Modules.Chats.Api (ChatService, getChatroom, subscribeMessagesLive, Chatroom, getExistingChatMessages)
 import qualified Modules.Chats.Api as CR (ChatMessage (ChatMessage), Chatroom)
 import qualified Controllers.Definition.DefinitionClient as D
 import Controllers.Game.Api
-import Controllers.Game.Api (initialSocketMessage)
 import Controllers.Game.Game
 import Controllers.Game.GameDefinitionController (GameDefinitionController, getStoredDefinitions)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
-import Controllers.Game.Persist
 import Controllers.User.Model.AuthUser
 import Data.Aeson
 import Data.Conduit
@@ -76,7 +74,7 @@ getGameR gameId = do
   webSockets $ gameApp app gameId maybeUser
 
   runResourceT $ do
-    (_, game) <- getCacheableResource (games app) gameId
+    (_, game) <- getGame (gameService app) gameId
     lift $ renderGamePage app gameId maybeUser game
 
 getServerPlayers :: ServerGame -> STM [ServerPlayer]
@@ -240,7 +238,7 @@ sendInitialGameState connection serverGameSnapshot maybeUser = do
 handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> IO ()
 handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince = runResourceT $ do
   result <- runExceptT $ do
-    serverGame    <- ExceptT $ snd <$> getCacheableResource (games app) gameId
+    serverGame    <- ExceptT $ snd <$> getGame (gameService app) gameId
     chatId        <- liftIO  $ getChatId gameId maybeUser serverGame
     chatroom      <- ExceptT $ getChatroom (chatService app) chatId
     userEventChan <- case maybeUser of

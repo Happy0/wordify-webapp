@@ -49,3 +49,13 @@ runSetup = do
   rawExecute
     "CREATE INDEX IF NOT EXISTS idx_notification_expires_at ON notification(expires_at)"
     []
+
+  -- Index on game for efficient ordering by creation time in descending order.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_game_created_at_desc ON game(created_at DESC)"
+    []
+
+  -- Index on game for efficient ordering by last move time in descending order.
+  rawExecute
+    "CREATE INDEX IF NOT EXISTS idx_game_last_move_made_at_desc ON game(last_move_made_at DESC)"
+    []
