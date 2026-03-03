@@ -32,7 +32,7 @@ COPY stack.yaml package.yaml ./
 COPY vendor vendor
 
 # Build dependencies only (this layer is cached unless stack.yaml/package.yaml change)
-RUN stack build --only-dependencies
+RUN stack build --install-ghc --only-dependencies
 
 # ===========================================
 # Stage 2: Build the UI
@@ -87,7 +87,7 @@ COPY --from=ui-build /app/static/css/ static/css/
 COPY --from=ui-build /app/static/sw.js static/sw.js
 
 # Build the application
-RUN stack build --copy-bins --local-bin-path "bin"
+RUN stack build --install-ghc --copy-bins --local-bin-path "bin"
 
 # ===========================================
 # Stage 4: Runtime - use slim image for smaller size
