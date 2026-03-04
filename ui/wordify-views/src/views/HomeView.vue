@@ -79,12 +79,19 @@ const hasUnreadMessages = computed(
   () => chatService.lastChatMessageReceived.value > lastSeenChatMessage.value
 )
 
-// Mobile chat panel state
+// Mobile panel state
 const chatPanelOpen = ref(false)
+const tvPanelOpen = ref(false)
 let handlingPopState = false
 
-// Consume stale history entry when panel is closed via UI (not back button)
+// Consume stale history entry when a panel is closed via UI (not back button)
 watch(chatPanelOpen, (newVal, oldVal) => {
+  if (oldVal && !newVal && !handlingPopState) {
+    history.back()
+  }
+}, { flush: 'sync' })
+
+watch(tvPanelOpen, (newVal, oldVal) => {
   if (oldVal && !newVal && !handlingPopState) {
     history.back()
   }
@@ -100,10 +107,24 @@ function closeChat() {
   chatPanelOpen.value = false
 }
 
+function openTv() {
+  tvPanelOpen.value = true
+  history.pushState({ mobilePanel: 'tv' }, '')
+}
+
+function closeTv() {
+  tvPanelOpen.value = false
+}
+
 function handlePopState(_: PopStateEvent) {
   handlingPopState = true
   if (chatPanelOpen.value) {
     closeChat()
+    handlingPopState = false
+    return
+  }
+  if (tvPanelOpen.value) {
+    closeTv()
     handlingPopState = false
     return
   }
@@ -261,6 +282,47 @@ function navigateToLogin() {
         </div>
       </div>
     </div>
+
+    <!-- Mobile TV FAB (shown whenever a TV game is available) -->
+    <div v-if="tvGame" class="lg:hidden fixed bottom-6 left-6 z-40">
+      <Button
+        icon="pi pi-desktop"
+        severity="secondary"
+        size="large"
+        rounded
+        @click="openTv"
+      />
+    </div>
+
+    <!-- Mobile TV panel overlay -->
+    <Transition name="slide">
+      <div
+        v-if="tvPanelOpen"
+        class="fixed inset-0 z-50 flex flex-col bg-stone-100 lg:hidden"
+      >
+        <div class="flex items-center justify-between px-4 py-3 bg-white shadow-sm">
+          <h2 class="text-lg font-semibold text-gray-800">📺 TV Game</h2>
+          <Button
+            icon="pi pi-times"
+            severity="secondary"
+            size="small"
+            rounded
+            @click="closeTv"
+          />
+        </div>
+        <div class="flex-1 flex items-center justify-center p-6">
+          <div class="w-full max-w-[300px]">
+            <TvMiniBoard
+              :board-string="tvGame!.boardString"
+              :last-activity="tvGame!.lastActivity"
+              :game-id="tvGame!.gameId"
+              :tile-values="tvGame!.tileValues"
+              :players="tvGame!.players"
+            />
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Mobile chat FAB (logged in only) -->
     <div v-if="isLoggedIn" class="lg:hidden fixed bottom-6 right-6 z-40">
