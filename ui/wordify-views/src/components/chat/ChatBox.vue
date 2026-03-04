@@ -88,7 +88,7 @@ function handleKeyDown(e: KeyboardEvent) {
       <InputText
         v-model="messageInput"
         :placeholder="placeholder"
-        class="flex-1"
+        class="flex-1 min-w-0"
         @keydown="handleKeyDown"
       />
       <Button

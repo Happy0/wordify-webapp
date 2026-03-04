@@ -266,19 +266,17 @@ function navigateToLogin() {
       </div>
 
       <!-- Desktop chat column (logged in only) -->
-      <!-- pt-[12.5vh] positions the chat centred on initial load; sticky top-[12.5vh] keeps it there while scrolling -->
-      <div v-if="isLoggedIn" class="hidden lg:flex w-[296px] flex-shrink-0 justify-center items-start pt-[12.5vh] px-3">
-        <div class="sticky top-[12.5vh] w-full">
-          <div class="h-[75vh]">
-            <ChatBox
-              class="h-full"
-              :messages="chatService.messages.value"
-              title="Chat"
-              placeholder="Say something to everyone..."
-              history-hint="Chat history is kept for 2 months"
-              @send="chatService.sendMessage"
-            />
-          </div>
+      <!-- pt-[10vh] + h-[80vh] keeps the vertical centre at 50vh (same as before) while making the card tall enough to fully contain the send button -->
+      <div v-if="isLoggedIn" class="hidden lg:flex w-[296px] flex-shrink-0 justify-center items-start pt-[10vh] px-3">
+        <div class="sticky top-[10vh] w-full flex flex-col h-[80vh]">
+          <ChatBox
+            class="flex-1 min-h-0"
+            :messages="chatService.messages.value"
+            title="Chat"
+            placeholder="Say something to everyone..."
+            history-hint="Chat history is kept for 2 months"
+            @send="chatService.sendMessage"
+          />
         </div>
       </div>
     </div>
@@ -357,9 +355,9 @@ function navigateToLogin() {
             @click="closeChat"
           />
         </div>
-        <div class="flex-1 p-4 min-h-0">
+        <div class="flex-1 flex flex-col p-4 min-h-0">
           <ChatBox
-            class="h-full"
+            class="flex-1 min-h-0"
             :messages="chatService.messages.value"
             title="Chat"
             placeholder="Say something to everyone..."
