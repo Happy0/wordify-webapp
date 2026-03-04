@@ -2,7 +2,7 @@ module Handler.Common.ClientNotificationPresentation
   ( notificationsForUser
   , sendNotificationUpdate
   , nextNotifUpdateFromUserChan
-  , withUserEventChan
+  , notificationsOnlyWebsocketHandler
   , notificationsWebSocketHandler
   ) where
 
@@ -13,7 +13,7 @@ import Data.Time (UTCTime)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import InactivityTracker (withTrackWebsocketActivity)
 import Modules.Notifications.Api (getRecentNotifications)
-import Modules.UserEvent.Api (UserEventService, subscribeToUserChannel)
+import Modules.UserEvent.Api (subscribeToUserChannel)
 import Repository.NotificationRepository (Notification (..), NotificationDetails (..), GameInviteDetails (..))
 import qualified Controllers.User.Model.ServerUser as SU
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..))
@@ -61,28 +61,44 @@ sendNotificationUpdate connection (NotificationsRead ids) =
     , "payload" .= ids
     ]
 
+-- | Higher-order WebSocket handler that:
+-- 1. Opens the user event channel
+-- 2. Sends the initial notification state to the client (after the channel is
+--    open so no events can be missed between fetching and subscribing)
+-- 3. Invokes the given callback with the channel so the caller can run
+--    the rest of the WebSocket session
+notificationsWebSocketHandler
+  :: App
+  -> Text                                              -- userId
+  -> (TChan UserEvent -> WebSocketsT Handler ())       -- callback
+  -> WebSocketsT Handler ()
+notificationsWebSocketHandler app userId callback = do
+  connection <- ask
+  withRunInIO $ \runInIO ->
+    runResourceT $ do
+      (_, eitherChan) <- subscribeToUserChannel (userEventService app) userId
+      case eitherChan of
+        Left _ -> return ()
+        Right userEventChan -> liftIO $ do
+          notifs <- notificationsForUser app userId
+          C.sendTextData connection $ encode $ object
+            [ "command" .= ("initialNotifications" :: Text)
+            , "payload" .= notifs
+            ]
+          runInIO (callback userEventChan)
+
 -- | WebSocket handler that forwards notification updates to the client.
 -- For use by endpoints that serve no other websocket messages.
-notificationsWebSocketHandler :: App -> Text -> WebSocketsT Handler ()
-notificationsWebSocketHandler app userId = do
-  connection <- ask
-  liftIO $
-    withTrackWebsocketActivity (inactivityTracker app) $ runResourceT $
-      withUserEventChan (userEventService app) userId $ \userEventChan ->
-        race_
-          (forever $ do
-            update <- atomically (nextNotifUpdateFromUserChan userEventChan)
-            sendNotificationUpdate connection update)
-          (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
-
--- | Subscribes to the user event channel and passes it to the given action.
--- If the subscription fails, returns () without calling the action.
-withUserEventChan :: MonadResource m => UserEventService -> Text -> (TChan UserEvent -> IO ()) -> m ()
-withUserEventChan service userId action = do
-  (_, eitherChan) <- subscribeToUserChannel service userId
-  case eitherChan of
-    Left _    -> return ()
-    Right chan -> liftIO $ action chan
+notificationsOnlyWebsocketHandler :: App -> Text -> WebSocketsT Handler ()
+notificationsOnlyWebsocketHandler app userId =
+  notificationsWebSocketHandler app userId $ \userEventChan -> do
+    connection <- ask
+    liftIO $ withTrackWebsocketActivity (inactivityTracker app) $
+      race_
+        (forever $ do
+          update <- atomically (nextNotifUpdateFromUserChan userEventChan)
+          sendNotificationUpdate connection update)
+        (forever $ C.sendPing connection ("hello~" :: Text) >> threadDelay 60000000)
 
 -- | Reads from the user event channel, skipping (and discarding) non-notification
 -- events until a NotificationsChanged event is found.

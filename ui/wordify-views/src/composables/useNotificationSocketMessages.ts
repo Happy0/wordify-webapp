@@ -8,7 +8,9 @@ export function useNotificationSocketMessages(transport: IGameTransport) {
   transport.onMessage((message) => {
     try {
       const data = JSON.parse(message)
-      if (data.command === 'notificationAdded') {
+      if (data.command === 'initialNotifications') {
+        notificationStore.updateNotifications(data.payload as NotificationItem[])
+      } else if (data.command === 'notificationAdded') {
         notificationStore.addNotification(data.payload as NotificationItem)
       } else if (data.command === 'notificationsRead') {
         notificationStore.markNotificationsAsRead(data.payload as string[])

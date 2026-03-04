@@ -46,9 +46,8 @@ import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer, fromServerTile, fromServerMoveHistory)
 import qualified Handler.Common.Chat as HC
 import Handler.Common.Chat (sendChatUpdate)
-import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, nextNotifUpdateFromUserChan)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, nextNotifUpdateFromUserChan, notificationsWebSocketHandler)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..))
-import Modules.UserEvent.Api (subscribeToUserChannel)
 import Control.Concurrent.STM (retry)
 import qualified Foundation as G
 import qualified Wordify.Rules.Move as G
@@ -235,20 +234,17 @@ sendInitialGameState connection serverGameSnapshot maybeUser = do
   let initialGameState = initialSocketMessage serverGameSnapshot maybeUser
   mapM_ (C.sendTextData connection . toJSONResponse) initialGameState
 
-handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> IO ()
-handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince = runResourceT $ do
+handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> TChan UserEvent -> IO ()
+handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince userEventChan = runResourceT $ do
   result <- runExceptT $ do
-    serverGame    <- ExceptT $ snd <$> getGame (gameService app) gameId
-    chatId        <- liftIO  $ getChatId gameId maybeUser serverGame
-    chatroom      <- ExceptT $ getChatroom (chatService app) chatId
-    userEventChan <- case maybeUser of
-      Nothing   -> liftIO $ newBroadcastTChanIO >>= atomically . dupTChan
-      Just user -> ExceptT $ snd <$> subscribeToUserChannel (userEventService app) (ident user)
-    pure (serverGame, chatroom, userEventChan)
+    serverGame <- ExceptT $ snd <$> getGame (gameService app) gameId
+    chatId     <- liftIO  $ getChatId gameId maybeUser serverGame
+    chatroom   <- ExceptT $ getChatroom (chatService app) chatId
+    pure (serverGame, chatroom)
 
   case result of
     Left err -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
-    Right (serverGame, chatroom, userEventChan) -> liftIO $ do
+    Right (serverGame, chatroom) -> liftIO $ do
       let inactivityTrackerState = inactivityTracker app
       (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
       withTrackWebsocketActivity inactivityTrackerState $ do
@@ -273,7 +269,13 @@ gameApp app gameId maybeUser = do
   connection <- ask
   chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
   definitionsSinceParam <- lift definitionsSinceQueryParamValue
-  liftIO (handleWebsocket app connection gameId maybeUser chatMessagesSinceParam definitionsSinceParam)
+  case maybeUser of
+    Nothing -> liftIO $ do
+      dummyChan <- newBroadcastTChanIO >>= atomically . dupTChan
+      handleWebsocket app connection gameId Nothing chatMessagesSinceParam definitionsSinceParam dummyChan
+    Just user ->
+      notificationsWebSocketHandler app (ident user) $ \userEventChan ->
+        liftIO $ handleWebsocket app connection gameId maybeUser chatMessagesSinceParam definitionsSinceParam userEventChan
 
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]
 gameToMoveSummaries game =

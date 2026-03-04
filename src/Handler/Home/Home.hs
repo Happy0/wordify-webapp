@@ -14,7 +14,7 @@ import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
 import Yesod.WebSockets
 import Network.WebSockets (Connection, sendTextData)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..))
-import Modules.UserEvent.Api (UserEventService, subscribeToUserChannel)
+import Modules.UserEvent.Api (UserEventService)
 import Modules.Games.Api (GameService, peekGame)
 import Control.Monad.Loops (iterateM_)
 import qualified Network.WebSockets.Connection as C
@@ -23,7 +23,7 @@ import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), ServerGame, la
 import qualified Controllers.Game.Model.ServerPlayer as SP
 import Wordify.Rules.Board (textRepresentation)
 import Wordify.Rules.Game (board)
-import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate)
+import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, notificationsWebSocketHandler)
 import Modules.Chats.Api (ChatService, getChatroom, subscribeMessagesLive, getMessagesSinceTime)
 import Data.Time.Clock (addUTCTime)
 import qualified Modules.Chats.Api as CR (ChatMessage (ChatMessage), Chatroom, sendMessage, SendMessage (SendMessage))
@@ -164,20 +164,20 @@ toChatMessage (CR.ChatMessage _ displayName msg sentTime messageNumber) =
 -- Acquires resources (chatroom, user event channel) and races the inbound and
 -- outbound socket handlers for the duration of the connection.
 homeWebsocketHandler :: App -> Text -> Text -> WebSocketsT Handler ()
-homeWebsocketHandler app userIdent displayName = do
-  connection <- ask
-  let gameRepository = GameRepositorySQLBackend (appConnPool app) (localisedGameSetups app)
-  liftIO $ runResourceT $ do
-    (_, userBroadcastChannelResult) <- subscribeToUserChannel (userEventService app) userIdent
-    chatroomResult <- getChatroom (chatService app) "Home"
-    case (userBroadcastChannelResult, chatroomResult) of
-      (Right userEventChan, Right chatroom) -> liftIO $ do
-        liveChatChan <- subscribeMessagesLive chatroom
-        tvChan <- subscribeHomeTV (tvService app)
-        let handleOutbound = handleOutboundHomeWebsocket gameRepository (gameService app) (tvService app) connection userIdent chatroom userEventChan liveChatChan tvChan
-            handleInbound  = handleInboundHomeWebsocket connection chatroom userIdent displayName
-        race_ handleOutbound handleInbound
-      _ -> return ()
+homeWebsocketHandler app userIdent displayName =
+  notificationsWebSocketHandler app userIdent $ \userEventChan -> do
+    connection <- ask
+    let gameRepository = GameRepositorySQLBackend (appConnPool app) (localisedGameSetups app)
+    liftIO $ runResourceT $ do
+      chatroomResult <- getChatroom (chatService app) "Home"
+      case chatroomResult of
+        Right chatroom -> liftIO $ do
+          liveChatChan <- subscribeMessagesLive chatroom
+          tvChan <- subscribeHomeTV (tvService app)
+          let handleOutbound = handleOutboundHomeWebsocket gameRepository (gameService app) (tvService app) connection userIdent chatroom userEventChan liveChatChan tvChan
+              handleInbound  = handleInboundHomeWebsocket connection chatroom userIdent displayName
+          race_ handleOutbound handleInbound
+        _ -> return ()
 
 handleOutboundHomeWebsocket :: (GameRepository a) => a -> GameService -> TvService -> C.Connection -> Text -> CR.Chatroom -> TChan UserEvent -> TChan CR.ChatMessage -> TChan HomeTvUpdate -> IO ()
 handleOutboundHomeWebsocket gameRepository gamesCache tvSvc connection userIdent chatroom userEventChan liveChatChan tvChan = do
