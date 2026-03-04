@@ -185,7 +185,6 @@ const formattedLastActivity = computed(() => {
 
 <style scoped>
 .tv-mini-board-card {
-  max-width: 220px;
   width: 100%;
 }
 
@@ -195,26 +194,26 @@ const formattedLastActivity = computed(() => {
 }
 
 .tile-letter {
-  font-size: 0.4rem;
+  font-size: 0.55rem;
 }
 
 .tile-value {
-  font-size: 0.18rem;
+  font-size: 0.24rem;
   bottom: 0;
   right: 1px;
   line-height: 1;
 }
 
 .square-label {
-  font-size: 0.25rem;
+  font-size: 0.35rem;
 }
 
 .player-icon {
-  font-size: 0.55rem;
+  font-size: 0.7rem;
 }
 
 .player-name {
-  font-size: 0.65rem;
+  font-size: 0.85rem;
   max-width: 12ch;
 }
 </style>

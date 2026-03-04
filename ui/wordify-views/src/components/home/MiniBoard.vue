@@ -166,11 +166,11 @@ function navigateToGame() {
 
 <template>
   <div
-    class="mini-board-card bg-white rounded-lg shadow-md p-3 cursor-pointer hover:shadow-lg transition-shadow"
+    class="mini-board-card bg-white rounded-lg shadow-md p-1.5 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow"
     @click="navigateToGame"
   >
     <!-- Turn indicator -->
-    <div class="flex items-center justify-between mb-2">
+    <div class="flex items-center justify-between mb-1 sm:mb-2">
       <div
         class="text-xs font-medium px-2 py-1 rounded-full w-fit shrink-0"
         :class="yourMove ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
@@ -221,7 +221,7 @@ function navigateToGame() {
     </div>
 
     <!-- Other players -->
-    <div v-if="otherPlayers.length" class="mt-2 flex flex-wrap gap-1 justify-center">
+    <div v-if="otherPlayers.length" class="mt-1 sm:mt-2 flex flex-wrap gap-1 justify-center">
       <span
         v-for="player in otherPlayers"
         :key="player.name"

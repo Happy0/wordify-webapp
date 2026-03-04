@@ -143,9 +143,14 @@ function navigateToLogin() {
     <!-- max-w-7xl keeps the chat from drifting too far right on ultra-wide screens -->
     <div class="flex-1 flex max-w-screen-2xl mx-auto w-full px-6">
 
+      <!-- Invisible spacer on lg (non-xl) to balance the chat column and keep main content centred -->
+      <div class="hidden lg:flex xl:hidden w-[296px] flex-shrink-0" aria-hidden="true"></div>
+
       <!-- Left TV column (xl+ only, mirrors chat column width to keep main content centred) -->
-      <div class="hidden xl:flex w-[22rem] flex-shrink-0 justify-center items-start pt-[38vh]">
-        <div v-if="tvGame" class="sticky top-[38vh] w-[220px]">
+      <!-- justify-start aligns the TV to the left edge of its column so the gap to the viewport
+           edge equals the chat column's gap to the right viewport edge (both = px-6 = 24px) -->
+      <div class="hidden xl:flex w-[296px] flex-shrink-0 justify-start items-start pt-[38vh] px-3">
+        <div v-if="tvGame" class="sticky top-[38vh] w-full">
           <TvMiniBoard
             :board-string="tvGame.boardString"
             :last-activity="tvGame.lastActivity"
@@ -163,12 +168,12 @@ function navigateToLogin() {
         <!-- On mobile the card is full-width with natural height and no internal scroll.                     -->
         <div
           v-if="isLoggedIn && hasGames"
-          class="bg-white rounded-lg shadow p-6
+          class="bg-white rounded-lg shadow p-3 sm:p-6
                  w-full lg:max-w-[56rem]
                  flex flex-col
                  lg:h-[93vh]"
         >
-          <h1 class="text-2xl font-bold text-center mb-4 flex-shrink-0">Your Games</h1>
+          <h1 class="text-2xl font-bold text-center mb-2 sm:mb-4 flex-shrink-0">Your Games</h1>
           <div class="flex-1 min-h-0 overflow-y-auto">
             <!-- Mobile: 2-column grid. Desktop: flex-wrap with justify-center so boards
                  grow outward from the middle (1 game = centred, 2 = centred pair, etc.) -->
@@ -241,7 +246,7 @@ function navigateToLogin() {
 
       <!-- Desktop chat column (logged in only) -->
       <!-- pt-[12.5vh] positions the chat centred on initial load; sticky top-[12.5vh] keeps it there while scrolling -->
-      <div v-if="isLoggedIn" class="hidden lg:flex w-[22rem] flex-shrink-0 justify-center items-start pt-[12.5vh]">
+      <div v-if="isLoggedIn" class="hidden lg:flex w-[296px] flex-shrink-0 justify-center items-start pt-[12.5vh] px-3">
         <div class="sticky top-[12.5vh] w-full">
           <div class="h-[75vh]">
             <ChatBox
