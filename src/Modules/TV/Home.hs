@@ -49,8 +49,14 @@ currentTVState :: HomeTvService -> IO (Maybe ServerGameSnapshot)
 currentTVState = readTVarIO . homeTvServiceCurrentGame
 
 runTvUpdateWorker :: GameRepository a => a -> GameService -> TChan HomeTvUpdate -> TVar (Maybe ServerGameSnapshot) -> Int -> IO ()
-runTvUpdateWorker repository gameService chan currentGameVar refreshAfterInactivityMinutes = 
-  forever (race_ newGameSearchTimer (sendCurrentTvGameUpdates repository gameService chan currentGameVar))
+runTvUpdateWorker repository gameService chan currentGameVar refreshAfterInactivityMinutes =
+  forever $ do
+    result <- try (race_ newGameSearchTimer (sendCurrentTvGameUpdates repository gameService chan currentGameVar))
+    case result of
+      Left ex -> do
+        putStrLn $ "TV update worker encountered an error: " <> tshow (ex :: SomeException)
+        threadDelay (1000000 * 60)
+      Right _ -> pure ()
   where
     newGameSearchTimer = threadDelay (1000000 * 60 * refreshAfterInactivityMinutes)
 
