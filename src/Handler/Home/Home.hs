@@ -5,7 +5,6 @@ import ClassyPrelude.Yesod
 import qualified Data.Text as T
 import Foundation
 import Repository.GameRepository
-import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend))
 import Yesod.Auth
 import Import.NoFoundation (wordifyCss, wordifyJs)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
@@ -119,8 +118,6 @@ renderActiveGamePage app gameRepository userId = do
 getHomeR :: Handler Html
 getHomeR = do
   app <- getYesod
-  let pool = appConnPool app
-  let gameRepositorySQLBackend = GameRepositorySQLBackend pool (localisedGameSetups app)
   maybePlayerId <- maybeAuthId
 
   case maybePlayerId of
@@ -131,7 +128,7 @@ getHomeR = do
       let displayName = authenticatedUsername authedUser
       {- If this is a websocket request the handler short circuits here, otherwise it goes on to return the HTML page -}
       webSockets $ homeWebsocketHandler app userId displayName
-      renderActiveGamePage app gameRepositorySQLBackend userId
+      renderActiveGamePage app (gameRepository app) userId
 
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html
@@ -164,14 +161,13 @@ homeWebsocketHandler :: App -> Text -> Text -> WebSocketsT Handler ()
 homeWebsocketHandler app userIdent displayName =
   notificationsWebSocketHandler app userIdent $ \userEventChan -> do
     connection <- ask
-    let gameRepository = GameRepositorySQLBackend (appConnPool app) (localisedGameSetups app)
     liftIO $ runResourceT $ do
       chatroomResult <- getChatroom (chatService app) "Home"
       case chatroomResult of
         Right chatroom -> liftIO $ do
           liveChatChan <- subscribeMessagesLive chatroom
           tvChan <- subscribeHomeTV (tvService app)
-          let handleOutbound = handleOutboundHomeWebsocket gameRepository (gameService app) (tvService app) connection userIdent chatroom userEventChan liveChatChan tvChan
+          let handleOutbound = handleOutboundHomeWebsocket (gameRepository app) (gameService app) (tvService app) connection userIdent chatroom userEventChan liveChatChan tvChan
               handleInbound  = handleInboundHomeWebsocket connection chatroom userIdent displayName
           race_ handleOutbound handleInbound
         _ -> return ()

@@ -1,4 +1,5 @@
-module Repository.GameRepository (UserId, GameSummary (GameSummary), OtherPlayerNames, GameRepository (getActiveUserGames, getRecentlyActiveGames), gameSummaryGameId) where
+{-# LANGUAGE ExistentialQuantification #-}
+module Repository.GameRepository (UserId, GameSummary (GameSummary), OtherPlayerNames, GameRepository (getActiveUserGames, getRecentlyActiveGames), gameSummaryGameId, AnyGameRepository (AnyGameRepository)) where
 
 import ClassyPrelude (Bool, UTCTime, Int)
 import Data.Maybe
@@ -22,3 +23,9 @@ class GameRepository a where
 
 gameSummaryGameId :: GameSummary -> T.Text
 gameSummaryGameId (GameSummary gameId _ _ _ _ _) = gameId
+
+data AnyGameRepository = forall a. GameRepository a => AnyGameRepository a
+
+instance GameRepository AnyGameRepository where
+  getActiveUserGames (AnyGameRepository r) = getActiveUserGames r
+  getRecentlyActiveGames (AnyGameRepository r) = getRecentlyActiveGames r
