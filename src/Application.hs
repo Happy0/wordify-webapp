@@ -59,7 +59,7 @@ import Repository.SQL.SqlUserRepository (SqlUserRepositoryBackend (SqlUserReposi
 import Repository.SQL.SqlLobbyRepository (SqlLobbyRepositoryBackend (SqlLobbyRepositoryBackend))
 import Controllers.User.UserController (makeUserController, UserController)
 import Controllers.Game.Model.ServerGame
-import Controllers.Game.Persist (getGame, getLobby)
+import Controllers.Game.Persist (getLobby)
 import Controllers.GameLobby.Model.GameLobby
 import Data.Char (isSpace)
 import Data.FileEmbed
@@ -209,7 +209,9 @@ makeFoundation appSettings inactivityTracker = do
   let userRepo = toUserRepositoryImpl (SqlUserRepositoryBackend pool)
   let userCtrl = makeUserController userRepo
 
-  gameService <- makeGameService (getGame pool userCtrl localisedGameSetups)
+  let gameRepository = AnyGameRepository (GameRepositorySQLBackend pool localisedGameSetups)
+
+  gameService <- makeGameService gameRepository
   gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing
 
   userEventService <- makeUserEventService
@@ -223,8 +225,6 @@ makeFoundation appSettings inactivityTracker = do
   notifSvc <- makeNotificationService notificationRepository pushNotificationRepository maybeVapidKeys appHttpManager userEventService
 
   let lobbyRepo = SqlLobbyRepositoryBackend pool
-
-  let gameRepository = AnyGameRepository (GameRepositorySQLBackend pool localisedGameSetups)
 
   tvSvc <- makeTvService (GameRepositorySQLBackend pool localisedGameSetups) gameService 5
 

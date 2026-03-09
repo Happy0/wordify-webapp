@@ -1,6 +1,6 @@
-module Controllers.Game.Persist (getGame, persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
+module Controllers.Game.Persist (persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
 
-import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fromMaybe, fst, id, liftIO, mapConcurrently, maybe, otherwise, putStrLn, repeat, show, snd, ($), (+), (++), (.), (==), String, Bool, notElem)
+import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fromMaybe, fst, id, liftIO, maybe, otherwise, show, snd, ($), (+), (++), (.), (==), String, Bool)
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Error.Util
@@ -24,7 +24,6 @@ import Data.Time.Clock
 import Database.Persist.Sql
 import Foundation
 import qualified Model as M
-import Repository.GameRepository (GameSummaryEntity)
 import System.Random
 import System.Random.Internal
 import System.Random.SplitMix
@@ -86,86 +85,6 @@ getLobbyPlayer pool userCtrl gameId playerId = do
     Nothing -> pure Nothing
     Just entity -> Just <$> playerFromLobbyEntity userCtrl entity
 
-addDisplayNames :: [ServerPlayer] -> [P.Player] -> [P.Player]
-addDisplayNames = L.zipWith addDisplayName
-  where
-    -- TODO: expose function to modify name of player in game state in wordify lib
-    addDisplayName serverPlayer gameStatePlayer =
-      let serverName = maybe (P.name gameStatePlayer) T.unpack (playerUsername serverPlayer)
-       in let player = P.makePlayer serverName
-           in let playerWithTiles = P.giveTiles player (P.tilesOnRack gameStatePlayer)
-               in let playerWithScore = P.increaseScore playerWithTiles (P.score gameStatePlayer)
-                   in let playerWithEndBonus = P.giveEndWinBonus playerWithScore (P.endBonus playerWithScore)
-                       in playerWithEndBonus
-
-setDisplayNames :: [P.Player] -> Game -> Game
-setDisplayNames players@[player1, player2] game = game {player1 = player1, player2 = player2, currentPlayer = getCurrentPlayer game players (playerNumber game)}
-setDisplayNames players@[player1, player2, player3] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Nothing), currentPlayer = getCurrentPlayer game players (playerNumber game)}
-setDisplayNames players@[player1, player2, player3, player4] game = game {player1 = player1, player2 = player2, optionalPlayers = Just (player3, Just player4), currentPlayer = getCurrentPlayer game players (playerNumber game)}
-setDisplayNames _ game = game
-
-getCurrentPlayer game (player1 : x) 1 = player1
-getCurrentPlayer game (player1 : player2 : x) 2 = player2
-getCurrentPlayer game (player1 : player2 : player3 : x) 3 = player3
-getCurrentPlayer game (player1 : player2 : player3 : player4 : x) 4 = player4
-getCurrentPlayer game _ _ = currentPlayer game
-
-getGame :: ConnectionPool -> UserController -> LocalisedGameSetups -> T.Text -> IO (Either T.Text ServerGame)
-getGame pool userCtrl localisedGameSetups gameId = do
-  dbEntries <- withPool pool $ do
-    maybeGame <- selectFirst [M.GameGameId ==. gameId] []
-    case maybeGame of
-      Nothing -> return $ Left (T.concat ["Game with id ", gameId, " does not exist"])
-      Just gameModel -> do
-        players <- selectList [M.PlayerGameId ==. gameId] []
-        moves <- selectList [M.MoveGame ==. M.GameKey gameId] []
-        return $ Right (gameModel, players, L.map entityVal moves)
-
-  case dbEntries of
-    Right (Entity _ (M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt currentMoveNumber _), playerModels, moveModels) -> do
-      -- This could be more efficient than individual fetches, but it doesn't matter for now
-      serverPlayers <- mapConcurrently (playerFromEntity userCtrl) playerModels
-
-      runExceptT $ do
-        let locale = fromMaybe "en" maybeLocale
-        let maybeLocalisedSetup = Mp.lookup locale localisedGameSetups
-        setup@(GameSetup _ dictionary bag extraRules _) <- hoistEither (note "Locale invalid" maybeLocalisedSetup)
-        internalPlayers <- hoistEither $ makeGameStatePlayers (L.length playerModels)
-        tiles <- hoistEither $ dbTileRepresentationToTiles bag bagText
-        let letterBag = makeBagUsingGenerator tiles (stdGenFromText bagSeed :: StdGen)
-        game <- hoistEither $ mapLeft (T.pack . show) (makeGame internalPlayers letterBag dictionary)
-        let playersWithNamesAdded = addDisplayNames serverPlayers (players game)
-        let gameWithDisplayNamesSet = setDisplayNames playersWithNamesAdded game
-
-        currentGame <- hoistEither $ playThroughGame gameWithDisplayNamesSet letterBag moveModels
-
-        liftIO $ atomically (makeServerGame gameId currentGame serverPlayers gameCreatedAt lastMoveMadeAt gameFinishedAt setup)
-    Left err -> return $ Left err
-
-playThroughGame :: Game -> LetterBag -> [M.Move] -> Either T.Text Game
-playThroughGame game initialBag = foldM playNextMove game
-  where
-    playNextMove :: Game -> M.Move -> Either T.Text Game
-    playNextMove game moveModel =
-      case moveFromEntity (board game) initialBag moveModel of
-        Left err -> Left err
-        Right move ->
-          let moveResult = makeMove game move
-           in case moveResult of
-                Left invalidState -> Left $ T.pack . show $ invalidState
-                Right moveResult -> Right (newGame moveResult)
-
-    scanM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m [a]
-    scanM f q [] = return [q]
-    scanM f q (x : xs) =
-      do
-        q2 <- f q x
-        qs <- scanM f q2 xs
-        return (q : qs)
-
-mapLeft :: (a -> c) -> Either a b -> Either c b
-mapLeft func (Left err) = Left $ func err
-mapLeft _ (Right r) = Right r
 
 persistNewLobby :: Pool SqlBackend -> T.Text -> T.Text -> GameLobby -> IO ()
 persistNewLobby pool gameId locale gameLobby = do
@@ -324,42 +243,9 @@ tileToDbRepresentation (Letter lettr val) = lettr
 tileToDbRepresentation (Blank Nothing) = "_"
 tileToDbRepresentation (Blank (Just letter)) = L.map C.toLower letter
 
-moveFromEntity :: Board -> LetterBag -> M.Move -> Either T.Text Move
-moveFromEntity board letterBag (M.Move gameId moveNumber Nothing Nothing Nothing Nothing) = Right Pass
-moveFromEntity board letterBag (M.Move gameId moveNumber (Just tiles) Nothing Nothing Nothing) =
-  case dbTileRepresentationToTiles letterBag tiles of
-    Left err -> error $ "you've dun goofed... " ++ show err
-    Right tiles -> Right $ Exchange tiles
-moveFromEntity
-  board
-  letterBag
-  ( M.Move
-      gameId
-      moveNumber
-      (Just tiles)
-      (Just startx)
-      (Just starty)
-      (Just isHorizontal)
-    ) =
-    do
-      let direction = if isHorizontal then Horizontal else Vertical
-      let startPos = posAt (startx, starty)
-
-      positions <- case startPos of
-        Nothing -> Left "u dun goofed. Start position stored for the move is invalid "
-        Just pos -> Right $ emptySquaresFrom board pos (T.length tiles) direction
-      tiles <- dbTileRepresentationToTiles letterBag tiles
-      return $ PlaceTiles (Mp.fromList (L.zip positions tiles))
-moveFromEntity _ _ m@M.Move {} = error "you've dun goofed, see database logs (hopefully) "
-
-playerFromEntity :: UserController -> Entity M.Player -> IO ServerPlayer
-playerFromEntity userCtrl (Entity _ (M.Player gameId playerId _ lastActive)) =
-  do
-    maybeUser <- UC.getUser userCtrl playerId
-    case maybeUser of
-      -- User was deleted from database?
-      Nothing -> return $ makeNewPlayer (ServerUser playerId Nothing) gameId 0 lastActive
-      Just serverUser -> return (makeNewPlayer serverUser gameId 0 lastActive)
+mapLeft :: (a -> c) -> Either a b -> Either c b
+mapLeft func (Left err) = Left $ func err
+mapLeft _ (Right r) = Right r
 
 playerFromLobbyEntity :: UserController -> Entity M.LobbyPlayer -> IO ServerPlayer
 playerFromLobbyEntity userCtrl (Entity _ (M.LobbyPlayer gameId playerId _ lastActive)) =
