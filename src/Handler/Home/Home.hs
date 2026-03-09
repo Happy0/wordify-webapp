@@ -151,7 +151,6 @@ gamePagelayout widget = do
                         ^{pageBody pc}
         |]
 
--- Internal dispatch type for the outbound loop
 data HomeOutboundMessage
   = HomeUserEventMsg UserEvent
   | HomeChatMessage HC.ChatMessage
@@ -161,8 +160,6 @@ toChatMessage :: CR.ChatMessage -> HC.ChatMessage
 toChatMessage (CR.ChatMessage _ displayName msg sentTime messageNumber) =
   HC.ChatMessage displayName msg sentTime messageNumber
 
--- Acquires resources (chatroom, user event channel) and races the inbound and
--- outbound socket handlers for the duration of the connection.
 homeWebsocketHandler :: App -> Text -> Text -> WebSocketsT Handler ()
 homeWebsocketHandler app userIdent displayName =
   notificationsWebSocketHandler app userIdent $ \userEventChan -> do

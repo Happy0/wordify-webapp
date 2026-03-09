@@ -54,6 +54,7 @@ import qualified Wordify.Rules.Move as G
 import Model.GameSetup (LocalisedGameSetup(..))
 import Wordify.Rules.Game (Game(..))
 import qualified Data.List.Split.Internals as T
+import Modules.UserEvent.Api (UserEventService)
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -235,16 +236,15 @@ sendInitialGameState connection serverGameSnapshot maybeUser = do
   mapM_ (C.sendTextData connection . toJSONResponse) initialGameState
 
 handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> TChan UserEvent -> IO ()
-handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince userEventChan = runResourceT $ do
-  result <- runExceptT $ do
-    serverGame <- ExceptT $ snd <$> getGame (gameService app) gameId
-    chatId     <- liftIO  $ getChatId gameId maybeUser serverGame
-    chatroom   <- ExceptT $ getChatroom (chatService app) chatId
-    pure (serverGame, chatroom)
-
-  case result of
-    Left err -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
-    Right (serverGame, chatroom) -> liftIO $ do
+handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince userEventChan = 
+  runResourceT $ do
+    resources <- getWebsocketResources
+    case resources of
+      Left err -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
+      Right (serverGame, chatroom) -> liftIO (runWebSocket serverGame chatroom)
+    where
+    runWebSocket :: ServerGame -> Chatroom -> IO ()
+    runWebSocket serverGame chatroom = do
       let inactivityTrackerState = inactivityTracker app
       (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
       withTrackWebsocketActivity inactivityTrackerState $ do
@@ -254,7 +254,14 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSin
           let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince userEventChan
           let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
           race_ handleOutbound handleInbound
-  where
+
+    getWebsocketResources :: MonadResource m => m (Either Text (ServerGame, Chatroom))
+    getWebsocketResources = runExceptT $ do
+      serverGame <- ExceptT $ snd <$> getGame (gameService app) gameId
+      chatId     <- liftIO  $ getChatId gameId maybeUser serverGame
+      chatroom   <- ExceptT $ getChatroom (chatService app) chatId
+      pure (serverGame, chatroom)
+
     getChatId :: Text -> Maybe AuthUser -> ServerGame -> IO Text
     getChatId gameId (Just user) game = do
       playerInGame <- flip playerIsInGame user <$> atomically (makeServerGameSnapshot game)
