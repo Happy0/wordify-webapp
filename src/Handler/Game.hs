@@ -8,7 +8,7 @@ import Control.Error (ExceptT (..), lastDef, note, runExceptT)
 import Modules.Games.Api (getGame)
 import Modules.Chats.Api (ChatService, getChatroom, subscribeMessagesLive, Chatroom, getExistingChatMessages)
 import qualified Modules.Chats.Api as CR (ChatMessage (ChatMessage), Chatroom)
-import qualified Controllers.Definition.DefinitionClient as D
+import qualified Modules.Definition.DefinitionClient as D
 import Controllers.Game.Api
 import Controllers.Game.Game
 import Controllers.Game.GameDefinitionController (GameDefinitionController, getStoredDefinitions)

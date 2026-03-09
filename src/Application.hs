@@ -36,9 +36,9 @@ import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
 import Controllers.Common.CacheableSharedResource
 import Modules.Chats.Api (makeChatService, ChatService)
-import Controllers.Definition.DefinitionService (makeDefinitionService, anyDefinitionClient)
-import Controllers.Definition.Clients.RaeApiClient (makeRaeApiClient)
-import Controllers.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
+import Modules.Definition.Api (makeDefinitionService, anyDefinitionClient)
+import Modules.Definition.Clients.RaeApiClient (makeRaeApiClient)
+import Modules.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
 import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
 import Modules.Games.Api (makeGameService)
 import Modules.Notifications.Api (makeNotificationService)
@@ -130,7 +130,7 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Extra.SpanishExtraRule (spanishGameExtraRules)
 import qualified Prelude as P
 import Model.GameSetup (LocalisedGameSetup (GameSetup), TileValues)
-import Controllers.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient)
+import Modules.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient)
 import Wordify.Rules.Tile (tileValue)
 import qualified Data.Text as T
 import Modules.UserEvent.Api (makeUserEventService)

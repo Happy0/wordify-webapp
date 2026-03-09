@@ -1,7 +1,7 @@
-module Controllers.Definition.Clients.RaeApiClient (RaeApiClient, makeRaeApiClient) where
+module Modules.Definition.Clients.RaeApiClient (RaeApiClient, makeRaeApiClient) where
 
 import ClassyPrelude (Bool (..), Either (Left, Right), IO, Maybe (..), Show, SomeException, concatMap, fmap, maybe, mempty, pure, try, ($))
-import Controllers.Definition.DefinitionClient (Definition (Definition), DefinitionClient (getDefinitions, supportedLocales))
+import Modules.Definition.DefinitionClient (Definition (Definition), DefinitionClient (getDefinitions, supportedLocales))
 import Data.Aeson
 import qualified Data.Text as T
 import Network.HTTP.Req
