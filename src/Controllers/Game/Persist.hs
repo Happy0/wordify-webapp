@@ -24,7 +24,7 @@ import Data.Time.Clock
 import Database.Persist.Sql
 import Foundation
 import qualified Model as M
-import Repository.GameRepository (GameSummary)
+import Repository.GameRepository (GameSummaryEntity)
 import System.Random
 import System.Random.Internal
 import System.Random.SplitMix
@@ -292,10 +292,10 @@ persistMoveUpdate pool gameId gameState move@(M.Move _ moveNumber _ _ _ _) = do
     _ <- insert move
     return ()
 
-  updateGameSummary pool gameId gameState
+  updateGameSummaryEntity pool gameId gameState
 
-updateGameSummary :: Pool SqlBackend -> T.Text -> Game -> IO ()
-updateGameSummary pool gameId gameState = do
+updateGameSummaryEntity :: Pool SqlBackend -> T.Text -> Game -> IO ()
+updateGameSummaryEntity pool gameId gameState = do
   now <- getCurrentTime
   withPool pool $ do
     let finishedAt = if gameFinished gameState then Just now else Nothing

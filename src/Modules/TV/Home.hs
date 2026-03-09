@@ -13,7 +13,7 @@ import ClassyPrelude (IO, Int, pure, undefined, race_, (*), ($), writeTChan, (.)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM (TChan, newBroadcastTChan, dupTChan)
 import Controllers.Game.Model.ServerGame (ServerGame (..), ServerGameSnapshot (..), makeServerGameSnapshot)
-import Repository.GameRepository (GameRepository (getRecentlyActiveGames), GameSummary (..))
+import Repository.GameRepository (GameRepository (getRecentlyActiveGames), GameSummaryEntity (..))
 import GHC.Conc.IO (threadDelay)
 import Control.Monad (forever)
 import Modules.Games.Api (GameService, getGame)
@@ -96,7 +96,7 @@ getGameWithLatestActivity repository gameService = do
   games <- liftIO (getRecentlyActiveGames repository 1)
   case games of 
     [] -> pure Nothing
-    (GameSummary gameId _ _ _ _ _): _ -> do
+    (GameSummaryEntity gameId _ _ _ _ _): _ -> do
       (_, game) <- getGame gameService gameId
       case game of
         Left _ -> pure Nothing

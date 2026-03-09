@@ -20,6 +20,7 @@ import qualified Network.WebSockets.Connection as C
 import Data.Aeson (encode, eitherDecode)
 import Controllers.Game.Model.ServerGame (ServerGameSnapshot(..), ServerGame, lastMove, playing, makeServerGameSnapshot, currentPlayerToMove)
 import qualified Controllers.Game.Model.ServerPlayer as SP
+import qualified Controllers.User.Model.ServerUser as SU
 import Wordify.Rules.Board (textRepresentation)
 import Wordify.Rules.Game (board)
 import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, notificationsWebSocketHandler)
@@ -35,23 +36,23 @@ import Handler.Home.Model.Inbound
 import Modules.TV.Api (TvService, currentHomeTVState, subscribeHomeTV)
 import Modules.TV.Home (HomeTvUpdate(..))
 
-mapGameSummary :: GameSummary -> [Text] -> ActiveGameSummary
-mapGameSummary (GameSummary gameId latestActivity myMove boardString localisedGameSetup otherPlayerNames) activePlayerNames =
+mapGameSummaryEntity :: GameSummaryEntity -> [Text] -> SU.ServerUser -> ActiveGameSummary
+mapGameSummaryEntity (GameSummaryEntity gameId latestActivity myMove boardString localisedGameSetup allPlayers) activePlayerNames currentUser =
   let tileValues = tileLettersToValueMap localisedGameSetup
-      resolvedNames = zipWith resolvePlayerName [1..] otherPlayerNames
+      otherPlayers' = filter ((/= SU.userId currentUser) . SU.userId) allPlayers
+      resolvedNames = zipWith resolvePlayerName [1..] otherPlayers'
       otherPlayersWithStatus = map (\name -> OtherPlayer name (name `elem` activePlayerNames)) resolvedNames
   in ActiveGameSummary gameId boardString myMove latestActivity tileValues otherPlayersWithStatus
   where
-    resolvePlayerName :: Int -> Maybe Text -> Text
-    resolvePlayerName n Nothing = T.pack ("Player " ++ show n)
-    resolvePlayerName _ (Just name) = name
+    resolvePlayerName :: Int -> SU.ServerUser -> Text
+    resolvePlayerName n u = fromMaybe (T.pack ("Player " ++ show n)) (SU.username u)
 
-buildActiveGameSummary :: GameSummary -> Maybe ServerGame -> IO ActiveGameSummary
-buildActiveGameSummary gameSummary Nothing = pure $ mapGameSummary gameSummary []
-buildActiveGameSummary gameSummary (Just serverGame) = do
+buildActiveGameSummary :: GameSummaryEntity -> Maybe ServerGame -> SU.ServerUser -> IO ActiveGameSummary
+buildActiveGameSummary gameSummary Nothing serverUser = pure $ mapGameSummaryEntity gameSummary [] serverUser
+buildActiveGameSummary gameSummary (Just serverGame) serverUser = do
   players <- mapM (readTVarIO . snd) (playing serverGame)
   let activeNames = [ defaultPlayerName i p | (i, p) <- zip [1..] players, SP.numConnections p > 0 ]
-  pure $ mapGameSummary gameSummary activeNames
+  pure $ mapGameSummaryEntity gameSummary activeNames serverUser
 
 snapshotToTvSummary :: ServerGameSnapshot -> TvActiveGameSummary
 snapshotToTvSummary snapshot =
@@ -70,7 +71,7 @@ renderNotLoggedInPage = do
   maybeTvGame <- liftIO $ currentHomeTVState (tvService app)
   let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
   gamePagelayout $ do
-    addStylesheet $ (StaticR wordifyCss)
+    addStylesheet $ StaticR wordifyCss
     addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
@@ -90,11 +91,11 @@ renderPlayerMoveNote :: Bool -> Widget
 renderPlayerMoveNote False = [whamlet| <span> |]
 renderPlayerMoveNote True = [whamlet| <span> (Your move) |]
 
-renderActiveGamePage :: (GameRepository a) => App -> a -> T.Text -> Handler Html
-renderActiveGamePage app gameRepository userId = do
-  activeGames <- liftIO $ getActiveUserGames gameRepository userId
-  summaries <- liftIO $ buildActiveGameSummaries (gameService app) activeGames
-  notifs <- liftIO $ notificationsForUser app userId
+renderActiveGamePage :: (GameRepository a) => App -> a -> SU.ServerUser -> Handler Html
+renderActiveGamePage app gameRepository serverUser = do
+  activeGames <- liftIO $ getActiveUserGames gameRepository (SU.userId serverUser)
+  summaries <- liftIO $ buildActiveGameSummaries (gameService app) activeGames serverUser
+  notifs <- liftIO $ notificationsForUser app (SU.userId serverUser)
   maybeTvGame <- liftIO $ currentHomeTVState (tvService app)
   let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
   gamePagelayout $ do
@@ -124,11 +125,10 @@ getHomeR = do
     Nothing -> renderNotLoggedInPage
     Just _ -> do
       authedUser <- requireUsername
-      let userId = authenticatedUserId authedUser
-      let displayName = authenticatedUsername authedUser
+      let serverUser = authenticatedServerUser authedUser
       {- If this is a websocket request the handler short circuits here, otherwise it goes on to return the HTML page -}
-      webSockets $ homeWebsocketHandler app userId displayName
-      renderActiveGamePage app (gameRepository app) userId
+      webSockets $ homeWebsocketHandler app serverUser
+      renderActiveGamePage app (gameRepository app) serverUser
 
 -- TODO: don't copypasta this and share it somewhere
 gamePagelayout :: Widget -> Handler Html
@@ -157,9 +157,9 @@ toChatMessage :: CR.ChatMessage -> HC.ChatMessage
 toChatMessage (CR.ChatMessage _ displayName msg sentTime messageNumber) =
   HC.ChatMessage displayName msg sentTime messageNumber
 
-homeWebsocketHandler :: App -> Text -> Text -> WebSocketsT Handler ()
-homeWebsocketHandler app userIdent displayName =
-  notificationsWebSocketHandler app userIdent $ \userEventChan -> do
+homeWebsocketHandler :: App -> SU.ServerUser -> WebSocketsT Handler ()
+homeWebsocketHandler app serverUser =
+  notificationsWebSocketHandler app (SU.userId serverUser) $ \userEventChan -> do
     connection <- ask
     liftIO $ runResourceT $ do
       chatroomResult <- getChatroom (chatService app) "Home"
@@ -167,16 +167,16 @@ homeWebsocketHandler app userIdent displayName =
         Right chatroom -> liftIO $ do
           liveChatChan <- subscribeMessagesLive chatroom
           tvChan <- subscribeHomeTV (tvService app)
-          let handleOutbound = handleOutboundHomeWebsocket (gameRepository app) (gameService app) (tvService app) connection userIdent chatroom userEventChan liveChatChan tvChan
-              handleInbound  = handleInboundHomeWebsocket connection chatroom userIdent displayName
+          let handleOutbound = handleOutboundHomeWebsocket (gameRepository app) (gameService app) (tvService app) connection serverUser chatroom userEventChan liveChatChan tvChan
+              handleInbound  = handleInboundHomeWebsocket connection chatroom serverUser
           race_ handleOutbound handleInbound
         _ -> return ()
 
-handleOutboundHomeWebsocket :: (GameRepository a) => a -> GameService -> TvService -> C.Connection -> Text -> CR.Chatroom -> TChan UserEvent -> TChan CR.ChatMessage -> TChan HomeTvUpdate -> IO ()
-handleOutboundHomeWebsocket gameRepository gamesCache tvSvc connection userIdent chatroom userEventChan liveChatChan tvChan = do
-  activeGames <- getActiveUserGames gameRepository userIdent
-  activeSummaryMap <- buildActiveGameSummaryMap gamesCache activeGames
-  sendGameSummaryState connection activeSummaryMap
+handleOutboundHomeWebsocket :: (GameRepository a) => a -> GameService -> TvService -> C.Connection -> SU.ServerUser -> CR.Chatroom -> TChan UserEvent -> TChan CR.ChatMessage -> TChan HomeTvUpdate -> IO ()
+handleOutboundHomeWebsocket gameRepository gamesCache tvSvc connection serverUser chatroom userEventChan liveChatChan tvChan = do
+  activeGames <- getActiveUserGames gameRepository (SU.userId serverUser)
+  activeSummaryMap <- buildActiveGameSummaryMap gamesCache activeGames serverUser
+  sendGameSummaryEntityState connection activeSummaryMap
   now <- getCurrentTime
   let twoMonthsAgo = addUTCTime (negate $ 60 * 60 * 24 * 61) now
   sendPreviousHomeChatMessages connection chatroom twoMonthsAgo
@@ -187,19 +187,19 @@ handleOutboundHomeWebsocket gameRepository gamesCache tvSvc connection userIdent
         nextChatMsg   = HomeChatMessage . toChatMessage <$> readTChan liveChatChan
         nextTvMsg     = HomeTvMsg <$> readTChan tvChan
     nextMessage <- atomically (nextUserEvent `orElse` nextChatMsg `orElse` nextTvMsg)
-    handleHomeOutboundMessage userIdent connection nextMessage currentState
+    handleHomeOutboundMessage serverUser connection nextMessage currentState
 
-handleInboundHomeWebsocket :: C.Connection -> CR.Chatroom -> Text -> Text -> IO ()
-handleInboundHomeWebsocket connection chatroom userIdent displayName = forever $ do
+handleInboundHomeWebsocket :: C.Connection -> CR.Chatroom -> SU.ServerUser -> IO ()
+handleInboundHomeWebsocket connection chatroom serverUser = forever $ do
   msg <- C.receiveData connection
   case eitherDecode msg of
     Left _err -> return ()
     Right (SendChatMessage message) ->
-      CR.sendMessage chatroom (CR.SendMessage userIdent displayName message)
+      CR.sendMessage chatroom (CR.SendMessage (SU.userId serverUser) (fromMaybe "" (SU.username serverUser)) message)
 
-handleHomeOutboundMessage :: T.Text -> C.Connection -> HomeOutboundMessage -> Map Text ActiveGameSummary -> IO (Map Text ActiveGameSummary)
-handleHomeOutboundMessage userIdent connection (HomeUserEventMsg event) state =
-  handleUserEvent userIdent connection event state
+handleHomeOutboundMessage :: SU.ServerUser -> C.Connection -> HomeOutboundMessage -> Map Text ActiveGameSummary -> IO (Map Text ActiveGameSummary)
+handleHomeOutboundMessage serverUser connection (HomeUserEventMsg event) state =
+  handleUserEvent serverUser connection event state
 handleHomeOutboundMessage _ connection (HomeChatMessage chatMsg) state = do
   sendChatUpdate connection chatMsg
   pure state
@@ -207,30 +207,30 @@ handleHomeOutboundMessage _ connection (HomeTvMsg (HomeTVUpdate snapshot)) state
   C.sendTextData connection (encode (TvUpdate (snapshotToTvSummary snapshot)))
   pure state
 
-handleUserEvent :: T.Text -> C.Connection -> UserEvent -> Map Text ActiveGameSummary -> IO (Map Text ActiveGameSummary)
-handleUserEvent userIdent connection (MoveInUserGame gameId serverGame) state = do
+handleUserEvent :: SU.ServerUser -> C.Connection -> UserEvent -> Map Text ActiveGameSummary -> IO (Map Text ActiveGameSummary)
+handleUserEvent serverUser connection (MoveInUserGame gameId serverGame) state = do
   snapshot <- atomically (makeServerGameSnapshot serverGame)
-  let userToMove = isUserToMove userIdent snapshot
-  let gameSummary = gameSummaryFromServerGame userIdent snapshot userToMove
-  let activeSummary = mapGameSummary gameSummary (activePlayerNamesFromSnapshot snapshot)
+  let userToMove = isUserToMove (SU.userId serverUser) snapshot
+  let gameSummary = gameSummaryFromServerGame snapshot userToMove
+  let activeSummary = mapGameSummaryEntity gameSummary (activePlayerNamesFromSnapshot snapshot) serverUser
   let newState = M.insert gameId activeSummary state
-  sendGameSummaryState connection newState
+  sendGameSummaryEntityState connection newState
   pure newState
 handleUserEvent _ connection (GameOver gameId _) state = do
   let newState = M.delete gameId state
-  sendGameSummaryState connection newState
+  sendGameSummaryEntityState connection newState
   pure newState
-handleUserEvent userIdent connection (NewGame gameId serverGame) state = do
+handleUserEvent serverUser connection (NewGame gameId serverGame) state = do
   snapshot <- atomically (makeServerGameSnapshot serverGame)
-  let userToMove = isUserToMove userIdent snapshot
-  let gameSummary = gameSummaryFromServerGame userIdent snapshot userToMove
-  let activeSummary = mapGameSummary gameSummary (activePlayerNamesFromSnapshot snapshot)
+  let userToMove = isUserToMove (SU.userId serverUser) snapshot
+  let gameSummary = gameSummaryFromServerGame snapshot userToMove
+  let activeSummary = mapGameSummaryEntity gameSummary (activePlayerNamesFromSnapshot snapshot) serverUser
   let newState = M.insert gameId activeSummary state
-  sendGameSummaryState connection newState
+  sendGameSummaryEntityState connection newState
   pure newState
 handleUserEvent _ connection (PlayerActivityChanged gId activeNames) state = do
   let newState = M.adjust (updateActivePlayers activeNames) gId state
-  sendGameSummaryState connection newState
+  sendGameSummaryEntityState connection newState
   pure newState
 handleUserEvent _ connection (NotificationsChanged notifUpdate) state = do
   sendNotificationUpdate connection notifUpdate
@@ -243,8 +243,8 @@ updateActivePlayers :: [Text] -> ActiveGameSummary -> ActiveGameSummary
 updateActivePlayers activeNames summary =
   summary { otherPlayers = map (\p -> p { playerActive = playerName p `elem` activeNames }) (otherPlayers summary) }
 
-sendGameSummaryState :: C.Connection -> Map Text ActiveGameSummary -> IO ()
-sendGameSummaryState connection state =
+sendGameSummaryEntityState :: C.Connection -> Map Text ActiveGameSummary -> IO ()
+sendGameSummaryEntityState connection state =
   C.sendTextData connection (encode (GamesUpdate (M.elems state)))
 
 sendPreviousHomeChatMessages :: C.Connection -> CR.Chatroom -> UTCTime -> IO ()
@@ -253,30 +253,29 @@ sendPreviousHomeChatMessages connection chatroom since =
     .| CL.map toChatMessage
     .| CL.mapM_ (sendChatUpdate connection)
 
-gameSummaryFromServerGame :: T.Text -> ServerGameSnapshot -> Bool -> GameSummary
-gameSummaryFromServerGame userIdent serverGameSnapshot userToMove =
-  let otherPlayers = filter (\p -> SP.playerId p /= userIdent) (snapshotPlayers serverGameSnapshot)
-  in GameSummary
+gameSummaryFromServerGame :: ServerGameSnapshot -> Bool -> GameSummaryEntity
+gameSummaryFromServerGame serverGameSnapshot userToMove =
+  GameSummaryEntity
     (snapshotGameId serverGameSnapshot)
     (Just (lastMove serverGameSnapshot))
     userToMove
     (T.pack (textRepresentation (board (gameState serverGameSnapshot))))
     (gameLocalisation serverGameSnapshot)
-    (map SP.playerUsername otherPlayers)
+    (map SP.user (snapshotPlayers serverGameSnapshot))
 
 activePlayerNamesFromSnapshot :: ServerGameSnapshot -> [Text]
 activePlayerNamesFromSnapshot snapshot =
   [ defaultPlayerName i p | (i, p) <- zip [1..] (snapshotPlayers snapshot), SP.numConnections p > 0 ]
 
-buildActiveGameSummaries :: GameService -> [GameSummary] -> IO [ActiveGameSummary]
-buildActiveGameSummaries gamesCache gameSummaries =
+buildActiveGameSummaries :: GameService -> [GameSummaryEntity] -> SU.ServerUser -> IO [ActiveGameSummary]
+buildActiveGameSummaries gamesCache gameSummaries serverUser =
   forM gameSummaries $ \g -> do
     maybeServerGame <- atomically $ peekGame gamesCache (gameSummaryGameId g)
-    buildActiveGameSummary g maybeServerGame
+    buildActiveGameSummary g maybeServerGame serverUser
 
-buildActiveGameSummaryMap :: GameService -> [GameSummary] -> IO (Map Text ActiveGameSummary)
-buildActiveGameSummaryMap gamesCache gameSummaries = do
-  summaries <- buildActiveGameSummaries gamesCache gameSummaries
+buildActiveGameSummaryMap :: GameService -> [GameSummaryEntity] -> SU.ServerUser -> IO (Map Text ActiveGameSummary)
+buildActiveGameSummaryMap gamesCache gameSummaries serverUser = do
+  summaries <- buildActiveGameSummaries gamesCache gameSummaries serverUser
   let gameIds = map gameSummaryGameId gameSummaries
   return $ M.fromList (zip gameIds summaries)
 
