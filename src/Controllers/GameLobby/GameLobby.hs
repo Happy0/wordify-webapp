@@ -148,7 +148,7 @@ createGame gameId lobby now = do
   return $ GameEntity
     { gameEntityId = gameId
     , gameEntityGame = pendingGame lobby
-    , gameEntityPlayers = map user shuffledPlayers
+    , gameEntityPlayers = map (\p -> (user p, Nothing)) shuffledPlayers
     , gameEntityCreatedAt = now
     , gameEntityLastMoveMadeAt = Nothing
     , gameEntityFinishedAt = Nothing
@@ -159,7 +159,7 @@ notifyGameStartedPush :: App -> GameEntity -> IO ()
 notifyGameStartedPush app entity = do
   let pushCtrl = notificationService app
       gId = gameEntityId entity
-  forM_ (gameEntityPlayers entity) $ \(ServerUser uid _) ->
+  forM_ (gameEntityPlayers entity) $ \(ServerUser uid _, _) ->
     sendGameStartedNotification pushCtrl uid gId
 
 notifyNewGame :: App -> GameEntity -> IO ()
@@ -170,10 +170,10 @@ notifyNewGame app entity = do
   serverGame <- atomically $ makeServerGame
     gId
     (gameEntityGame entity)
-    (map (\su -> makeNewPlayer su gId 0 Nothing) players)
+    (map (\(su, lastActive) -> makeNewPlayer su gId 0 lastActive) players)
     (gameEntityCreatedAt entity)
     (gameEntityLastMoveMadeAt entity)
     (gameEntityFinishedAt entity)
     (gameEntitySetup entity)
-  forM_ players $ \(ServerUser uid _) ->
+  forM_ players $ \(ServerUser uid _, _) ->
     atomically $ UE.notifyNewGame svc uid gId serverGame

@@ -10,7 +10,7 @@ module Modules.Games.Api
   )
 where
 
-import ClassyPrelude (Either (Left, Right), IO, Int, Maybe (..), Text, fmap, pure, zipWith, ($), (.))
+import ClassyPrelude (Either (Left, Right), IO, Int, Maybe (..), Text, fmap, map, pure, zipWith, ($), (.))
 import Controllers.User.Model.ServerUser (ServerUser)
 import Data.Time (UTCTime)
 import Control.Concurrent.STM (STM, atomically)
@@ -48,7 +48,7 @@ loadGame repo gameId = do
 
 gameEntityToServerGame :: GameEntity -> STM ServerGame
 gameEntityToServerGame entity =
-  let serverPlayers = zipWith (\su i -> makeNewPlayer su (gameEntityId entity) 0 Nothing) (gameEntityPlayers entity) [(1 :: Int) ..]
+  let serverPlayers = map (\(su, lastActive) -> makeNewPlayer su (gameEntityId entity) 0 lastActive) (gameEntityPlayers entity)
   in makeServerGame
       (gameEntityId entity)
       (gameEntityGame entity)

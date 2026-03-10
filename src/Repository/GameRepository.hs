@@ -24,7 +24,7 @@ data GameSummaryEntity = GameSummaryEntity GameId LatestActivity MyMove BoardStr
 data GameEntity = GameEntity
   { gameEntityId :: GameId
   , gameEntityGame :: Game
-  , gameEntityPlayers :: [ServerUser]
+  , gameEntityPlayers :: [(ServerUser, Maybe UTCTime)]
   , gameEntityCreatedAt :: UTCTime
   , gameEntityLastMoveMadeAt :: Maybe UTCTime
   , gameEntityFinishedAt :: Maybe UTCTime

@@ -160,7 +160,7 @@ persistNewGame pool (GameEntity gameId game players createdAt lastMoveMadeAt fin
         lastMoveMadeAt
         currentMove
         boardRepresentation
-    forM_ (L.zip [1 :: Int ..] players) $ \(playerNum, ServerUser uid _) ->
+    forM_ (L.zip [1 :: Int ..] players) $ \(playerNum, (ServerUser uid _, _)) ->
       insert $ M.Player gameId uid playerNum Nothing
 
 sqlSaveBoardMove :: Pool SqlBackend -> T.Text -> Int -> [(Pos, Tile)] -> T.Text -> IO ()
@@ -249,12 +249,12 @@ fetchGameEntity gameSetups gameId = do
         E.on (usr ^. M.UserIdent E.==. player ^. M.PlayerPlayerId)
         E.where_ (player ^. M.PlayerGameId E.==. E.val gameId)
         E.orderBy [E.asc (player ^. M.PlayerPlayerNumber)]
-        return (player ^. M.PlayerPlayerId, usr ^. M.UserUsername)
+        return (player ^. M.PlayerPlayerId, usr ^. M.UserUsername, player ^. M.PlayerLastActive)
       moves <- selectList [M.MoveGame ==. M.GameKey gameId] []
-      let serverUsers = map (\(E.Value pid, E.Value uname) -> ServerUser pid uname) playerRows
+      let serverUsers = map (\(E.Value pid, E.Value uname, E.Value lastActive) -> (ServerUser pid uname, lastActive)) playerRows
       return $ buildGameEntity gameSetups gameId game serverUsers (map entityVal moves)
 
-buildGameEntity :: Map.Map T.Text LocalisedGameSetup -> T.Text -> M.Game -> [ServerUser] -> [M.Move] -> Either T.Text GameEntity
+buildGameEntity :: Map.Map T.Text LocalisedGameSetup -> T.Text -> M.Game -> [(ServerUser, Maybe UTCTime)] -> [M.Move] -> Either T.Text GameEntity
 buildGameEntity gameSetups gameId game serverUsers moves = runExcept $ do
   let M.Game _ bagText bagSeed maybeLocale gameCreatedAt gameFinishedAt lastMoveMadeAt _ _ = game
       locale = fromMaybe "en" maybeLocale
@@ -263,7 +263,7 @@ buildGameEntity gameSetups gameId game serverUsers moves = runExcept $ do
   tiles' <- hoistEither $ dbTileRepresentationToTiles bag bagText
   let letterBag = makeBagUsingGenerator tiles' (stdGenFromText bagSeed :: StdGen)
   initialGame <- hoistEither $ gameMapLeft (T.pack . show) (makeGame internalPlayers letterBag dictionary)
-  let playersWithNames = addDisplayNamesFromUsers serverUsers (players initialGame)
+  let playersWithNames = addDisplayNamesFromUsers (map fst serverUsers) (players initialGame)
       gameWithNames = setDisplayNames playersWithNames initialGame
   currentGame <- hoistEither $ playThroughGame gameWithNames letterBag moves
   return $ GameEntity gameId currentGame serverUsers gameCreatedAt lastMoveMadeAt gameFinishedAt setup
