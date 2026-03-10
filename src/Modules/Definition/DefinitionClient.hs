@@ -1,4 +1,4 @@
-module Controllers.Definition.DefinitionClient (DefinitionClient (getDefinitions, supportedLocales), Definition (Definition)) where
+module Modules.Definition.DefinitionClient (DefinitionClient (getDefinitions, supportedLocales), Definition (Definition)) where
 
 import ClassyPrelude (Either, IO, Maybe, Show)
 import qualified Data.Text as T

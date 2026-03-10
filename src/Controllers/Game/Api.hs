@@ -23,11 +23,11 @@ module Controllers.Game.Api
 where
 
 import Control.Applicative
-import Controllers.Definition.DefinitionClient (Definition (Definition))
+import Modules.Definition.DefinitionClient (Definition (Definition))
 import Controllers.Game.GameMessage (ChatMessage (ChatMessage), GameMessage (..), MoveSummary (..))
 import Controllers.Game.Model.ServerGame (ServerGame, ServerGameSnapshot (gameState, snapshotPlayers), getSnapshotPlayerNumber)
 import Controllers.Game.Model.ServerPlayer
-import Controllers.User.Model.AuthUser (AuthUser)
+import Controllers.User.Model.ServerUser (ServerUser)
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Bifunctor (first)
@@ -195,7 +195,7 @@ getMoveCommandMessages initialGameState moves =
     Left err -> Left $ T.pack (Prelude.show err)
     Right transitions -> Right (NE.toList (NE.map transitionToMessage transitions))
 
-initialSocketMessage :: ServerGameSnapshot -> Maybe AuthUser -> Either Text ServerResponse
+initialSocketMessage :: ServerGameSnapshot -> Maybe ServerUser -> Either Text ServerResponse
 initialSocketMessage serverGameSnapshot authUser = do
   let gameSoFar = gameState serverGameSnapshot
   let (G.History originalBag moves) = G.history gameSoFar

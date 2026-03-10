@@ -1,8 +1,8 @@
-module Controllers.Definition.Clients.FreeDictionaryClient (getDefinitions, FreeDictionaryClient (FreeDictionaryClient)) where
+module Modules.Definition.Clients.FreeDictionaryClient (getDefinitions, FreeDictionaryClient (FreeDictionaryClient)) where
 
 import ClassyPrelude (Either (Left, Right), IO, Maybe, Show, SomeException, String, concat, concatMap, fmap, map, mapM, mempty, pure, toList, try, undefined, ($), (.), (<$>))
 import Control.Arrow (left)
-import Controllers.Definition.DefinitionClient (Definition (Definition), DefinitionClient (getDefinitions, supportedLocales))
+import Modules.Definition.DefinitionClient (Definition (Definition), DefinitionClient (getDefinitions, supportedLocales))
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.Text as T

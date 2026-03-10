@@ -33,6 +33,7 @@ import Import.NoFoundation
 import InactivityTracker
 import OAuthDetails (OAuthDetails, buildOAuthDetails)
 import Repository.DefinitionRepository
+import Repository.GameRepository (AnyGameRepository)
 import System.Environment
 import System.Random
 import Text.Hamlet (hamletFile)
@@ -85,7 +86,8 @@ data App = App
     vapidPublicKey :: Maybe Text,
     userController :: UserController,
     lobbyRepository :: SqlLobbyRepositoryBackend,
-    tvService :: TvService
+    tvService :: TvService,
+    gameRepository :: AnyGameRepository
   }
 
 data MenuItem = MenuItem

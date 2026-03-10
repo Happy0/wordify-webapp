@@ -1,8 +1,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
-module Controllers.Definition.DefinitionService (DefinitionService, AnyDefinitionClient, anyDefinitionClient, makeDefinitionService, getDefinition) where
+module Modules.Definition.Api (DefinitionService, AnyDefinitionClient, anyDefinitionClient, makeDefinitionService, getDefinition) where
 
 import ClassyPrelude (Either (Right), IO, Maybe (Just, Nothing), elem, map, pure, (.))
-import Controllers.Definition.DefinitionClient (Definition, DefinitionClient, getDefinitions, supportedLocales)
+import Modules.Definition.DefinitionClient (Definition, DefinitionClient, getDefinitions, supportedLocales)
 import Data.List (find)
 import qualified Data.Text as T
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
-module Controllers.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient) where
+module Modules.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient) where
     import qualified Data.Text as T
-    import Controllers.Definition.DefinitionClient (DefinitionClient (getDefinitions, supportedLocales), Definition(Definition))
+    import Modules.Definition.DefinitionClient (DefinitionClient (getDefinitions, supportedLocales), Definition(Definition))
     import ClassyPrelude (IO, undefined, Maybe, ($), pure, (<$>), traverse, SomeException, (.), not, (==), (++), Bool, Bool(False), lift, rights, head, Int, join, const, mapMaybe, mapM_, print)
     import Data.Either (Either (..))
     import qualified Data.Map as M

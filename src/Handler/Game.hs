@@ -8,13 +8,13 @@ import Control.Error (ExceptT (..), lastDef, note, runExceptT)
 import Modules.Games.Api (getGame)
 import Modules.Chats.Api (ChatService, getChatroom, subscribeMessagesLive, Chatroom, getExistingChatMessages)
 import qualified Modules.Chats.Api as CR (ChatMessage (ChatMessage), Chatroom)
-import qualified Controllers.Definition.DefinitionClient as D
+import qualified Modules.Definition.DefinitionClient as D
 import Controllers.Game.Api
 import Controllers.Game.Game
 import Controllers.Game.GameDefinitionController (GameDefinitionController, getStoredDefinitions)
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
-import Controllers.User.Model.AuthUser
+import Controllers.User.Model.ServerUser (ServerUser (ServerUser), userId)
 import Data.Aeson
 import Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -54,6 +54,7 @@ import qualified Wordify.Rules.Move as G
 import Model.GameSetup (LocalisedGameSetup(..))
 import Wordify.Rules.Game (Game(..))
 import qualified Data.List.Split.Internals as T
+import Modules.UserEvent.Api (UserEventService)
 
 getGameR :: Text -> Handler Html
 getGameR gameId = do
@@ -65,7 +66,7 @@ getGameR gameId = do
     Nothing -> return Nothing
     Just _ -> do
       authedUser <- requireUsername
-      return $ Just (AuthUser (authenticatedUserId authedUser) Nothing)
+      return $ Just (ServerUser (authenticatedUserId authedUser) Nothing)
 
   {-- If this is a websocket request, the handler is short cutted here
       Once the client has loaded the page and javascript, the javascript for the page
@@ -116,7 +117,7 @@ gamePagelayout widget = do
                         ^{pageBody pc}
         |]
 
-renderGamePage :: App -> Text -> Maybe AuthUser -> Either Text ServerGame -> Handler Html
+renderGamePage :: App -> Text -> Maybe ServerUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
 renderGamePage app gameId maybeUser (Right serverGame) = do
   let isLoggedIn = isJust maybeUser
@@ -147,7 +148,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
   notifs <- case maybeUser of
     Nothing   -> return []
-    Just user -> liftIO $ notificationsForUser app (ident user)
+    Just user -> liftIO $ notificationsForUser app (userId user)
 
   gamePagelayout $ do
     addStylesheet $ StaticR wordifyCss
@@ -219,43 +220,49 @@ sendBroadcastMessages connection chatMessageChannel gameMessageChannel userEvent
     ChatMsg msg      -> sendChatUpdate connection msg
     NotifMsg update  -> sendNotificationUpdate connection update
 
-handleInboundSocketMessages :: App -> C.Connection -> CR.Chatroom -> ServerGame -> Maybe AuthUser -> IO ()
+handleInboundSocketMessages :: App -> C.Connection -> CR.Chatroom -> ServerGame -> Maybe ServerUser -> IO ()
 handleInboundSocketMessages app connection chatroom serverGame maybeUser = forever
   $ do
     msg <- C.receiveData connection
     case eitherDecode msg of
       Left err -> C.sendTextData connection $ toJSONResponse (InvalidCommand (pack err))
       Right parsedCommand -> do
-        response <- liftIO $ performRequest serverGame chatroom (gameDefinitionController app) (appConnPool app) (userEventService app) (notificationService app) (userController app) maybeUser parsedCommand
+        response <- liftIO $ performRequest serverGame chatroom (gameDefinitionController app) (gameService app) (userEventService app) (notificationService app) (userController app) maybeUser parsedCommand
         C.sendTextData connection $ toJSONResponse response
 
-sendInitialGameState :: C.Connection -> ServerGameSnapshot -> Maybe AuthUser -> IO ()
+sendInitialGameState :: C.Connection -> ServerGameSnapshot -> Maybe ServerUser -> IO ()
 sendInitialGameState connection serverGameSnapshot maybeUser = do
   let initialGameState = initialSocketMessage serverGameSnapshot maybeUser
   mapM_ (C.sendTextData connection . toJSONResponse) initialGameState
 
-handleWebsocket :: App -> C.Connection -> Text -> Maybe AuthUser -> Maybe Int -> Maybe Int -> TChan UserEvent -> IO ()
-handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince userEventChan = runResourceT $ do
-  result <- runExceptT $ do
-    serverGame <- ExceptT $ snd <$> getGame (gameService app) gameId
-    chatId     <- liftIO  $ getChatId gameId maybeUser serverGame
-    chatroom   <- ExceptT $ getChatroom (chatService app) chatId
-    pure (serverGame, chatroom)
-
-  case result of
-    Left err -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
-    Right (serverGame, chatroom) -> liftIO $ do
+handleWebsocket :: App -> C.Connection -> Text -> Maybe ServerUser -> Maybe Int -> Maybe Int -> TChan UserEvent -> IO ()
+handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSince userEventChan = 
+  runResourceT $ do
+    resources <- getWebsocketResources
+    case resources of
+      Left err -> liftIO $ C.sendTextData connection (toJSONResponse (InvalidCommand err))
+      Right (serverGame, chatroom) -> liftIO (runWebSocket serverGame chatroom)
+    where
+    runWebSocket :: ServerGame -> Chatroom -> IO ()
+    runWebSocket serverGame chatroom = do
       let inactivityTrackerState = inactivityTracker app
       (channel, gameSnapshot) <- atomically $ (,) <$> dupTChan (broadcastChannel serverGame) <*> makeServerGameSnapshot serverGame
       withTrackWebsocketActivity inactivityTrackerState $ do
-        withNotifyJoinAndLeave (appConnPool app) (userEventService app) serverGame maybeUser $ do
+        withNotifyJoinAndLeave (gameService app) (userEventService app) serverGame maybeUser $ do
           sendInitialGameState connection gameSnapshot maybeUser
           sendPreviousDefinitions (gameDefinitionController app) gameId definitionsSince connection
           let handleOutbound = handleBroadcastMessages connection channel chatroom chatMessagesSince userEventChan
           let handleInbound = handleInboundSocketMessages app connection chatroom serverGame maybeUser
           race_ handleOutbound handleInbound
-  where
-    getChatId :: Text -> Maybe AuthUser -> ServerGame -> IO Text
+
+    getWebsocketResources :: MonadResource m => m (Either Text (ServerGame, Chatroom))
+    getWebsocketResources = runExceptT $ do
+      serverGame <- ExceptT $ snd <$> getGame (gameService app) gameId
+      chatId     <- liftIO  $ getChatId gameId maybeUser serverGame
+      chatroom   <- ExceptT $ getChatroom (chatService app) chatId
+      pure (serverGame, chatroom)
+
+    getChatId :: Text -> Maybe ServerUser -> ServerGame -> IO Text
     getChatId gameId (Just user) game = do
       playerInGame <- flip playerIsInGame user <$> atomically (makeServerGameSnapshot game)
       if playerInGame then pure gameId else pure (observerChatId gameId)
@@ -264,7 +271,7 @@ handleWebsocket app connection gameId maybeUser chatMessagesSince definitionsSin
     observerChatId :: Text -> Text
     observerChatId gId = T.concat [gId, "#ObserverChatroom"]
 
-gameApp :: App -> Text -> Maybe AuthUser -> WebSocketsT Handler ()
+gameApp :: App -> Text -> Maybe ServerUser -> WebSocketsT Handler ()
 gameApp app gameId maybeUser = do
   connection <- ask
   chatMessagesSinceParam <- lift chatMessageSinceQueryParamValue
@@ -274,7 +281,7 @@ gameApp app gameId maybeUser = do
       dummyChan <- newBroadcastTChanIO >>= atomically . dupTChan
       handleWebsocket app connection gameId Nothing chatMessagesSinceParam definitionsSinceParam dummyChan
     Just user ->
-      notificationsWebSocketHandler app (ident user) $ \userEventChan ->
+      notificationsWebSocketHandler app (userId user) $ \userEventChan ->
         liftIO $ handleWebsocket app connection gameId maybeUser chatMessagesSinceParam definitionsSinceParam userEventChan
 
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]

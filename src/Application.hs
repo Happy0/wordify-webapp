@@ -36,9 +36,9 @@ import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
 import Controllers.Common.CacheableSharedResource
 import Modules.Chats.Api (makeChatService, ChatService)
-import Controllers.Definition.DefinitionService (makeDefinitionService, anyDefinitionClient)
-import Controllers.Definition.Clients.RaeApiClient (makeRaeApiClient)
-import Controllers.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
+import Modules.Definition.Api (makeDefinitionService, anyDefinitionClient)
+import Modules.Definition.Clients.RaeApiClient (makeRaeApiClient)
+import Modules.Definition.Clients.FreeDictionaryClient (FreeDictionaryClient (FreeDictionaryClient))
 import Controllers.Game.GameDefinitionController (makeGameDefinitionController)
 import Modules.Games.Api (makeGameService)
 import Modules.Notifications.Api (makeNotificationService)
@@ -59,7 +59,7 @@ import Repository.SQL.SqlUserRepository (SqlUserRepositoryBackend (SqlUserReposi
 import Repository.SQL.SqlLobbyRepository (SqlLobbyRepositoryBackend (SqlLobbyRepositoryBackend))
 import Controllers.User.UserController (makeUserController, UserController)
 import Controllers.Game.Model.ServerGame
-import Controllers.Game.Persist (getGame, getLobby)
+import Controllers.Game.Persist (getLobby)
 import Controllers.GameLobby.Model.GameLobby
 import Data.Char (isSpace)
 import Data.FileEmbed
@@ -130,12 +130,13 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Extra.SpanishExtraRule (spanishGameExtraRules)
 import qualified Prelude as P
 import Model.GameSetup (LocalisedGameSetup (GameSetup), TileValues)
-import Controllers.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient)
+import Modules.Definition.Clients.WiktionaryClient (WiktionaryClient, makeWiktionaryClient)
 import Wordify.Rules.Tile (tileValue)
 import qualified Data.Text as T
 import Modules.UserEvent.Api (makeUserEventService)
 import Modules.TV.Api (makeTvService)
 import Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend))
+import Repository.GameRepository (AnyGameRepository (AnyGameRepository))
 
 -- This line actually creates our YesodDispatch instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see the
@@ -171,14 +172,14 @@ makeFoundation appSettings inactivityTracker = do
   -- The App {..} syntax is an example of record wild cards. For more
   -- information, see:
   -- https://ocharles.org.uk/blog/posts/2014-12-04-record-wildcards.html
-  let mkFoundation appConnPool gameService gameLobbies gameDefinitionController chatService userEventService notificationService userController lobbyRepository tvService = App {..}
+  let mkFoundation appConnPool gameService gameLobbies gameDefinitionController chatService userEventService notificationService userController lobbyRepository tvService gameRepository = App {..}
 
   -- We need a log function to create a connection pool. We need a connection
   -- pool to create our foundation. And we need our foundation to get a
   -- logging function. To get out of this loop, we initially create a
   -- temporary foundation without a real connection pool, get a log function
   -- from there, and then create the real foundation.
-  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chat service forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Notification service forced in tempFoundation") (error "User controller forced in tempFoundation") (error "Lobby repository forced in tempFoundation") (error "TV service forced in tempFoundation")
+  let tempFoundation = mkFoundation (error "connPool forced in tempFoundation") (error "game cache forced in tempFoundation") (error "game lobby cache forced in tempFoundation") (error "Definition repository forced in tempFoundation") (error "Chat service forced in tempFoundation") (error "Game user event cache forced in tempFoundation") (error "Notification service forced in tempFoundation") (error "User controller forced in tempFoundation") (error "Lobby repository forced in tempFoundation") (error "TV service forced in tempFoundation") (error "Game repository forced in tempFoundation")
   let logFunc = messageLoggerSource tempFoundation appLogger
 
   -- Create the database connection pool, setting busy_timeout on every
@@ -208,7 +209,9 @@ makeFoundation appSettings inactivityTracker = do
   let userRepo = toUserRepositoryImpl (SqlUserRepositoryBackend pool)
   let userCtrl = makeUserController userRepo
 
-  gameService <- makeGameService (getGame pool userCtrl localisedGameSetups)
+  let gameRepository = AnyGameRepository (GameRepositorySQLBackend pool localisedGameSetups)
+
+  gameService <- makeGameService gameRepository
   gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing
 
   userEventService <- makeUserEventService
@@ -226,7 +229,7 @@ makeFoundation appSettings inactivityTracker = do
   tvSvc <- makeTvService (GameRepositorySQLBackend pool localisedGameSetups) gameService 5
 
   -- Return the foundation
-  return $ mkFoundation pool gameService gameLobbies gameDefinitionController chatService userEventService notifSvc userCtrl lobbyRepo tvSvc
+  return $ mkFoundation pool gameService gameLobbies gameDefinitionController chatService userEventService notifSvc userCtrl lobbyRepo tvSvc gameRepository
 
 getAuthDetails :: IO (Either Text OAuthDetails)
 getAuthDetails =
@@ -298,7 +301,7 @@ loadGameBundle locale =
     let tileValues = getTileValues (validLetters bag)
 
     case locale of
-      "es_fise" -> return (pack locale, GameSetup "es" dictionary bag spanishGameExtraRules tileValues)
+      "es_fise" -> return (pack locale, GameSetup "es_fise" dictionary bag spanishGameExtraRules tileValues)
       _ -> return (pack locale, GameSetup (pack locale) dictionary bag [] tileValues)
 
 

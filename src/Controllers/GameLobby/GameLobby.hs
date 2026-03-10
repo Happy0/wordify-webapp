@@ -5,7 +5,9 @@ import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.STM
+import qualified Modules.Games.Api as Games
 import qualified Modules.UserEvent.Api as UE
+import Repository.GameRepository (GameEntity (..))
 import Repository.LobbyRepository (LobbyRepository (invitePlayer, getLobbyInvites, getInviterForUser), InvitePlayerResult (..))
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
@@ -36,13 +38,12 @@ joinClient app gameLobby gameId userId =
     now <- getCurrentTime
     serverPlayer <- makeLobbyServerPlayer app gameId userId
     result <- atomically $ updateLobbyState app gameLobby serverPlayer gameId now
-    let language = gameLanguage gameLobby
 
     case result of
       Left errorMessage -> return $ Left errorMessage
       Right (ClientLobbyJoinResult broadcastChannel (Just createdGame) _ lobby) ->
         do
-          _ <- startGame app gameId language broadcastChannel createdGame
+          _ <- startGame app broadcastChannel createdGame
           return result
       Right (ClientLobbyJoinResult broadcastChannel _ previouslyJoined lobby) ->
         unless
@@ -68,18 +69,17 @@ updateLobbyState app lobby serverPlayer gameId now = do
   lobbyFull <- lobbyIsFull lobby
   if lobbyFull then pure $ Left LobbyAlreadyFull else Right <$> handleJoinClient app gameId lobby serverPlayer now
 
-startGame :: App -> T.Text -> T.Text -> TChan LobbyMessage -> ServerGame -> IO ()
-startGame app gameId gameLanguage channel serverGame = do
-  do
-    let pool = appConnPool app
-    deleteLobby app gameId
-    persistNewGame pool gameId gameLanguage serverGame
-    -- Inform the clients that the game has been started
-    atomically (writeTChan channel (LobbyFull gameId))
-    -- Notify user event channels about the new game
-    notifyNewGame app serverGame
-    -- Send push notifications to all players
-    notifyGameStartedPush app gameId serverGame
+startGame :: App -> TChan LobbyMessage -> GameEntity -> IO ()
+startGame app channel entity = do
+  let gameId = gameEntityId entity
+  deleteLobby app gameId
+  Games.startGame (gameService app) entity
+  -- Inform the clients that the game has been started
+  atomically (writeTChan channel (LobbyFull gameId))
+  -- Notify user event channels about the new game
+  notifyNewGame app entity
+  -- Send push notifications to all players
+  notifyGameStartedPush app entity
 
 sendLobbyInvite :: LobbyRepository r => r -> GameLobby -> NotificationService -> T.Text -> T.Text -> T.Text -> T.Text -> IO InvitePlayerResult
 sendLobbyInvite repo lobby notifSvc gameLobbyId invitedUsername inviterUserId inviterUsername
@@ -132,38 +132,48 @@ handleJoinNewPlayer app gameId newPlayer gameLobby now =
 
     return (ClientLobbyJoinResult channel maybeServerGame (not playerAdded) lobbySnapshot)
 
-createServerGameIfLobbyFull :: GameLobby -> T.Text -> UTCTime -> STM (Maybe ServerGame)
+createServerGameIfLobbyFull :: GameLobby -> T.Text -> UTCTime -> STM (Maybe GameEntity)
 createServerGameIfLobbyFull lobby gameId now = do
   lobbyFull <- lobbyIsFull lobby
   if lobbyFull
     then Just <$> createGame gameId lobby now
     else return Nothing
 
-createGame :: T.Text -> GameLobby -> UTCTime -> STM ServerGame
-createGame gameId lobby now =
-  do
-    players <- readTVar (lobbyPlayers lobby)
-    let initialGameState = pendingGame lobby
+createGame :: T.Text -> GameLobby -> UTCTime -> STM GameEntity
+createGame gameId lobby now = do
+  players <- readTVar (lobbyPlayers lobby)
+  randomNumberGenerator <- readTVar (playerIdGenerator lobby)
+  -- We shuffle so that who gets to go first is randomised.
+  let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
+  return $ GameEntity
+    { gameEntityId = gameId
+    , gameEntityGame = pendingGame lobby
+    , gameEntityPlayers = map user shuffledPlayers
+    , gameEntityCreatedAt = now
+    , gameEntityLastMoveMadeAt = Nothing
+    , gameEntityFinishedAt = Nothing
+    , gameEntitySetup = pendingGameSetup lobby
+    }
 
-    randomNumberGenerator <- readTVar (playerIdGenerator lobby)
-
-    -- We shuffle so that who gets to go first is randomised.
-    let shuffledPlayers = shuffle' players (length players) randomNumberGenerator
-    makeNewServerGame gameId initialGameState shuffledPlayers now (pendingGameSetup lobby)
-
-notifyGameStartedPush :: App -> T.Text -> ServerGame -> IO ()
-notifyGameStartedPush app gId serverGame = do
+notifyGameStartedPush :: App -> GameEntity -> IO ()
+notifyGameStartedPush app entity = do
   let pushCtrl = notificationService app
-  snapshot <- atomically $ makeServerGameSnapshot serverGame
-  forM_ (snapshotPlayers snapshot) $ \player ->
-    sendGameStartedNotification pushCtrl (playerId player) gId
+      gId = gameEntityId entity
+  forM_ (gameEntityPlayers entity) $ \(ServerUser uid _) ->
+    sendGameStartedNotification pushCtrl uid gId
 
-notifyNewGame :: App -> ServerGame -> IO ()
-notifyNewGame app serverGame = do
+notifyNewGame :: App -> GameEntity -> IO ()
+notifyNewGame app entity = do
   let svc = userEventService app
-  snapshot <- atomically $ makeServerGameSnapshot serverGame
-  let gId = snapshotGameId snapshot
-      gamePlayers = snapshotPlayers snapshot
-  forM_ gamePlayers $ \player -> do
-    let userIdent = playerId player
-    atomically $ UE.notifyNewGame svc userIdent gId serverGame
+      gId = gameEntityId entity
+      players = gameEntityPlayers entity
+  serverGame <- atomically $ makeServerGame
+    gId
+    (gameEntityGame entity)
+    (map (\su -> makeNewPlayer su gId 0 Nothing) players)
+    (gameEntityCreatedAt entity)
+    (gameEntityLastMoveMadeAt entity)
+    (gameEntityFinishedAt entity)
+    (gameEntitySetup entity)
+  forM_ players $ \(ServerUser uid _) ->
+    atomically $ UE.notifyNewGame svc uid gId serverGame

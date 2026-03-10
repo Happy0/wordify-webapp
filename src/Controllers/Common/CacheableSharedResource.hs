@@ -72,7 +72,6 @@ startBroomLoop resourceCache cleanUpMap onRemove = forever $ do
         _ -> return ()
 
   threadDelay (1 * 60000000)
-  startBroomLoop resourceCache cleanUpMap onRemove
 
 scheduleCacheCleanup :: ResourceCache err a -> UTCTime -> Text -> STM ()
 scheduleCacheCleanup (ResourceCache cache cleanUpMap _ _ _) now resourceId = do
@@ -166,7 +165,6 @@ getCacheableResource resourceCache resourceId = do
       case resource of
         Left _ -> pure ()
         Right sharedResource -> handleSharerLeave resourceCache sharedResource resourceId
-
 
 {-
   Returns the item if it's in the cache but does not load it into the cache if it is not present
