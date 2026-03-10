@@ -17,16 +17,13 @@ import Controllers.Game.Api
 import Controllers.Game.GameDefinitionController (DefinitionResponse (..), GameDefinitionController, storeGameDefinitions)
 import Controllers.Game.Model.ServerGame
 import qualified Controllers.Game.Model.ServerPlayer as SP
-import qualified Controllers.Game.Persist as P
-import Controllers.User.Model.AuthUser
+import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
 import Data.Conduit
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
-import Data.Pool
 import Data.Text
 import Data.Time
-import Database.Persist.Sql
 import GHC.IO
 import Controllers.User.UserController (UserController)
 import qualified Controllers.User.UserController as UC
@@ -44,14 +41,16 @@ import Prelude
 import Model.GameSetup (extraRules, LocalisedGameSetup (gameLanguageShortCode))
 import qualified Control.Arrow as A
 import Wordify.Rules.Extra.ExtraRule (applyExtraRules, finalTransition, RuleApplicationsResult (finalTransition), RuleApplicationResult (transition))
+import qualified Modules.Games.Api as Games
 import Modules.Notifications.Api (NotificationService, sendMoveNotification, sendGameOverNotification, sendGameStartedNotification)
 import Modules.UserEvent.Api (UserEventService, notifyMove, notifyGameOver, notifyPlayerActivityChanged)
+import Wordify.Rules.Board (textRepresentation)
 
-handlePlayerConnect :: Pool SqlBackend -> UserEventService -> ServerGame -> Maybe AuthUser -> IO ()
-handlePlayerConnect pool _ serverGame Nothing = pure ()
-handlePlayerConnect pool userEventSvc serverGame (Just user) = do
+handlePlayerConnect :: Games.GameService -> UserEventService -> ServerGame -> Maybe ServerUser -> IO ()
+handlePlayerConnect _ _ _ Nothing = pure ()
+handlePlayerConnect gameService userEventSvc serverGame (Just user) = do
   now <- getCurrentTime
-  persistPlayerLastSeen pool user (gameId serverGame) now
+  Games.updatePlayerLastSeen gameService (gameId serverGame) user now
   atomically $ do
     newConnectionCount <- increasePlayerConnections serverGame user now
     when (isFirstConnection newConnectionCount) $ do
@@ -63,11 +62,11 @@ handlePlayerConnect pool userEventSvc serverGame (Just user) = do
     isFirstConnection (Just connectionCount) = connectionCount == 1
     isFirstConnection Nothing = False
 
-handlePlayerDisconnect :: Pool SqlBackend -> UserEventService -> ServerGame -> Maybe AuthUser -> IO ()
-handlePlayerDisconnect pool _ serverGame Nothing = pure ()
-handlePlayerDisconnect pool userEventSvc serverGame (Just user) = do
+handlePlayerDisconnect :: Games.GameService -> UserEventService -> ServerGame -> Maybe ServerUser -> IO ()
+handlePlayerDisconnect _ _ _ Nothing = pure ()
+handlePlayerDisconnect gameService userEventSvc serverGame (Just user) = do
   now <- getCurrentTime
-  persistPlayerLastSeen pool user (gameId serverGame) now
+  Games.updatePlayerLastSeen gameService (gameId serverGame) user now
   atomically $ do
     newConnectionCount <- decreasePlayerConnections serverGame user now
     when (isLastConnection newConnectionCount) $ do
@@ -88,29 +87,26 @@ notifyUserChannelsPlayerActivity userEventSvc serverGame = do
     let userIdent = SP.playerId player
     notifyPlayerActivityChanged userEventSvc userIdent gId activeNames
 
-notifyPlayerConnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
-notifyPlayerConnect serverGame user@(AuthUser userid _) now = do
+notifyPlayerConnect :: ServerGame -> ServerUser -> UTCTime -> STM ()
+notifyPlayerConnect serverGame user now = do
   let playerNumber = getPlayerNumber serverGame user
   traverse_ (writeTChan (broadcastChannel serverGame) . flip PlayerConnect now) playerNumber
 
-notifyPlayerDisconnect :: ServerGame -> AuthUser -> UTCTime -> STM ()
+notifyPlayerDisconnect :: ServerGame -> ServerUser -> UTCTime -> STM ()
 notifyPlayerDisconnect serverGame user now = do
   let playerNumber = getPlayerNumber serverGame user
   traverse_ (writeTChan (broadcastChannel serverGame) . flip PlayerDisconnect now) playerNumber
 
-persistPlayerLastSeen :: Pool SqlBackend -> AuthUser -> Text -> UTCTime -> IO ()
-persistPlayerLastSeen pool (AuthUser userId _) gameId = P.updatePlayerLastSeen pool gameId userId
+withNotifyJoinAndLeave :: Games.GameService -> UserEventService -> ServerGame -> Maybe ServerUser -> IO () -> IO ()
+withNotifyJoinAndLeave gameService userEventSvc serverGame maybeUser = bracket_ (handlePlayerConnect gameService userEventSvc serverGame maybeUser) (handlePlayerDisconnect gameService userEventSvc serverGame maybeUser)
 
-withNotifyJoinAndLeave :: Pool SqlBackend -> UserEventService -> ServerGame -> Maybe AuthUser -> IO () -> IO ()
-withNotifyJoinAndLeave pool userEventSvc serverGame maybeUser = bracket_ (handlePlayerConnect pool userEventSvc serverGame maybeUser) (handlePlayerDisconnect pool userEventSvc serverGame maybeUser)
-
-performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Pool SqlBackend -> UserEventService -> NotificationService -> UserController -> Maybe AuthUser -> ClientMessage -> IO ServerResponse
-performRequest serverGame _ _ pool userEventSvc pushCtrl _ player (BoardMove placed) =
-  handleBoardMove serverGame pool userEventSvc pushCtrl (player >>= getPlayerNumber serverGame) placed
-performRequest serverGame _ _ pool userEventSvc pushCtrl _ player (ExchangeMove exchanged) =
-  handleExchangeMove serverGame pool userEventSvc pushCtrl (player >>= getPlayerNumber serverGame) exchanged
-performRequest serverGame _ _ pool userEventSvc pushCtrl _ player PassMove =
-  handlePassMove serverGame pool userEventSvc pushCtrl (player >>= getPlayerNumber serverGame)
+performRequest :: ServerGame -> Chatroom -> GameDefinitionController -> Games.GameService -> UserEventService -> NotificationService -> UserController -> Maybe ServerUser -> ClientMessage -> IO ServerResponse
+performRequest serverGame _ _ gameService userEventSvc pushCtrl _ player (BoardMove placed) =
+  handleBoardMove serverGame gameService userEventSvc pushCtrl (player >>= getPlayerNumber serverGame) placed
+performRequest serverGame _ _ gameService userEventSvc pushCtrl _ player (ExchangeMove exchanged) =
+  handleExchangeMove serverGame gameService userEventSvc pushCtrl (player >>= getPlayerNumber serverGame) exchanged
+performRequest serverGame _ _ gameService userEventSvc pushCtrl _ player PassMove =
+  handlePassMove serverGame gameService userEventSvc pushCtrl (player >>= getPlayerNumber serverGame)
 performRequest serverGame chatroom _ _ _ _ userCtrl player (SendChatMessage msg) =
   handleChatMessage serverGame chatroom userCtrl player msg
 performRequest serverGame _ _ _ _ _ _ player (AskPotentialScore placed) =
@@ -153,14 +149,14 @@ handlePotentialScore serverGame placedTiles =
 -}
 handleMove ::
   ServerGame ->
-  Pool SqlBackend ->
+  Games.GameService ->
   UserEventService ->
   NotificationService ->
   Int ->
   Move ->
   (Either Text GameTransition -> ServerResponse) ->
   IO ServerResponse
-handleMove serverGame pool userEventSvc pushCtrl playerMoving move moveOutcomeHandler =
+handleMove serverGame gameService userEventSvc pushCtrl playerMoving move moveOutcomeHandler =
   do
     now <- getCurrentTime
     moveResult <- atomically $ do
@@ -197,7 +193,7 @@ handleMove serverGame pool userEventSvc pushCtrl playerMoving move moveOutcomeHa
 
         -- TODO: Think of how to handle this if it fails... Could end up with a corrupted game state if next move succeeds (missing move)
         -- especially important if we stop using sqlite ':D
-        P.persistGameUpdate pool (snapshotGameId newSnapshot) newGameState eventMessage
+        forM_ (toMoveUpdate (snapshotGameId newSnapshot) newGameState eventMessage) (Games.saveMove gameService)
 
         return $ moveOutcomeHandler moveOutcome
 
@@ -227,12 +223,12 @@ applyLocalisedRules gameTransition localisedGameSetup =
   in let resultWithTransformedError = A.left (pack . Prelude.show) ruleApplicationResult
   in finalTransition <$> resultWithTransformedError
 
-handleBoardMove :: ServerGame -> Pool SqlBackend -> UserEventService -> NotificationService -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
+handleBoardMove :: ServerGame -> Games.GameService -> UserEventService -> NotificationService -> Maybe Int -> [(Pos, Tile)] -> IO ServerResponse
 handleBoardMove _ _ _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"
-handleBoardMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) placed =
+handleBoardMove sharedServerGame gameService userEventSvc pushCtrl (Just playerNo) placed =
   handleMove
     sharedServerGame
-    pool
+    gameService
     userEventSvc
     pushCtrl
     playerNo
@@ -243,12 +239,12 @@ handleBoardMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) plac
     moveOutcomeHandler (Right (MoveTransition newPlayer _ _)) = BoardMoveSuccess (tilesOnRack newPlayer)
     moveOutcomeHandler (Right _) = BoardMoveSuccess []
 
-handleExchangeMove :: ServerGame -> Pool SqlBackend -> UserEventService -> NotificationService -> Maybe Int -> [Tile] -> IO ServerResponse
+handleExchangeMove :: ServerGame -> Games.GameService -> UserEventService -> NotificationService -> Maybe Int -> [Tile] -> IO ServerResponse
 handleExchangeMove _ _ _ _ Nothing _ = return $ InvalidCommand "Observers cannot move"
-handleExchangeMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) exchanged =
+handleExchangeMove sharedServerGame gameService userEventSvc pushCtrl (Just playerNo) exchanged =
   handleMove
     sharedServerGame
-    pool
+    gameService
     userEventSvc
     pushCtrl
     playerNo
@@ -259,19 +255,42 @@ handleExchangeMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) e
     moveOutcomeHandler (Right (ExchangeTransition _ _ afterPlayer _)) = ExchangeMoveSuccess (tilesOnRack afterPlayer)
     moveOutcomeHandler _ = InvalidCommand "internal server error, unexpected transition"
 
-handlePassMove :: ServerGame -> Pool SqlBackend -> UserEventService -> NotificationService -> Maybe Int -> IO ServerResponse
+handlePassMove :: ServerGame -> Games.GameService -> UserEventService -> NotificationService -> Maybe Int -> IO ServerResponse
 handlePassMove _ _ _ _ Nothing = return $ InvalidCommand "Observers cannot move"
-handlePassMove sharedServerGame pool userEventSvc pushCtrl (Just playerNo) =
-  handleMove sharedServerGame pool userEventSvc pushCtrl playerNo Pass moveOutcomeHandler
+handlePassMove sharedServerGame gameService userEventSvc pushCtrl (Just playerNo) =
+  handleMove sharedServerGame gameService userEventSvc pushCtrl playerNo Pass moveOutcomeHandler
   where
     moveOutcomeHandler (Left err) = InvalidCommand err
     moveOutcomeHandler (Right _) = PassMoveSuccess
 
-handleChatMessage :: ServerGame -> Chatroom -> UserController -> Maybe AuthUser -> Text -> IO ServerResponse
+toMoveUpdate :: Text -> Game -> GameMessage -> Maybe Games.MoveUpdate
+toMoveUpdate gId gameState (PlayerBoardMove _ placed _ _ _ _) =
+  Just $ Games.BoardMoveUpdate gId moveNum placed boardText
+  where
+    moveNum = L.length (movesMade gameState)
+    boardText = pack $ textRepresentation (board gameState)
+toMoveUpdate gId gameState (PlayerPassMove _ _ _) =
+  Just $ Games.PassMoveUpdate gId moveNum boardText
+  where
+    moveNum = L.length (movesMade gameState)
+    boardText = pack $ textRepresentation (board gameState)
+toMoveUpdate gId gameState (PlayerExchangeMove _ _ tiles _) =
+  Just $ Games.ExchangeMoveUpdate gId moveNum tiles boardText
+  where
+    moveNum = L.length (movesMade gameState)
+    boardText = pack $ textRepresentation (board gameState)
+toMoveUpdate gId gameState (GameEnd _ placed _) =
+  Just $ Games.GameEndMoveUpdate gId moveNum placed boardText
+  where
+    moveNum = L.length (movesMade gameState)
+    boardText = pack $ textRepresentation (board gameState)
+toMoveUpdate _ _ _ = Nothing
+
+handleChatMessage :: ServerGame -> Chatroom -> UserController -> Maybe ServerUser -> Text -> IO ServerResponse
 handleChatMessage _ _ _ Nothing _ = return $ InvalidCommand "Only logged in players can chat."
 handleChatMessage serverGame chatroom userCtrl (Just user) messageText = do
   gameSnapshot <- atomically $ makeServerGameSnapshot serverGame
-  let userId = ident user
+  let userId = SU.userId user
   displayName <- case getServerPlayerSnapshot gameSnapshot user of
     Just serverPlayer -> pure $ SP.playerUsername serverPlayer
     Nothing           -> fmap (>>= SU.username) (UC.getUser userCtrl userId)

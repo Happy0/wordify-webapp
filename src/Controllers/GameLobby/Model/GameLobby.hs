@@ -22,8 +22,8 @@ where
 import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
-import qualified Controllers.Game.Model.ServerGame as S
 import qualified Controllers.Game.Model.ServerPlayer as SP
+import Repository.GameRepository (GameEntity)
 import Controllers.GameLobby.Api
 import Data.List
 import Data.Maybe
@@ -37,8 +37,8 @@ import Model.GameSetup (LocalisedGameSetup)
 data ClientLobbyJoinResult = ClientLobbyJoinResult
   {
     broadcastChannel :: TChan LobbyMessage,
-    -- If the lobby was made full as a result of the client join, the newly created server game
-    createdGame :: Maybe S.ServerGame,
+    -- If the lobby was made full as a result of the client join, the newly created game
+    createdGame :: Maybe GameEntity,
     previouslyJoined :: Bool,
 
     lobby :: GameLobbySnapshot

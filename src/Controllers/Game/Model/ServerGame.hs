@@ -19,6 +19,7 @@ module Controllers.Game.Model.ServerGame
     getSnapshotPlayerNumber,
     currentPlayerToMove,
     gameSetup,
+    createdAt,
     playerIsInGame
   )
 where
@@ -30,7 +31,7 @@ import Control.Monad.STM
 import Controllers.Game.GameMessage
 import Controllers.Game.Model.ServerPlayer (ServerPlayer (ServerPlayer))
 import qualified Controllers.Game.Model.ServerPlayer as SP
-import Controllers.User.Model.AuthUser
+import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
 import qualified Data.List as L
 import Data.Maybe
 import Data.Maybe (listToMaybe)
@@ -100,7 +101,7 @@ updateLastMoveMade serverGame moveTime = writeTVar (lastMoveMadeAt serverGame) (
 updateGameFinishedAt :: ServerGame -> UTCTime -> STM ()
 updateGameFinishedAt serverGame finishTime = writeTVar (finishedAt serverGame) (Just finishTime)
 
-increasePlayerConnections :: ServerGame -> AuthUser -> UTCTime -> STM (Maybe Int)
+increasePlayerConnections :: ServerGame -> ServerUser -> UTCTime -> STM (Maybe Int)
 increasePlayerConnections serverGame user now = do
   let player = getServerPlayer serverGame user
 
@@ -110,7 +111,7 @@ increasePlayerConnections serverGame user now = do
       modifyTVar p (`SP.addConnection` now)
       Just . SP.numConnections <$> readTVar p
 
-decreasePlayerConnections :: ServerGame -> AuthUser -> UTCTime -> STM (Maybe Int)
+decreasePlayerConnections :: ServerGame -> ServerUser -> UTCTime -> STM (Maybe Int)
 decreasePlayerConnections serverGame user now = do
   let player = getServerPlayer serverGame user
 
@@ -120,29 +121,29 @@ decreasePlayerConnections serverGame user now = do
       modifyTVar p (`SP.removeConnection` now)
       Just . SP.numConnections <$> readTVar p
 
-getServerPlayer :: ServerGame -> AuthUser -> Maybe (TVar SP.ServerPlayer)
+getServerPlayer :: ServerGame -> ServerUser -> Maybe (TVar SP.ServerPlayer)
 getServerPlayer serverGame user = snd <$> L.find (isUser user) (playing serverGame)
   where
-    isUser :: AuthUser -> (Text, TVar SP.ServerPlayer) -> Bool
-    isUser (AuthUser userId _) (playerId, _) = userId == playerId
+    isUser :: ServerUser -> (Text, TVar SP.ServerPlayer) -> Bool
+    isUser (ServerUser userId _) (playerId, _) = userId == playerId
 
-getServerPlayerSnapshot :: ServerGameSnapshot -> AuthUser -> Maybe SP.ServerPlayer
+getServerPlayerSnapshot :: ServerGameSnapshot -> ServerUser -> Maybe SP.ServerPlayer
 getServerPlayerSnapshot gameSnapshot user = L.find (isUser user) (snapshotPlayers gameSnapshot)
   where
-    isUser :: AuthUser -> SP.ServerPlayer -> Bool
-    isUser (AuthUser userId _) serverPlayer = SP.playerId serverPlayer == userId
+    isUser :: ServerUser -> SP.ServerPlayer -> Bool
+    isUser (ServerUser userId _) serverPlayer = SP.playerId serverPlayer == userId
 
-getPlayerNumber :: ServerGame -> AuthUser -> Maybe Int
-getPlayerNumber serverGame (AuthUser userId _) = do
+getPlayerNumber :: ServerGame -> ServerUser -> Maybe Int
+getPlayerNumber serverGame (ServerUser userId _) = do
   let playerIds = Prelude.map fst (playing serverGame)
   fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)
 
-getSnapshotPlayerNumber :: ServerGameSnapshot -> AuthUser -> Maybe Int
-getSnapshotPlayerNumber serverGame (AuthUser userId _) = do
+getSnapshotPlayerNumber :: ServerGameSnapshot -> ServerUser -> Maybe Int
+getSnapshotPlayerNumber serverGame (ServerUser userId _) = do
   let playerIds = Prelude.map SP.playerId (snapshotPlayers serverGame)
   fst <$> L.find (\(_, playerId) -> userId == playerId) (Prelude.zip [1 .. 4] playerIds)
 
-playerIsInGame :: ServerGameSnapshot -> AuthUser -> Bool 
+playerIsInGame :: ServerGameSnapshot -> ServerUser -> Bool
 playerIsInGame snapshot = isJust . getServerPlayerSnapshot snapshot
 
 currentPlayerToMove :: ServerGameSnapshot -> Maybe Text

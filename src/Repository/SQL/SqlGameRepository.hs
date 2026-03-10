@@ -1,10 +1,10 @@
 
 
-module Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend), GameRepository (getActiveUserGames, getRecentlyActiveGames, getGame)) where
+module Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend), GameRepository (getActiveUserGames, getRecentlyActiveGames, getGame, startNewGame, saveBoardMove, savePassMove, saveExchangeMove, saveGameEnd, updatePlayerLastSeen)) where
 
 import Control.Applicative ((<|>))
 import Control.Error.Util (note, hoistEither)
-import Control.Monad (foldM)
+import Control.Monad (foldM, forM_)
 import Control.Monad.Except (runExcept, ExceptT)
 import Control.Monad.IO.Class (MonadIO)
 import Data.List (groupBy)
@@ -20,14 +20,16 @@ import Database.Esqueleto ((^.))
 import qualified Database.Esqueleto as E
 import Database.Persist.Sql
 import qualified Model as M
-import Model.GameSetup (LocalisedGameSetup (GameSetup))
-import Repository.GameRepository (GameRepository, GameSummaryEntity (GameSummaryEntity), GameEntity (GameEntity), UserId, getActiveUserGames, getRecentlyActiveGames, getGame)
+import Model.GameSetup (LocalisedGameSetup (GameSetup), gameLanguageShortCode)
+import Data.Time.Clock (getCurrentTime, UTCTime)
+import Repository.GameRepository (GameRepository, GameSummaryEntity (GameSummaryEntity), GameEntity (GameEntity), UserId, getActiveUserGames, getRecentlyActiveGames, getGame, startNewGame, saveBoardMove, savePassMove, saveExchangeMove, saveGameEnd, updatePlayerLastSeen)
 import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
 import qualified Controllers.User.Model.ServerUser as SU
 import Controllers.Game.Model.ServerPlayer (makeGameStatePlayers)
+
 import System.Random (StdGen)
-import System.Random.Internal (StdGen (StdGen))
-import System.Random.SplitMix (seedSMGen')
+import System.Random.Internal (StdGen (StdGen), unStdGen)
+import System.Random.SplitMix (seedSMGen', unseedSMGen)
 import Text.Read (read)
 import Wordify.Rules.Board
 import Wordify.Rules.Game
@@ -44,6 +46,13 @@ instance GameRepository GameRepositorySQLBackend where
   getActiveUserGames (GameRepositorySQLBackend pool gameSetups) userId = withPool pool (activeUserGames gameSetups userId)
   getRecentlyActiveGames (GameRepositorySQLBackend pool gameSetups) n = withPool pool (recentlyActiveGames gameSetups n)
   getGame (GameRepositorySQLBackend pool gameSetups) gameId = withPool pool (fetchGameEntity gameSetups gameId)
+  startNewGame (GameRepositorySQLBackend pool _) entity = persistNewGame pool entity
+  saveBoardMove (GameRepositorySQLBackend pool _) = sqlSaveBoardMove pool
+  savePassMove (GameRepositorySQLBackend pool _) = sqlSavePassMove pool
+  saveExchangeMove (GameRepositorySQLBackend pool _) = sqlSaveExchangeMove pool
+  saveGameEnd (GameRepositorySQLBackend pool _) = sqlSaveGameEnd pool
+  updatePlayerLastSeen (GameRepositorySQLBackend pool _) gameId (ServerUser uid _) now =
+    withPool pool $ updateWhere [M.PlayerGameId ==. gameId, M.PlayerPlayerId ==. uid] [M.PlayerLastActive =. Just now]
 
 activeUserGames :: (Monad m, MonadIO m) => Map.Map T.Text LocalisedGameSetup -> UserId -> E.SqlPersistT m [GameSummaryEntity]
 activeUserGames gameSetups userId = do
@@ -132,6 +141,101 @@ toGlobalGameSummaries gameSetups rows =
         (M.gameBoard game)
         localisedSetup
         players
+
+persistNewGame :: Pool SqlBackend -> GameEntity -> IO ()
+persistNewGame pool (GameEntity gameId game players createdAt lastMoveMadeAt finishedAt setup) = do
+  let locale = gameLanguageShortCode setup
+      History letterBag _ = history game
+      currentMove = L.length (movesMade game) + 1
+      boardRepresentation = T.pack (L.replicate 255 ',')
+  withPool pool $ do
+    _ <- insert $
+      M.Game
+        gameId
+        (tilesToDbRepresentation (tiles letterBag))
+        (stdGenToText (getGenerator letterBag))
+        (Just locale)
+        createdAt
+        finishedAt
+        lastMoveMadeAt
+        currentMove
+        boardRepresentation
+    forM_ (L.zip [1 :: Int ..] players) $ \(playerNum, ServerUser uid _) ->
+      insert $ M.Player gameId uid playerNum Nothing
+
+sqlSaveBoardMove :: Pool SqlBackend -> T.Text -> Int -> [(Pos, Tile)] -> T.Text -> IO ()
+sqlSaveBoardMove pool gameId moveNumber placed boardText = do
+  let placedSorted = L.sort placed
+      positions = L.map fst placedSorted
+      (minPos, maxPos) = (L.minimum positions, L.maximum positions)
+      isHorizontal = yPos minPos == yPos maxPos
+  withPool pool $ do
+    _ <- insert $ M.Move (M.GameKey gameId) moveNumber
+           (Just $ tilesToDbRepresentation (L.map snd placedSorted))
+           (Just $ xPos minPos) (Just $ yPos minPos) (Just isHorizontal)
+    return ()
+  updateGameSummary pool gameId moveNumber boardText False
+
+sqlSavePassMove :: Pool SqlBackend -> T.Text -> Int -> T.Text -> IO ()
+sqlSavePassMove pool gameId moveNumber boardText = do
+  withPool pool $ do
+    _ <- insert $ M.Move (M.GameKey gameId) moveNumber Nothing Nothing Nothing Nothing
+    return ()
+  updateGameSummary pool gameId moveNumber boardText False
+
+sqlSaveExchangeMove :: Pool SqlBackend -> T.Text -> Int -> [Tile] -> T.Text -> IO ()
+sqlSaveExchangeMove pool gameId moveNumber tiles boardText = do
+  withPool pool $ do
+    _ <- insert $ M.Move (M.GameKey gameId) moveNumber
+           (Just $ tilesToDbRepresentation tiles) Nothing Nothing Nothing
+    return ()
+  updateGameSummary pool gameId moveNumber boardText False
+
+sqlSaveGameEnd :: Pool SqlBackend -> T.Text -> Int -> Maybe [(Pos, Tile)] -> T.Text -> IO ()
+sqlSaveGameEnd pool gameId moveNumber maybePlaced boardText = do
+  withPool pool $ do
+    _ <- case maybePlaced of
+           Just placed ->
+             let placedSorted = L.sort placed
+                 positions = L.map fst placedSorted
+                 (minPos, maxPos) = (L.minimum positions, L.maximum positions)
+                 isHorizontal = yPos minPos == yPos maxPos
+             in insert $ M.Move (M.GameKey gameId) moveNumber
+                  (Just $ tilesToDbRepresentation (L.map snd placedSorted))
+                  (Just $ xPos minPos) (Just $ yPos minPos) (Just isHorizontal)
+           Nothing ->
+             insert $ M.Move (M.GameKey gameId) moveNumber Nothing Nothing Nothing Nothing
+    return ()
+  updateGameSummary pool gameId moveNumber boardText True
+
+updateGameSummary :: Pool SqlBackend -> T.Text -> Int -> T.Text -> Bool -> IO ()
+updateGameSummary pool gameId moveNumber boardText isFinished = do
+  now <- getCurrentTime
+  withPool pool $ do
+    let finishedAt = if isFinished then Just now else Nothing
+    _ <- update (M.GameKey gameId)
+           [ M.GameCurrentMoveNumber =. (moveNumber + 1)
+           , M.GameLastMoveMadeAt =. Just now
+           , M.GameFinishedAt =. finishedAt
+           , M.GameBoard =. boardText
+           ]
+    return ()
+
+tilesToDbRepresentation :: [Tile] -> T.Text
+tilesToDbRepresentation ts = T.pack (L.intercalate "," (L.map tileToDbRepresentation ts))
+
+tileToDbRepresentation :: Tile -> String
+tileToDbRepresentation (Letter lettr _) = lettr
+tileToDbRepresentation (Blank Nothing) = "_"
+tileToDbRepresentation (Blank (Just letter)) = L.map C.toLower letter
+
+stdGenToText :: StdGen -> T.Text
+stdGenToText stdGen =
+  let (a, b) = toSeedStdGen stdGen
+   in T.concat [T.pack (show a), " ", T.pack (show b)]
+
+toSeedStdGen :: StdGen -> (Word64, Word64)
+toSeedStdGen = unseedSMGen . unStdGen
 
 withPool = flip runSqlPersistMPool
 

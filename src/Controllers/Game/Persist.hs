@@ -1,4 +1,4 @@
-module Controllers.Game.Persist (persistNewGame, getLobbyPlayer, persistGameUpdate, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby, updatePlayerLastSeen) where
+module Controllers.Game.Persist (getLobbyPlayer, persistNewLobby, persistNewLobbyPlayer, deleteLobby, getLobby) where
 
 import ClassyPrelude (Either (Left, Right), IO, Maybe (Just, Nothing), Word64, error, flip, fromMaybe, fst, id, liftIO, maybe, otherwise, show, snd, ($), (+), (++), (.), (==), String, Bool)
 import Control.Applicative
@@ -6,16 +6,12 @@ import Control.Concurrent.STM
 import Control.Error.Util
 import Control.Monad
 import Control.Monad.Except
-import Controllers.Game.Api
-import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer
 import Controllers.GameLobby.Model.GameLobby
 import Controllers.User.Model.ServerUser (ServerUser (ServerUser))
 import Controllers.User.UserController (UserController)
 import qualified Controllers.User.UserController as UC
 import qualified Data.Char as C
-import Data.Conduit
-import qualified Data.Conduit.List as CL
 import qualified Data.List as L
 import qualified Data.Map as Mp
 import Data.Pool
@@ -28,15 +24,10 @@ import System.Random
 import System.Random.Internal
 import System.Random.SplitMix
 import Text.Read (read)
-import Wordify.Rules.Board
-import Wordify.Rules.Game
+import Wordify.Rules.Game (History (..), history, bag, makeGame)
 import Wordify.Rules.LetterBag
-import Wordify.Rules.Move
-import qualified Wordify.Rules.Player as P
-import Wordify.Rules.Pos
 import Wordify.Rules.Tile
 import qualified Data.List.Split as SL
-import Database.Sqlite (Connection)
 import Database.Esqueleto (ConnectionPool)
 import Model.GameSetup (LocalisedGameSetup(..))
 
@@ -107,38 +98,7 @@ persistNewLobby pool gameId locale gameLobby = do
 persistNewLobbyPlayer :: Pool SqlBackend -> T.Text -> ServerPlayer -> IO ()
 persistNewLobbyPlayer pool gameId serverPlayer = withPool pool $ persistLobbyPlayers gameId [serverPlayer]
 
-{-
-    Persists the original game state (before the game has begun)
--}
-persistNewGame :: Pool SqlBackend -> T.Text -> T.Text -> ServerGame -> IO ()
-persistNewGame pool gameId locale serverGame = do
-  _ <- persistGameState pool gameId locale serverGame
-  return ()
-
 withPool = flip runSqlPersistMPool
-
-persistGameState :: Pool SqlBackend -> T.Text -> T.Text -> ServerGame -> IO (Key M.Game)
-persistGameState pool gameId locale serverGame = do
-  ServerGameSnapshot gameId gameState gamePlayers created snapshotLastMove finished _ <- atomically $ makeServerGameSnapshot serverGame
-  let History letterBag _ = history gameState
-  let currentMove = L.length (movesMade gameState) + 1
-  let boardRepresentation = T.pack (L.replicate 255 ',')
-  withPool pool $ do
-    gameDbId <-
-      insert $
-        M.Game
-          gameId
-          (tilesToDbRepresentation (tiles letterBag))
-          (stdGenToText (getGenerator letterBag))
-          (Just locale)
-          created
-          finished
-          snapshotLastMove
-          currentMove
-          boardRepresentation
-
-    persistPlayers gameId gamePlayers
-    return gameDbId
 
 persistLobbyPlayers gameId players =
   let playersWithNumbers = L.zip [1 .. 4] players
@@ -146,94 +106,6 @@ persistLobbyPlayers gameId players =
         \(playerNumber, player) ->
           insert $
             M.LobbyPlayer gameId (playerId player) playerNumber (lastActive player)
-
-persistPlayers gameId players =
-  let playersWithNumbers = L.zip [1 .. 4] players
-   in forM_ playersWithNumbers $ do
-        \(playerNumber, player) ->
-          insert $
-            M.Player gameId (playerId player) playerNumber (lastActive player)
-
-updatePlayerLastSeen :: Pool SqlBackend -> T.Text -> T.Text -> UTCTime -> IO ()
-updatePlayerLastSeen pool gameId playerId now = do
-  withPool pool (updateWhere [M.PlayerGameId ==. gameId, M.PlayerPlayerId ==. playerId] [M.PlayerLastActive =. Just now])
-  return ()
-
-persistGameUpdate :: Pool SqlBackend -> T.Text -> Game -> GameMessage -> IO ()
-persistGameUpdate pool gameId _ (PlayerChat chatMessage) = pure ()
-persistGameUpdate pool gameId gameState (PlayerBoardMove moveNumber placed _ _ _ _) =
-  persistBoardMove pool gameId gameState placed
-persistGameUpdate pool gameId gameState (PlayerPassMove moveNumber _ _) = persistPassMove pool gameId gameState
-persistGameUpdate pool gameId gameState (PlayerExchangeMove moveNumber _ exchanged _) =
-  persistExchangeMove pool gameId gameState exchanged
-persistGameUpdate pool gameId gameState (GameEnd moveNumber placed moveSummary) = do
-  -- TODO: move to own function
-  now <- getCurrentTime
-  case placed of
-    Nothing -> persistPassMove pool gameId gameState
-    Just placed -> persistBoardMove pool gameId gameState placed
-persistGameUpdate _ _ _ _ = return ()
-
-persistBoardMove :: Pool SqlBackend -> T.Text -> Game -> [(Pos, Tile)] -> IO ()
-persistBoardMove pool gameId gameState placed = do
-  let move =
-        M.Move
-          (M.GameKey gameId)
-          moveNumber
-          (Just $ tilesToDbRepresentation (L.map snd placedSorted))
-          (Just $ xPos min)
-          (Just $ yPos min)
-          (Just isHorizontal)
-
-  persistMoveUpdate pool gameId gameState move
-  where
-    moveNumber = L.length (movesMade gameState)
-    placedSorted = L.sort placed
-    positions = L.map fst placedSorted
-    (min, max) = (L.minimum positions, L.maximum positions)
-    isHorizontal = yPos min == yPos max
-
-persistPassMove :: Pool SqlBackend -> T.Text -> Game -> IO ()
-persistPassMove pool gameId gameState = do
-  persistMoveUpdate pool gameId gameState (M.Move (M.GameKey gameId) moveNumber Nothing Nothing Nothing Nothing)
-  where
-    moveNumber = L.length (movesMade gameState)
-
-persistExchangeMove :: Pool SqlBackend -> T.Text -> Game -> [Tile] -> IO ()
-persistExchangeMove pool gameId gameState tiles = do
-  persistMoveUpdate pool gameId gameState (M.Move (M.GameKey gameId) moveNumber (Just (tilesToDbRepresentation tiles)) Nothing Nothing Nothing)
-  where
-    moveNumber = L.length (movesMade gameState)
-
-persistMoveUpdate :: Pool SqlBackend -> T.Text -> Game -> M.Move -> IO ()
-persistMoveUpdate pool gameId gameState move@(M.Move _ moveNumber _ _ _ _) = do
-  withPool pool $ do
-    _ <- insert move
-    return ()
-
-  updateGameSummaryEntity pool gameId gameState
-
-updateGameSummaryEntity :: Pool SqlBackend -> T.Text -> Game -> IO ()
-updateGameSummaryEntity pool gameId gameState = do
-  now <- getCurrentTime
-  withPool pool $ do
-    let finishedAt = if gameFinished gameState then Just now else Nothing
-    let boardRepresentation = gameBoardTextRepresentation gameState
-    let currentMoveNumber = L.length (movesMade gameState) + 1
-    _ <-
-      -- TODO: make this a conditional update based on the lastMove timestamp being greater than the previous
-      update
-        (M.GameKey gameId)
-        [ M.GameCurrentMoveNumber =. currentMoveNumber,
-          M.GameLastMoveMadeAt =. Just now,
-          M.GameFinishedAt =. finishedAt,
-          M.GameBoard =. T.pack boardRepresentation
-        ]
-
-    return ()
-  where
-    gameFinished game = gameStatus game == Finished
-    gameBoardTextRepresentation = textRepresentation . board
 
 tilesToDbRepresentation :: [Tile] -> T.Text
 tilesToDbRepresentation tiles = T.pack (L.intercalate "," (L.map tileToDbRepresentation tiles))

@@ -301,7 +301,7 @@ loadGameBundle locale =
     let tileValues = getTileValues (validLetters bag)
 
     case locale of
-      "es_fise" -> return (pack locale, GameSetup "es" dictionary bag spanishGameExtraRules tileValues)
+      "es_fise" -> return (pack locale, GameSetup "es_fise" dictionary bag spanishGameExtraRules tileValues)
       _ -> return (pack locale, GameSetup (pack locale) dictionary bag [] tileValues)
 
 

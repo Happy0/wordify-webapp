@@ -57,9 +57,9 @@ instance FromJSON RaeWordEntryResponse where
     pure $ RaeWordEntryResponse ok dat
 
 instance DefinitionClient RaeApiClient where
-  getDefinitions client word "es" = raeGetDefinitionsImpl client word
+  getDefinitions client word "es_fise" = raeGetDefinitionsImpl client word
   getDefinitions _ _ _ = pure (Right [])
-  supportedLocales _ = ["es"]
+  supportedLocales _ = ["es_fise"]
 
 makeRaeApiClient :: Maybe T.Text -> RaeApiClient
 makeRaeApiClient = RaeApiClient
