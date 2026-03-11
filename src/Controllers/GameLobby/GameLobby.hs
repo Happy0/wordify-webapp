@@ -175,5 +175,6 @@ notifyNewGame app entity = do
     (gameEntityLastMoveMadeAt entity)
     (gameEntityFinishedAt entity)
     (gameEntitySetup entity)
-  forM_ players $ \(ServerUser uid _, _) ->
-    atomically $ UE.notifyNewGame svc uid gId serverGame
+  forM_ players $ \(ServerUser uid _, _) -> do
+    now <- getCurrentTime
+    atomically $ UE.notifyNewGame svc uid gId serverGame now

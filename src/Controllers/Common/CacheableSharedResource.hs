@@ -4,9 +4,10 @@ module Controllers.Common.CacheableSharedResource (
   withCacheableResource,
   getCacheableResource,
   ResourceCache,
-  peekCacheableResource) where
+  peekCacheableResource,
+  withPeekCacheableResource) where
 
-import ClassyPrelude (liftIO, (<&>))
+import ClassyPrelude (liftIO)
 import Control.Concurrent
 import Control.Concurrent.STM.TVar
 import qualified Control.Foldl as Foldl
@@ -90,9 +91,12 @@ handlerSharerJoin cache cacheItem resourceId = do
 handleSharerLeave :: ResourceCache err a -> CacheItem a -> Text -> IO ()
 handleSharerLeave cache cacheItem resourceId = do
   now <- getCurrentTime
-  atomically $ do
-    newSharerCount <- decreaseSharersByOne cacheItem
-    when (newSharerCount == 0) $ void (scheduleCacheCleanup cache now resourceId)
+  atomically (handleSharerLeaveSTM cache cacheItem resourceId now)
+
+handleSharerLeaveSTM  :: ResourceCache err a -> CacheItem a -> Text -> UTCTime -> STM ()
+handleSharerLeaveSTM cache cacheItem resourceId now = do
+  newSharerCount <- decreaseSharersByOne cacheItem
+  when (newSharerCount == 0) $ void (scheduleCacheCleanup cache now resourceId)
 
 removeFromCache :: M.Map Text (CacheItem a) -> Text -> STM ()
 removeFromCache resourceCache resourceId = M.delete resourceId resourceCache
@@ -167,8 +171,48 @@ getCacheableResource resourceCache resourceId = do
         Right sharedResource -> handleSharerLeave resourceCache sharedResource resourceId
 
 {-
-  Returns the item if it's in the cache but does not load it into the cache if it is not present
+  Returns the item if it's in the cache but does not load it into the cache if it is not present.
+
+  If there are no other sharers of the resource once the resource action has been run to completion
+  or the 'release key' is used to free it early then the item is scheduled for eviction from the cache.
 -}
-peekCacheableResource :: ResourceCache err a -> Text -> STM (Maybe a)
+peekCacheableResource :: MonadResource m => ResourceCache err a -> Text -> m (ReleaseKey, Maybe a)
 peekCacheableResource resourceCache resourceId = do
-  M.lookup resourceId (cache resourceCache) <&> fmap cacheItem
+  (releaseKey, cacheEntry) <- allocate (allocateResource resourceCache resourceId) (deAllocateResource resourceCache)
+  return (releaseKey, cacheItem <$> cacheEntry)
+  where
+    allocateResource :: ResourceCache err a -> Text -> IO (Maybe (CacheItem a))
+    allocateResource resourceCache resourceId = atomically $ do
+      item <- M.lookup resourceId (cache resourceCache)
+      case item of
+        Nothing -> pure Nothing
+        Just cachedItem -> do
+          handlerSharerJoin resourceCache cachedItem resourceId
+          pure (Just cachedItem)
+
+    deAllocateResource :: ResourceCache err a -> Maybe (CacheItem a) -> IO ()
+    deAllocateResource resourceCache resource =
+      case resource of
+        Nothing -> pure ()
+        Just sharedResource -> handleSharerLeave resourceCache sharedResource resourceId
+
+{-
+  Executes the given action with a 'Just' if an item with the given resourceID is present in the cache,
+  otherwise executes it with Nothing
+
+  If there are no other sharers of the resource once the action is complete then the item is scheduled
+  for eviction
+
+  The date parameter is used to schedule the item for eviction from the cache.
+-}
+withPeekCacheableResource :: ResourceCache err a -> Text -> (Maybe a -> STM b) -> UTCTime -> STM b
+withPeekCacheableResource resourceCache resourceId action now = do
+  resource <- M.lookup resourceId (cache resourceCache)
+  case resource of
+    Just item -> do
+      handlerSharerJoin resourceCache item resourceId
+      result <- action (Just (cacheItem item))
+      handleSharerLeaveSTM resourceCache item resourceId now
+      pure result
+    Nothing -> action Nothing
+

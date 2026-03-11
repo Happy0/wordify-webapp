@@ -269,9 +269,9 @@ activePlayerNamesFromSnapshot snapshot =
 
 buildActiveGameSummaries :: GameService -> [GameSummaryEntity] -> SU.ServerUser -> IO [ActiveGameSummary]
 buildActiveGameSummaries gamesCache gameSummaries serverUser =
-  forM gameSummaries $ \g -> do
-    maybeServerGame <- atomically $ peekGame gamesCache (gameSummaryGameId g)
-    buildActiveGameSummary g maybeServerGame serverUser
+  forM gameSummaries $ \g -> runResourceT $ do
+    (_, maybeServerGame) <- peekGame gamesCache (gameSummaryGameId g)
+    liftIO $ buildActiveGameSummary g maybeServerGame serverUser
 
 buildActiveGameSummaryMap :: GameService -> [GameSummaryEntity] -> SU.ServerUser -> IO (Map Text ActiveGameSummary)
 buildActiveGameSummaryMap gamesCache gameSummaries serverUser = do

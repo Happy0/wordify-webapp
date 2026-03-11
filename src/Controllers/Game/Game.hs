@@ -55,7 +55,7 @@ handlePlayerConnect gameService userEventSvc serverGame (Just user) = do
     newConnectionCount <- increasePlayerConnections serverGame user now
     when (isFirstConnection newConnectionCount) $ do
       notifyPlayerConnect serverGame user now
-      notifyUserChannelsPlayerActivity userEventSvc serverGame
+      notifyUserChannelsPlayerActivity userEventSvc serverGame now
 
   where
     isFirstConnection :: Maybe Int -> Bool
@@ -71,21 +71,21 @@ handlePlayerDisconnect gameService userEventSvc serverGame (Just user) = do
     newConnectionCount <- decreasePlayerConnections serverGame user now
     when (isLastConnection newConnectionCount) $ do
       notifyPlayerDisconnect serverGame user now
-      notifyUserChannelsPlayerActivity userEventSvc serverGame
+      notifyUserChannelsPlayerActivity userEventSvc serverGame now
 
   where
     isLastConnection :: Maybe Int -> Bool
     isLastConnection (Just connectionCount) = connectionCount == 0
     isLastConnection Nothing = False
 
-notifyUserChannelsPlayerActivity :: UserEventService -> ServerGame -> STM ()
-notifyUserChannelsPlayerActivity userEventSvc serverGame = do
+notifyUserChannelsPlayerActivity :: UserEventService -> ServerGame -> UTCTime -> STM ()
+notifyUserChannelsPlayerActivity userEventSvc serverGame now = do
   players <- mapM (readTVar . snd) (playing serverGame)
   let activeNames = [ defaultPlayerName i p | (i, p) <- Prelude.zip [1..] players, SP.numConnections p > 0 ]
       gId = gameId serverGame
   forM_ players $ \player -> do
     let userIdent = SP.playerId player
-    notifyPlayerActivityChanged userEventSvc userIdent gId activeNames
+    notifyPlayerActivityChanged userEventSvc userIdent gId activeNames now
 
 notifyPlayerConnect :: ServerGame -> ServerUser -> UTCTime -> STM ()
 notifyPlayerConnect serverGame user now = do
@@ -211,10 +211,11 @@ updateUserChannelsOfMove userEventSvc serverGame snapshot gameOver = do
       gId = snapshotGameId snapshot
   forM_ players $ \player -> do
     let userIdent = SP.playerId player
+    now <- getCurrentTime
     atomically $
       if gameOver
-        then notifyGameOver userEventSvc userIdent gId serverGame
-        else notifyMove userEventSvc userIdent gId serverGame
+        then notifyGameOver userEventSvc userIdent gId serverGame now
+        else notifyMove userEventSvc userIdent gId serverGame now
 
 applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameTransition
 applyLocalisedRules gameTransition localisedGameSetup =

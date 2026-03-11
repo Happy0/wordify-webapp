@@ -13,7 +13,8 @@ module Modules.UserEvent.Api
 import ClassyPrelude (IO, Maybe (..), Either (..), pure, return, (<$>), ($), liftIO)
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TChan (TChan, writeTChan, dupTChan)
-import Controllers.Common.CacheableSharedResource (ResourceCache, getCacheableResource, makeGlobalResourceCache, peekCacheableResource)
+import Controllers.Common.CacheableSharedResource (ResourceCache, getCacheableResource, makeGlobalResourceCache, withPeekCacheableResource)
+import Data.Time (UTCTime)
 import Controllers.Game.Model.ServerGame (ServerGame)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..), newUserEventSubcriptionChannel)
 import Repository.NotificationRepository (Notification)
@@ -30,47 +31,47 @@ makeUserEventService = do
   cache <- makeGlobalResourceCache loadChannel Nothing
   pure (UserEventService cache)
 
-notifyMove :: UserEventService -> Text -> Text -> ServerGame -> STM ()
-notifyMove service userId gameId serverGame = do
-  maybeChannel <- peekCacheableResource (userEventChannels service) userId
-  case maybeChannel of
-    Nothing -> return ()
-    Just chan -> writeTChan chan (MoveInUserGame gameId serverGame)
+notifyMove :: UserEventService -> Text -> Text -> ServerGame -> UTCTime -> STM ()
+notifyMove service userId gameId serverGame now =
+  withPeekCacheableResource (userEventChannels service) userId action now
+  where
+    action Nothing = return ()
+    action (Just chan) = writeTChan chan (MoveInUserGame gameId serverGame)
 
-notifyGameOver :: UserEventService -> Text -> Text -> ServerGame -> STM ()
-notifyGameOver service userId gameId serverGame = do
-  maybeChannel <- peekCacheableResource (userEventChannels service) userId
-  case maybeChannel of
-    Nothing -> return ()
-    Just chan -> writeTChan chan (GameOver gameId serverGame)
+notifyGameOver :: UserEventService -> Text -> Text -> ServerGame -> UTCTime -> STM ()
+notifyGameOver service userId gameId serverGame now =
+  withPeekCacheableResource (userEventChannels service) userId action now
+  where
+    action Nothing = return ()
+    action (Just chan) = writeTChan chan (GameOver gameId serverGame)
 
-notifyNewGame :: UserEventService -> Text -> Text -> ServerGame -> STM ()
-notifyNewGame service userId gameId serverGame = do
-  maybeChannel <- peekCacheableResource (userEventChannels service) userId
-  case maybeChannel of
-    Nothing -> return ()
-    Just chan -> writeTChan chan (NewGame gameId serverGame)
+notifyNewGame :: UserEventService -> Text -> Text -> ServerGame -> UTCTime -> STM ()
+notifyNewGame service userId gameId serverGame now =
+  withPeekCacheableResource (userEventChannels service) userId action now
+  where
+    action Nothing = return ()
+    action (Just chan) = writeTChan chan (NewGame gameId serverGame)
 
-notifyPlayerActivityChanged :: UserEventService -> Text -> Text -> [Text] -> STM ()
-notifyPlayerActivityChanged service userId gameId activeNames = do
-  maybeChannel <- peekCacheableResource (userEventChannels service) userId
-  case maybeChannel of
-    Nothing -> return ()
-    Just chan -> writeTChan chan (PlayerActivityChanged gameId activeNames)
+notifyPlayerActivityChanged :: UserEventService -> Text -> Text -> [Text] -> UTCTime -> STM ()
+notifyPlayerActivityChanged service userId gameId activeNames now =
+  withPeekCacheableResource (userEventChannels service) userId action now
+  where
+    action Nothing = return ()
+    action (Just chan) = writeTChan chan (PlayerActivityChanged gameId activeNames)
 
-notifyNotificationAdded :: UserEventService -> Text -> Notification -> STM ()
-notifyNotificationAdded service userId notification = do
-  maybeChannel <- peekCacheableResource (userEventChannels service) userId
-  case maybeChannel of
-    Nothing -> return ()
-    Just chan -> writeTChan chan (NotificationsChanged (NotificationAdded notification))
+notifyNotificationAdded :: UserEventService -> Text -> Notification -> UTCTime -> STM ()
+notifyNotificationAdded service userId notification now =
+  withPeekCacheableResource (userEventChannels service) userId action now
+  where
+    action Nothing = return ()
+    action (Just chan) = writeTChan chan (NotificationsChanged (NotificationAdded notification))
 
-notifyNotificationsRead :: UserEventService -> Text -> [Text] -> STM ()
-notifyNotificationsRead service userId notificationIds = do
-  maybeChannel <- peekCacheableResource (userEventChannels service) userId
-  case maybeChannel of
-    Nothing -> return ()
-    Just chan -> writeTChan chan (NotificationsChanged (NotificationsRead notificationIds))
+notifyNotificationsRead :: UserEventService -> Text -> [Text] -> UTCTime -> STM ()
+notifyNotificationsRead service userId notificationIds now =
+  withPeekCacheableResource (userEventChannels service) userId action now
+  where
+    action Nothing = return ()
+    action (Just chan) = writeTChan chan (NotificationsChanged (NotificationsRead notificationIds))
 
 subscribeToUserChannel :: MonadResource m => UserEventService -> Text -> m (ReleaseKey, Either Text (TChan UserEvent))
 subscribeToUserChannel service userId = do

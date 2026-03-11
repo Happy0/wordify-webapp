@@ -61,7 +61,7 @@ gameEntityToServerGame entity =
 getGame :: MonadResource m => GameService -> Text -> m (ReleaseKey, Either Text ServerGame)
 getGame svc = getCacheableResource (gameCache svc)
 
-peekGame :: GameService -> Text -> STM (Maybe ServerGame)
+peekGame :: MonadResource m => GameService -> Text -> m (ReleaseKey, Maybe ServerGame)
 peekGame svc = peekCacheableResource (gameCache svc)
 
 startGame :: GameService -> GameEntity -> IO ()

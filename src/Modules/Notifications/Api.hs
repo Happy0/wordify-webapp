@@ -15,7 +15,7 @@ where
 import ClassyPrelude (IO, Maybe, pure, (.), ($), map, tshow)
 import Control.Concurrent.STM (atomically)
 import qualified Data.Text as T
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, getCurrentTime)
 import Network.HTTP.Client (Manager)
 import Repository.NotificationRepository (Notification, NotificationId, NotificationRepository)
 import Controllers.User.Model.ServerUser (ServerUser)
@@ -49,7 +49,8 @@ sendGameOverNotification svc = PushService.sendGameOverNotification (pushService
 createInviteNotification :: NotificationService -> T.Text -> T.Text -> ServerUser -> IO ()
 createInviteNotification svc userId lobbyId invitedByUser = do
   notification <- NS.createInviteNotification (notifService svc) userId lobbyId invitedByUser
-  atomically $ notifyNotificationAdded (userEventService svc) userId notification
+  now <- getCurrentTime
+  atomically $ notifyNotificationAdded (userEventService svc) userId notification now
   PushService.createInviteNotification (pushService svc) userId lobbyId
 
 getRecentNotifications :: NotificationService -> T.Text -> IO [Notification]
@@ -58,7 +59,8 @@ getRecentNotifications svc = NS.getRecentNotifications (notifService svc)
 markNotificationsAsRead :: NotificationService -> T.Text -> UTCTime -> IO [NotificationId]
 markNotificationsAsRead svc userId upTo = do
   ids <- NS.markNotificationsAsRead (notifService svc) userId upTo
-  atomically $ notifyNotificationsRead (userEventService svc) userId (map tshow ids)
+  now <- getCurrentTime
+  atomically $ notifyNotificationsRead (userEventService svc) userId (map tshow ids) now
   pure ids
 
 pushNotificationRepository :: NotificationService -> PushNotificationRepositoryImpl
