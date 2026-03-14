@@ -159,15 +159,12 @@ const formattedLastActivity = computed(() => {
   return date.toLocaleDateString()
 })
 
-function navigateToGame() {
-  window.location.href = `/games/${props.gameId}`
-}
 </script>
 
 <template>
-  <div
-    class="mini-board-card bg-white rounded-lg shadow-md p-1.5 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow"
-    @click="navigateToGame"
+  <a
+    :href="`/games/${gameId}`"
+    class="mini-board-card block bg-white rounded-lg shadow-md p-1.5 sm:p-3 cursor-pointer hover:shadow-lg transition-shadow no-underline"
   >
     <!-- Turn indicator -->
     <div class="flex items-center justify-between mb-1 sm:mb-2">
@@ -233,7 +230,7 @@ function navigateToGame() {
         <span class="player-name truncate">{{ player.name }}</span>
       </span>
     </div>
-  </div>
+  </a>
 </template>
 
 <style scoped>

@@ -90,10 +90,6 @@ function getSquareLabel(row: number, col: number): string {
   }
 }
 
-function navigateToGame() {
-  window.location.href = `/games/${props.gameId}`
-}
-
 function getSquareLabelColorClass(row: number, col: number): string {
   const type = BOARD_LAYOUT[row]?.[col] ?? 'Normal'
   switch (type) {
@@ -121,9 +117,9 @@ const formattedLastActivity = computed(() => {
 </script>
 
 <template>
-  <div
-    class="tv-mini-board-card bg-white rounded-lg shadow-md p-3 cursor-pointer hover:shadow-lg transition-shadow"
-    @click="navigateToGame"
+  <a
+    :href="`/games/${gameId}`"
+    class="tv-mini-board-card block bg-white rounded-lg shadow-md p-3 cursor-pointer hover:shadow-lg transition-shadow no-underline"
   >
     <!-- Header: TV indicator + last activity -->
     <div class="flex items-center justify-between mb-2">
@@ -180,7 +176,7 @@ const formattedLastActivity = computed(() => {
         <span class="player-name truncate">{{ player.name }}</span>
       </span>
     </div>
-  </div>
+  </a>
 </template>
 
 <style scoped>
