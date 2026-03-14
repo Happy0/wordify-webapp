@@ -188,7 +188,7 @@ handleMove serverGame gameService userEventSvc pushCtrl playerMoving move moveOu
               GameFinished _ _ -> True
               _ -> False
 
-        updateUserChannelsOfMove userEventSvc serverGame newSnapshot isGameOver
+        updateUserChannelsOfMove userEventSvc serverGame isGameOver
         sendMovePushNotification pushCtrl newSnapshot transition (currentPlayerToMove newSnapshot)
 
         -- TODO: Think of how to handle this if it fails... Could end up with a corrupted game state if next move succeeds (missing move)
@@ -205,17 +205,19 @@ sendMovePushNotification _ _ _ Nothing = pure ()
 sendMovePushNotification pushCtrl snapshot _ (Just nextPlayerId) =
   sendMoveNotification pushCtrl nextPlayerId (snapshotGameId snapshot)
 
-updateUserChannelsOfMove :: UserEventService -> ServerGame -> ServerGameSnapshot -> Bool -> IO ()
-updateUserChannelsOfMove userEventSvc serverGame snapshot gameOver = do
-  let players = snapshotPlayers snapshot
-      gId = snapshotGameId snapshot
+updateUserChannelsOfMove :: UserEventService -> ServerGame -> Bool -> IO ()
+updateUserChannelsOfMove userEventSvc serverGame gameOver = do
+  snapshot <- atomically (makeServerGameSnapshot serverGame)
+  let (players, gId) = (snapshotPlayers snapshot, snapshotGameId snapshot)
   forM_ players $ \player -> do
     let userIdent = SP.playerId player
     now <- getCurrentTime
-    atomically $
+    atomically $ do
+      -- Technically the game could've been updated again in the interim (although unlikely) 
+      latestSnapshot <- makeServerGameSnapshot serverGame
       if gameOver
-        then notifyGameOver userEventSvc userIdent gId serverGame now
-        else notifyMove userEventSvc userIdent gId serverGame now
+        then notifyGameOver userEventSvc userIdent gId latestSnapshot now
+        else notifyMove userEventSvc userIdent gId latestSnapshot now
 
 applyLocalisedRules :: GameTransition -> LocalisedGameSetup -> Either Text GameTransition
 applyLocalisedRules gameTransition localisedGameSetup =

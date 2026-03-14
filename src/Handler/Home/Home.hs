@@ -208,11 +208,10 @@ handleHomeOutboundMessage _ connection (HomeTvMsg (HomeTVUpdate snapshot)) state
   pure state
 
 handleUserEvent :: SU.ServerUser -> C.Connection -> UserEvent -> Map Text ActiveGameSummary -> IO (Map Text ActiveGameSummary)
-handleUserEvent serverUser connection (MoveInUserGame gameId serverGame) state = do
-  snapshot <- atomically (makeServerGameSnapshot serverGame)
-  let userToMove = isUserToMove (SU.userId serverUser) snapshot
-  let gameSummary = gameSummaryFromServerGame snapshot userToMove
-  let activeSummary = mapGameSummaryEntity gameSummary (activePlayerNamesFromSnapshot snapshot) serverUser
+handleUserEvent serverUser connection (MoveInUserGame gameId serverGameSnapshot) state = do
+  let userToMove = isUserToMove (SU.userId serverUser) serverGameSnapshot
+  let gameSummary = gameSummaryFromServerGame serverGameSnapshot userToMove
+  let activeSummary = mapGameSummaryEntity gameSummary (activePlayerNamesFromSnapshot serverGameSnapshot) serverUser
   let newState = M.insert gameId activeSummary state
   sendGameSummaryEntityState connection newState
   pure newState
@@ -220,11 +219,11 @@ handleUserEvent _ connection (GameOver gameId _) state = do
   let newState = M.delete gameId state
   sendGameSummaryEntityState connection newState
   pure newState
-handleUserEvent serverUser connection (NewGame gameId serverGame) state = do
-  snapshot <- atomically (makeServerGameSnapshot serverGame)
-  let userToMove = isUserToMove (SU.userId serverUser) snapshot
-  let gameSummary = gameSummaryFromServerGame snapshot userToMove
-  let activeSummary = mapGameSummaryEntity gameSummary (activePlayerNamesFromSnapshot snapshot) serverUser
+handleUserEvent serverUser connection (NewGame gameId serverGameSnapshot) state = do
+  
+  let userToMove = isUserToMove (SU.userId serverUser) serverGameSnapshot
+  let gameSummary = gameSummaryFromServerGame serverGameSnapshot userToMove
+  let activeSummary = mapGameSummaryEntity gameSummary (activePlayerNamesFromSnapshot serverGameSnapshot) serverUser
   let newState = M.insert gameId activeSummary state
   sendGameSummaryEntityState connection newState
   pure newState

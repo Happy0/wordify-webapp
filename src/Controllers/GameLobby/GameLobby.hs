@@ -177,4 +177,6 @@ notifyNewGame app entity = do
     (gameEntitySetup entity)
   forM_ players $ \(ServerUser uid _, _) -> do
     now <- getCurrentTime
-    atomically $ UE.notifyNewGame svc uid gId serverGame now
+    atomically $ do
+      serverGameSnapshot <- makeServerGameSnapshot serverGame
+      UE.notifyNewGame svc uid gId serverGameSnapshot now

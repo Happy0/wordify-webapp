@@ -15,7 +15,7 @@ import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TChan (TChan, writeTChan, dupTChan)
 import Controllers.Common.CacheableSharedResource (ResourceCache, getCacheableResource, makeGlobalResourceCache, withPeekCacheableResource)
 import Data.Time (UTCTime)
-import Controllers.Game.Model.ServerGame (ServerGame)
+import Controllers.Game.Model.ServerGame (ServerGame, ServerGameSnapshot)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..), newUserEventSubcriptionChannel)
 import Repository.NotificationRepository (Notification)
 import Data.Text (Text)
@@ -31,21 +31,21 @@ makeUserEventService = do
   cache <- makeGlobalResourceCache loadChannel Nothing
   pure (UserEventService cache)
 
-notifyMove :: UserEventService -> Text -> Text -> ServerGame -> UTCTime -> STM ()
+notifyMove :: UserEventService -> Text -> Text -> ServerGameSnapshot -> UTCTime -> STM ()
 notifyMove service userId gameId serverGame now =
   withPeekCacheableResource (userEventChannels service) userId action now
   where
     action Nothing = return ()
     action (Just chan) = writeTChan chan (MoveInUserGame gameId serverGame)
 
-notifyGameOver :: UserEventService -> Text -> Text -> ServerGame -> UTCTime -> STM ()
+notifyGameOver :: UserEventService -> Text -> Text -> ServerGameSnapshot -> UTCTime -> STM ()
 notifyGameOver service userId gameId serverGame now =
   withPeekCacheableResource (userEventChannels service) userId action now
   where
     action Nothing = return ()
     action (Just chan) = writeTChan chan (GameOver gameId serverGame)
 
-notifyNewGame :: UserEventService -> Text -> Text -> ServerGame -> UTCTime -> STM ()
+notifyNewGame :: UserEventService -> Text -> Text -> ServerGameSnapshot -> UTCTime -> STM ()
 notifyNewGame service userId gameId serverGame now =
   withPeekCacheableResource (userEventChannels service) userId action now
   where
