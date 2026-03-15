@@ -130,6 +130,8 @@ loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _ _) r
   case existingItem of
     Just item -> pure $ Right item
     Nothing -> do
+      -- TODO: coordinate through an MVar so that multiple threads calling at the exact same time don't
+      -- load the resource then throw it away, wasting effort
       resource <- loadResourceOp resourceId
       case resource of
         Left loadError -> pure $ Left loadError
