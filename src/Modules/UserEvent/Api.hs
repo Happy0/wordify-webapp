@@ -28,7 +28,7 @@ makeUserEventService :: IO UserEventService
 makeUserEventService = do
   let loadChannel :: Text -> IO (Either Text (TChan UserEvent))
       loadChannel _ = Right <$> newUserEventSubcriptionChannel
-  cache <- makeGlobalResourceCache loadChannel Nothing
+  cache <- makeGlobalResourceCache loadChannel Nothing 60
   pure (UserEventService cache)
 
 notifyMove :: UserEventService -> Text -> Text -> ServerGameSnapshot -> UTCTime -> STM ()

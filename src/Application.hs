@@ -212,7 +212,7 @@ makeFoundation appSettings inactivityTracker = do
   let gameRepository = AnyGameRepository (GameRepositorySQLBackend pool localisedGameSetups)
 
   gameService <- makeGameService gameRepository
-  gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing
+  gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing 60
 
   userEventService <- makeUserEventService
 

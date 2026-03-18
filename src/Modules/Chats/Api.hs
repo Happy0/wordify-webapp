@@ -25,7 +25,7 @@ data ChatService = ChatService
 
 makeChatService :: ChatRepositoryImpl -> IO ChatService
 makeChatService chatRepository = do
-  rooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom)
+  rooms <- makeGlobalResourceCache (getChat chatRepository) (Just freezeChatroom) 60
   pure (ChatService rooms)
 
 getChatroom :: (MonadResource m) => ChatService -> Text -> m (Either Text Chatroom)

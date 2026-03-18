@@ -46,8 +46,8 @@ decreaseSharersByOne (CacheItem item connections) = modifyTVar' connections (\it
 numberOfSharers :: CacheItem a -> STM Int
 numberOfSharers (CacheItem item connections) = readTVar connections
 
-makeResourceCache :: (MonadResource m) => (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> m (ReleaseKey, ResourceCache err a)
-makeResourceCache loadResourceOp onRemoval = do
+makeResourceCache :: (MonadResource m) => (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> Int -> m (ReleaseKey, ResourceCache err a)
+makeResourceCache loadResourceOp onRemoval sweepIntervalSeconds = do
   allocate (allocateResource loadResourceOp onRemoval) deallocateResource
   where
     allocateResource :: (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> IO (ResourceCache err a)
@@ -56,17 +56,17 @@ makeResourceCache loadResourceOp onRemoval = do
     deallocateResource cache = do
       let threadId = cacheCleanupThreadId cache
       killThread threadId
-    allocateResource = makeGlobalResourceCache
+    allocateResource loadOp removal = makeGlobalResourceCache loadOp removal sweepIntervalSeconds
 
-makeGlobalResourceCache :: (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> IO (ResourceCache err a)
-makeGlobalResourceCache loadResourceOp onRemoval = do
+makeGlobalResourceCache :: (Text -> IO (Either err a)) -> Maybe (a -> IO ()) -> Int -> IO (ResourceCache err a)
+makeGlobalResourceCache loadResourceOp onRemoval sweepIntervalSeconds = do
   resourceCache <- M.newIO
   cleanUpMap <- M.newIO
-  threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap onRemoval
+  threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap onRemoval sweepIntervalSeconds
   pure $ ResourceCache resourceCache cleanUpMap loadResourceOp onRemoval threadId
 
-startBroomLoop :: M.Map Text (CacheEntry err a) -> M.Map Text UTCTime -> Maybe (a -> IO ()) -> IO ()
-startBroomLoop resourceCache cleanUpMap onRemove = forever $ do
+startBroomLoop :: M.Map Text (CacheEntry err a) -> M.Map Text UTCTime -> Maybe (a -> IO ()) -> Int -> IO ()
+startBroomLoop resourceCache cleanUpMap onRemove sweepIntervalSeconds = forever $ do
   now <- getCurrentTime
   potentiallyStaleMapItems <- atomically $ stmMapToList cleanUpMap
 
@@ -77,7 +77,7 @@ startBroomLoop resourceCache cleanUpMap onRemove = forever $ do
         (Just removedItem, Just onRemovalFunction) -> onRemovalFunction removedItem
         _ -> return ()
 
-  threadDelay (1 * 60000000)
+  threadDelay (sweepIntervalSeconds * 1000000)
 
 scheduleCacheCleanup :: ResourceCache err a -> UTCTime -> Text -> STM ()
 scheduleCacheCleanup (ResourceCache cache cleanUpMap _ _ _) now resourceId = do

@@ -36,7 +36,7 @@ data GameService = GameService
 
 makeGameService :: AnyGameRepository -> IO GameService
 makeGameService repo = do
-  cache <- makeGlobalResourceCache (loadGame repo) Nothing
+  cache <- makeGlobalResourceCache (loadGame repo) Nothing 60
   pure (GameService cache repo)
 
 loadGame :: AnyGameRepository -> Text -> IO (Either Text ServerGame)
