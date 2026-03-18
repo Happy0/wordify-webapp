@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Controllers.Common.CacheableSharedResource (
   makeResourceCache,
   makeGlobalResourceCache,
@@ -21,11 +22,15 @@ import qualified DeferredFolds.UnfoldlM as UnfoldlM
 import qualified StmContainers.Map as M
 import UnliftIO.Resource
 import Prelude
+import Control.Exception (bracket, catch, throwIO, SomeException)
+import Control.Exception (finally)
 
 data CacheItem a = CacheItem {cacheItem :: a, connections :: TVar Int}
 
+data CacheEntry err a = LoadedEntry (CacheItem a) | LoadingEntry (MVar ())
+
 data ResourceCache err a = ResourceCache
-  { cache :: M.Map Text (CacheItem a),
+  { cache :: M.Map Text (CacheEntry err a),
     cleanUpMap :: M.Map Text UTCTime,
     loadResourceOp :: Text -> IO (Either err a),
     onRemoval :: Maybe (a -> IO ()),
@@ -60,7 +65,7 @@ makeGlobalResourceCache loadResourceOp onRemoval = do
   threadId <- forkIO $ startBroomLoop resourceCache cleanUpMap onRemoval
   pure $ ResourceCache resourceCache cleanUpMap loadResourceOp onRemoval threadId
 
-startBroomLoop :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> Maybe (a -> IO ()) -> IO ()
+startBroomLoop :: M.Map Text (CacheEntry err a) -> M.Map Text UTCTime -> Maybe (a -> IO ()) -> IO ()
 startBroomLoop resourceCache cleanUpMap onRemove = forever $ do
   now <- getCurrentTime
   potentiallyStaleMapItems <- atomically $ stmMapToList cleanUpMap
@@ -98,15 +103,14 @@ handleSharerLeaveSTM cache cacheItem resourceId now = do
   newSharerCount <- decreaseSharersByOne cacheItem
   when (newSharerCount == 0) $ void (scheduleCacheCleanup cache now resourceId)
 
-removeFromCache :: M.Map Text (CacheItem a) -> Text -> STM ()
+removeFromCache :: M.Map Text (CacheEntry err a) -> Text -> STM ()
 removeFromCache resourceCache resourceId = M.delete resourceId resourceCache
 
-removeIfNoSharers :: M.Map Text (CacheItem a) -> M.Map Text UTCTime -> Text -> STM (Maybe a)
+removeIfNoSharers :: M.Map Text (CacheEntry err a) -> M.Map Text UTCTime -> Text -> STM (Maybe a)
 removeIfNoSharers cache cleanupMap resourceId = do
   resource <- M.lookup resourceId cache
   case resource of
-    Nothing -> pure Nothing
-    Just cached -> do
+    Just (LoadedEntry cached) -> do
       sharers <- numberOfSharers cached
 
       if sharers == 0
@@ -116,6 +120,7 @@ removeIfNoSharers cache cleanupMap resourceId = do
           return (Just (cacheItem cached))
         else
           return Nothing
+    _ -> pure Nothing
 
 loadCacheableResource :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
 loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _ _) resourceId = do
@@ -123,31 +128,68 @@ loadCacheableResource resourceCache@(ResourceCache cache _ loadResourceOp _ _) r
     item <- M.lookup resourceId cache
     case item of
       Nothing -> pure Nothing
-      Just resource -> do
+      Just result@(LoadingEntry loadingMVar) -> pure (Just result)
+      Just result@(LoadedEntry resource) -> do
         handlerSharerJoin resourceCache resource resourceId
-        pure $ Just resource
+        pure (Just result)
 
   case existingItem of
-    Just item -> pure $ Right item
-    Nothing -> do
-      -- TODO: coordinate through an MVar so that multiple threads calling at the exact same time don't
-      -- load the resource then throw it away, wasting effort
-      resource <- loadResourceOp resourceId
-      case resource of
-        Left loadError -> pure $ Left loadError
-        Right newResource ->
-          atomically $ do
-            cachedItem <- M.lookup resourceId cache
-            result <- case cachedItem of
-              Just cachedResource -> pure cachedResource
-              Nothing -> do
-                numConnections <- newTVar 0
-                let item = CacheItem newResource numConnections
-                M.insert item resourceId cache
-                pure item
+    Just (LoadedEntry item) -> pure $ Right item
+    Just (LoadingEntry loadedSignalMVar) -> do
+      -- Wait the for the other thread that is already loading the resource to signal that it has loaded the item
+      -- into the cache then recursively start again
+      readMVar loadedSignalMVar
+      loadCacheableResource resourceCache resourceId
+    Nothing -> loadFreshlyIntoCache resourceCache resourceId
 
-            handlerSharerJoin resourceCache result resourceId
-            pure (Right result)
+loadFreshlyIntoCache :: ResourceCache err a -> Text -> IO (Either err (CacheItem a))
+loadFreshlyIntoCache resourceCache@(ResourceCache cache _ loadResourceOp _ _) resourceId = do
+  maybeSemaphore <- takeOwnershipOfLoad resourceCache resourceId
+
+  case maybeSemaphore of 
+    -- Already loaded or loading in another thread, recursively start again
+    Nothing -> loadCacheableResource resourceCache resourceId
+
+    -- We've claimed ownership of loading the item into the cache
+    Just semaphore -> loadIntoCache resourceCache resourceId semaphore
+
+  where
+    -- Returns a Just if we took ownership and Nothing if a thread is already loading the item or it has already been fully loaded
+    takeOwnershipOfLoad :: ResourceCache err a -> Text -> IO (Maybe (MVar ()))
+    takeOwnershipOfLoad resourceCache@(ResourceCache cache _ loadResourceOp _ _) resourceId = do
+      signal <- newEmptyMVar
+      atomically $ do
+        cachedItem <- M.lookup resourceId cache
+        case cachedItem of 
+          Nothing -> do 
+            let entry = LoadingEntry signal 
+            M.insert entry resourceId cache
+            pure (Just signal)
+          _ -> pure Nothing
+
+    loadIntoCache :: ResourceCache err a -> Text -> MVar () -> IO (Either err (CacheItem a))
+    loadIntoCache resourceCache@(ResourceCache cache _ loadResourceOp _ _) resourceId signalMVar = do
+      resourceLoadResult <- loadResourceOp resourceId 
+        `catch` (\(err :: SomeException) -> removeLoadingClaim resourceCache resourceId >> putMVar signalMVar () >> throwIO err)
+
+      result <- case resourceLoadResult of 
+        Right resource -> putIntoCache resourceCache resourceId resource
+        Left err -> removeLoadingClaim resourceCache resourceId >> pure (Left err)
+
+      putMVar signalMVar ()
+      pure result
+
+    putIntoCache :: ResourceCache err a -> Text -> a -> IO (Either err (CacheItem a))
+    putIntoCache resourceCache@(ResourceCache cache _ loadResourceOp _ _) resourceId resource = do
+      atomically $ do
+        connections <- newTVar 0
+        let entry = CacheItem resource connections
+        handlerSharerJoin resourceCache entry resourceId
+        M.insert (LoadedEntry entry) resourceId cache
+        pure (Right entry)
+
+    removeLoadingClaim :: ResourceCache err a -> Text -> IO ()
+    removeLoadingClaim resourceCache@(ResourceCache cache _ _ _ _) resourceId = atomically $ M.delete resourceId cache
 
 stmMapToList :: M.Map k v -> STM [(k, v)]
 stmMapToList = UnfoldlM.foldM (Foldl.generalize Foldl.list) . M.unfoldlM
@@ -187,10 +229,10 @@ peekCacheableResource resourceCache resourceId = do
     allocateResource resourceCache resourceId = atomically $ do
       item <- M.lookup resourceId (cache resourceCache)
       case item of
-        Nothing -> pure Nothing
-        Just cachedItem -> do
+        Just (LoadedEntry cachedItem) -> do
           handlerSharerJoin resourceCache cachedItem resourceId
           pure (Just cachedItem)
+        _ -> pure Nothing    
 
     deAllocateResource :: ResourceCache err a -> Maybe (CacheItem a) -> IO ()
     deAllocateResource resourceCache resource =
@@ -211,10 +253,10 @@ withPeekCacheableResource :: ResourceCache err a -> Text -> (Maybe a -> STM b) -
 withPeekCacheableResource resourceCache resourceId action now = do
   resource <- M.lookup resourceId (cache resourceCache)
   case resource of
-    Just item -> do
+    Just (LoadedEntry item) -> do
       handlerSharerJoin resourceCache item resourceId
       result <- action (Just (cacheItem item))
       handleSharerLeaveSTM resourceCache item resourceId now
       pure result
-    Nothing -> action Nothing
+    _ -> action Nothing
 
