@@ -99,7 +99,7 @@ renderActiveGamePage app gameRepository serverUser = do
   maybeTvGame <- liftIO $ currentHomeTVState (tvService app)
   let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
   gamePagelayout $ do
-    addStylesheet $ (StaticR wordifyCss)
+    addStylesheet (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
     [whamlet|
       <div #home>
@@ -181,7 +181,7 @@ handleOutboundHomeWebsocket gameRepository gamesCache tvSvc connection serverUse
   let twoMonthsAgo = addUTCTime (negate $ 60 * 60 * 24 * 61) now
   sendPreviousHomeChatMessages connection chatroom twoMonthsAgo
   maybeTvState <- currentHomeTVState tvSvc
-  mapM_ (\snapshot -> C.sendTextData connection (encode (TvUpdate (snapshotToTvSummary snapshot)))) maybeTvState
+  mapM_ (C.sendTextData connection . encode . TvUpdate . snapshotToTvSummary) maybeTvState
   flip iterateM_ activeSummaryMap $ \currentState -> do
     let nextUserEvent = HomeUserEventMsg <$> readTChan userEventChan
         nextChatMsg   = HomeChatMessage . toChatMessage <$> readTChan liveChatChan
@@ -220,7 +220,7 @@ handleUserEvent _ connection (GameOver gameId _) state = do
   sendGameSummaryEntityState connection newState
   pure newState
 handleUserEvent serverUser connection (NewGame gameId serverGameSnapshot) state = do
-  
+
   let userToMove = isUserToMove (SU.userId serverUser) serverGameSnapshot
   let gameSummary = gameSummaryFromServerGame serverGameSnapshot userToMove
   let activeSummary = mapGameSummaryEntity gameSummary (activePlayerNamesFromSnapshot serverGameSnapshot) serverUser

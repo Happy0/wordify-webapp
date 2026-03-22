@@ -6,7 +6,7 @@ module Handler.GameLobby where
 import Control.Applicative
 import Control.Concurrent
 import Control.Monad.Loops
-import Controllers.Common.CacheableSharedResource (getCacheableResource)
+import Data.SharedResourceCache (getCacheableResource)
 import Controllers.Game.Api
 import Controllers.Game.Model.ServerGame
 import Controllers.Game.Model.ServerPlayer

@@ -14,7 +14,7 @@ module Foundation where
 
 import Auth0 (auth0Provider)
 import Control.Monad.Logger (LogSource)
-import Controllers.Common.CacheableSharedResource
+import Data.SharedResourceCache (SharedResourceCache)
 import Modules.Chats.Api (ChatService)
 
 import Controllers.Game.GameDefinitionController (GameDefinitionController)
@@ -74,7 +74,7 @@ data App = App
     appHttpManager :: Manager,
     appLogger :: Logger,
     localisedGameSetups :: LocalisedGameSetups,
-    gameLobbies :: ResourceCache Text GameLobby,
+    gameLobbies :: SharedResourceCache Text GameLobby,
     gameService :: GameService,
     chatService :: ChatService,
     userEventService :: UserEventService,

@@ -14,11 +14,12 @@ import ClassyPrelude (Either (Left, Right), IO, Int, Maybe (..), Text, fmap, map
 import Controllers.User.Model.ServerUser (ServerUser)
 import Data.Time (UTCTime)
 import Control.Concurrent.STM (STM, atomically)
-import Controllers.Common.CacheableSharedResource
-  ( ResourceCache,
+import Data.SharedResourceCache
+  ( SharedResourceCache,
     getCacheableResource,
-    makeGlobalResourceCache,
+    makeGlobalSharedResourceCache,
     peekCacheableResource,
+    CacheExpiryConfig (..),
   )
 import Controllers.Game.Model.ServerGame (ServerGame, makeServerGame)
 import Controllers.Game.Model.ServerPlayer (makeNewPlayer)
@@ -30,13 +31,13 @@ import Wordify.Rules.Tile (Tile)
 import Data.Functor ((<$>))
 
 data GameService = GameService
-  { gameCache :: ResourceCache Text ServerGame
+  { gameCache :: SharedResourceCache Text ServerGame
   , gameRepo  :: AnyGameRepository
   }
 
 makeGameService :: AnyGameRepository -> IO GameService
 makeGameService repo = do
-  cache <- makeGlobalResourceCache (loadGame repo) Nothing 60
+  cache <- makeGlobalSharedResourceCache (loadGame repo) Nothing (CacheExpiryConfig { sweepIntervalSeconds = 60, itemEligibleForRemovalAfterUnusedSeconds = 600 })
   pure (GameService cache repo)
 
 loadGame :: AnyGameRepository -> Text -> IO (Either Text ServerGame)

@@ -13,7 +13,7 @@ module Modules.UserEvent.Api
 import ClassyPrelude (IO, Maybe (..), Either (..), pure, return, (<$>), ($), liftIO)
 import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TChan (TChan, writeTChan, dupTChan)
-import Controllers.Common.CacheableSharedResource (ResourceCache, getCacheableResource, makeGlobalResourceCache, withPeekCacheableResource)
+import Data.SharedResourceCache (SharedResourceCache, getCacheableResource, makeGlobalSharedResourceCache, withPeekCacheableResource, CacheExpiryConfig (..))
 import Data.Time (UTCTime)
 import Controllers.Game.Model.ServerGame (ServerGame, ServerGameSnapshot)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..), newUserEventSubcriptionChannel)
@@ -22,13 +22,13 @@ import Data.Text (Text)
 import UnliftIO.Resource (MonadResource, ReleaseKey)
 
 newtype UserEventService = UserEventService
-  { userEventChannels :: ResourceCache Text (TChan UserEvent) }
+  { userEventChannels :: SharedResourceCache Text (TChan UserEvent) }
 
 makeUserEventService :: IO UserEventService
 makeUserEventService = do
   let loadChannel :: Text -> IO (Either Text (TChan UserEvent))
       loadChannel _ = Right <$> newUserEventSubcriptionChannel
-  cache <- makeGlobalResourceCache loadChannel Nothing 60
+  cache <- makeGlobalSharedResourceCache loadChannel Nothing (CacheExpiryConfig { sweepIntervalSeconds = 60, itemEligibleForRemovalAfterUnusedSeconds = 600 })
   pure (UserEventService cache)
 
 notifyMove :: UserEventService -> Text -> Text -> ServerGameSnapshot -> UTCTime -> STM ()

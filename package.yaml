@@ -84,6 +84,7 @@ dependencies:
   - http-types
   - lens
   - web-push
+  - shared-resource-cache
 
 # The library contains all of our application code. The executable
 # defined below is just a thin wrapper.

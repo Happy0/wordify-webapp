@@ -34,7 +34,7 @@ import Control.Error.Util
 import qualified Control.Monad as MO
 import Control.Monad.Logger (liftLoc, runLoggingT)
 import Control.Monad.Trans.Except
-import Controllers.Common.CacheableSharedResource
+import Data.SharedResourceCache (makeGlobalSharedResourceCache, CacheExpiryConfig (..))
 import Modules.Chats.Api (makeChatService, ChatService)
 import Modules.Definition.Api (makeDefinitionService, anyDefinitionClient)
 import Modules.Definition.Clients.RaeApiClient (makeRaeApiClient)
@@ -212,7 +212,7 @@ makeFoundation appSettings inactivityTracker = do
   let gameRepository = AnyGameRepository (GameRepositorySQLBackend pool localisedGameSetups)
 
   gameService <- makeGameService gameRepository
-  gameLobbies <- makeGlobalResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing 60
+  gameLobbies <- makeGlobalSharedResourceCache (getLobby pool userCtrl localisedGameSetups) Nothing (CacheExpiryConfig { sweepIntervalSeconds = 60, itemEligibleForRemovalAfterUnusedSeconds = 600 })
 
   userEventService <- makeUserEventService
 
