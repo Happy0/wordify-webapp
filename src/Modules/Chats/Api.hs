@@ -20,7 +20,7 @@ import Repository.ChatRepository (ChatRepositoryImpl)
 import UnliftIO.Resource (MonadResource)
 
 data ChatService = ChatService
-  { chatRooms :: SharedResourceCache Text Chatroom
+  { chatRooms :: SharedResourceCache Text Chatroom Text
   }
 
 makeChatService :: ChatRepositoryImpl -> IO ChatService

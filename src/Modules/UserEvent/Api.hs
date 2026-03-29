@@ -22,7 +22,7 @@ import Data.Text (Text)
 import UnliftIO.Resource (MonadResource, ReleaseKey)
 
 newtype UserEventService = UserEventService
-  { userEventChannels :: SharedResourceCache Text (TChan UserEvent) }
+  { userEventChannels :: SharedResourceCache Text (TChan UserEvent) Text }
 
 makeUserEventService :: IO UserEventService
 makeUserEventService = do

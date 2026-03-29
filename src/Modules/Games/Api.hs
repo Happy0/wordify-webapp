@@ -31,7 +31,7 @@ import Wordify.Rules.Tile (Tile)
 import Data.Functor ((<$>))
 
 data GameService = GameService
-  { gameCache :: SharedResourceCache Text ServerGame
+  { gameCache :: SharedResourceCache Text ServerGame Text
   , gameRepo  :: AnyGameRepository
   }
 

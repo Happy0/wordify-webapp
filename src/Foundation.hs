@@ -74,7 +74,7 @@ data App = App
     appHttpManager :: Manager,
     appLogger :: Logger,
     localisedGameSetups :: LocalisedGameSetups,
-    gameLobbies :: SharedResourceCache Text GameLobby,
+    gameLobbies :: SharedResourceCache Text GameLobby Text,
     gameService :: GameService,
     chatService :: ChatService,
     userEventService :: UserEventService,
