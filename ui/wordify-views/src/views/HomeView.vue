@@ -250,7 +250,7 @@ function navigateToLogin() {
           <template #content>
             <div class="flex flex-col gap-6 text-center">
               <p class="text-gray-600">
-                Log in or sign up to create a game or join a game.
+                Log in or sign up to create or join a game.
               </p>
 
               <Button
