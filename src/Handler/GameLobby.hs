@@ -33,6 +33,7 @@ import Web.Cookie
 import Yesod.Core
 import Yesod.WebSockets
 import Network.HTTP.Types.Status (status404, status422)
+import Handler.Common (defaultPageLayout)
 import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, nextNotifUpdateFromUserChan, notificationsOnlyWebsocketHandler, notificationsWebSocketHandler)
 import Controllers.Game.Model.UserEventSubscription (NotificationUpdate)
 
@@ -42,12 +43,12 @@ getCreateGamePageR = do
     liftIO $ trackRequestReceivedActivity (inactivityTracker app)
     maid <- maybeAuthId
     case maid of
-      Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
+      Nothing -> defaultPageLayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
       Just _ -> do
         authedUser <- requireUsername
         webSockets $ notificationsOnlyWebsocketHandler app (authenticatedUserId authedUser)
         notifs <- liftIO $ notificationsForUser app (authenticatedUserId authedUser)
-        gamePagelayout $ do
+        defaultPageLayout $ do
           addStylesheet $ (StaticR wordifyCss)
           addScript $ StaticR wordifyJs
           [whamlet|
@@ -119,7 +120,7 @@ getGameLobbyR gameId =
       Just _ -> do
         authedUser <- requireUsername
         handlerLobbyAuthenticated gameId (authenticatedUserId authedUser)
-      Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
+      Nothing -> defaultPageLayout $ renderNotLoggedInLobbyPage "Login / Sign Up to Join the Lobby"
 
 handlerLobbyAuthenticated :: Text -> Text -> Handler Html
 handlerLobbyAuthenticated gameId userId =
@@ -145,7 +146,7 @@ renderLobbyPage :: Either LobbyInputError GL.ClientLobbyJoinResult -> [Text] -> 
 renderLobbyPage (Left InvalidPlayerID) _ _ gameId = invalidArgs ["Invalid player ID given by browser"]
 renderLobbyPage (Left _) _ _ gameId = redirectHandler gameId
 renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel (Just gameCreated) _ _)) _ _ gameId = redirectHandler gameId
-renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) invitedPlayers notifs gameId = gamePagelayout $ do
+renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnapshot)) invitedPlayers notifs gameId = defaultPageLayout $ do
   let joinedPlayerNames = map playerUsername (snapshotLobbyPlayers lobbySnapshot)
 
   addStylesheet $ (StaticR wordifyCss)
@@ -234,7 +235,7 @@ getGameLobbyInviteR gameId = do
   liftIO $ trackRequestReceivedActivity (inactivityTracker app)
   maid <- maybeAuthId
   case maid of
-    Nothing -> gamePagelayout $ renderNotLoggedInLobbyPage "Login / Sign Up to accept the invite"
+    Nothing -> defaultPageLayout $ renderNotLoggedInLobbyPage "Login / Sign Up to accept the invite"
     Just _ -> do
       authedUser <- requireUsername
       let userId = authenticatedUserId authedUser
@@ -250,7 +251,7 @@ getGameLobbyInviteR gameId = do
             lift $ renderGameInvitePage gameId (snapShotgameLanguage lobbySnapshot) inviterUsername notifs
 
 renderGameInvitePage :: Text -> Text -> Maybe Text -> [Value] -> Handler Html
-renderGameInvitePage gameId locale inviterUsername notifs = gamePagelayout $ do
+renderGameInvitePage gameId locale inviterUsername notifs = defaultPageLayout $ do
   addStylesheet $ (StaticR wordifyCss)
   addScript $ StaticR wordifyJs
   [whamlet|
@@ -271,20 +272,3 @@ renderGameInvitePage gameId locale inviterUsername notifs = gamePagelayout $ do
       });
     |]
 
--- TODO: don't copypasta this and share it somewhere
-gamePagelayout :: Widget -> Handler Html
-gamePagelayout widget = do
-  pc <- widgetToPageContent widget
-  withUrlRenderer
-        [hamlet|
-            $doctype 5
-            <html>
-                <head>
-                    <title>Wordify
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    ^{pageHead pc}
-                <body>
-                    <div .special-wrapper>
-                        ^{pageBody pc}
-        |]

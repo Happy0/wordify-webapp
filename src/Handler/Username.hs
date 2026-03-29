@@ -7,14 +7,14 @@ module Handler.Username where
     import Repository.UserRepository (SetUsernameResult(..))
     import Yesod.Core (sendStatusJSON)
     import Network.HTTP.Types.Status (status400, status409)
-    import Handler.Home.Home (gamePagelayout)
+    import Handler.Common (defaultPageLayout)
     import qualified Data.Text as T
     import Data.Char (isAlphaNum)
 
     getChooseUsernameR :: Handler Html
     getChooseUsernameR = do
         _ <- requireAuthId
-        gamePagelayout $ do
+        defaultPageLayout $ do
             addStylesheet $ StaticR wordifyCss
             addScript $ StaticR wordifyJs
             [whamlet|

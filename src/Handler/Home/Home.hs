@@ -23,6 +23,7 @@ import qualified Controllers.Game.Model.ServerPlayer as SP
 import qualified Controllers.User.Model.ServerUser as SU
 import Wordify.Rules.Board (textRepresentation)
 import Wordify.Rules.Game (board)
+import Handler.Common (defaultPageLayout)
 import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, notificationsWebSocketHandler)
 import Modules.Chats.Api (ChatService, getChatroom, subscribeMessagesLive, getMessagesSinceTime)
 import Data.Time.Clock (addUTCTime)
@@ -70,7 +71,7 @@ renderNotLoggedInPage = do
   app <- getYesod
   maybeTvGame <- liftIO $ currentHomeTVState (tvService app)
   let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
-  gamePagelayout $ do
+  defaultPageLayout $ do
     addStylesheet $ StaticR wordifyCss
     addScript $ StaticR wordifyJs
     [whamlet|
@@ -98,7 +99,7 @@ renderActiveGamePage app gameRepository serverUser = do
   notifs <- liftIO $ notificationsForUser app (SU.userId serverUser)
   maybeTvGame <- liftIO $ currentHomeTVState (tvService app)
   let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
-  gamePagelayout $ do
+  defaultPageLayout $ do
     addStylesheet (StaticR wordifyCss)
     addScript $ StaticR wordifyJs
     [whamlet|
@@ -130,23 +131,6 @@ getHomeR = do
       webSockets $ homeWebsocketHandler app serverUser
       renderActiveGamePage app (gameRepository app) serverUser
 
--- TODO: don't copypasta this and share it somewhere
-gamePagelayout :: Widget -> Handler Html
-gamePagelayout widget = do
-  pc <- widgetToPageContent widget
-  withUrlRenderer
-        [hamlet|
-            $doctype 5
-            <html>
-                <head>
-                    <title>Wordify
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    ^{pageHead pc}
-                <body>
-                    <div .special-wrapper>
-                        ^{pageBody pc}
-        |]
 
 data HomeOutboundMessage
   = HomeUserEventMsg UserEvent

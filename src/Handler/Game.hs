@@ -45,6 +45,7 @@ import qualified Wordify.Rules.Player as P
 import Yesod.WebSockets
 import Handler.Model.ClientGame (fromServerPlayer, fromServerTile, fromServerMoveHistory)
 import qualified Handler.Common.Chat as HC
+import Handler.Common (defaultPageLayout)
 import Handler.Common.Chat (sendChatUpdate)
 import Handler.Common.ClientNotificationPresentation (notificationsForUser, sendNotificationUpdate, nextNotifUpdateFromUserChan, notificationsWebSocketHandler)
 import Controllers.Game.Model.UserEventSubscription (UserEvent (..), NotificationUpdate (..))
@@ -99,23 +100,6 @@ definitionsSinceQueryParamValue = do
     Right (messageNumber, _) -> pure (Just messageNumber)
 
 
-gamePagelayout :: Widget -> Handler Html
-gamePagelayout widget = do
-  pc <- widgetToPageContent widget
-  withUrlRenderer
-        [hamlet|
-            $doctype 5
-            <html>
-                <head>
-                    <title>Wordify
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <link rel="manifest" href="/manifest.json">
-                    ^{pageHead pc}
-                <body>
-                    <div .special-wrapper>
-                        ^{pageBody pc}
-        |]
 
 renderGamePage :: App -> Text -> Maybe ServerUser -> Either Text ServerGame -> Handler Html
 renderGamePage _ _ _ (Left err) = invalidArgs [err]
@@ -150,7 +134,7 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
     Nothing   -> return []
     Just user -> liftIO $ notificationsForUser app (userId user)
 
-  gamePagelayout $ do
+  defaultPageLayout $ do
     addStylesheet $ StaticR wordifyCss
     addScript $ StaticR wordifyJs
     toWidget

@@ -14,7 +14,7 @@ self.addEventListener('push', (event: PushEvent) => {
   const title = payload.title ?? 'Wordify'
   const options: NotificationOptions = {
     body: payload.body ?? '',
-    icon: '/favicon.ico',
+    icon: '/favicon.svg',
     data: { url: payload.url ?? '/' }
   }
 
