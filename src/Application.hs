@@ -79,6 +79,7 @@ import Database.Persist.Sqlite
   )
 
 import Handler.AuthTest
+import Handler.BoardSvg
 import Handler.Common
 import Handler.Game
 import Handler.GameLobby

@@ -9,12 +9,13 @@ self.addEventListener('push', (event: PushEvent) => {
     title?: string
     body?: string
     url?: string
+    icon?: string
   }
 
   const title = payload.title ?? 'Wordify'
   const options: NotificationOptions = {
     body: payload.body ?? '',
-    icon: '/favicon.svg',
+    icon: payload.icon ?? '/favicon.svg',
     data: { url: payload.url ?? '/' }
   }
 

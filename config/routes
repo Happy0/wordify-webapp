@@ -21,6 +21,7 @@
 /games/#Text/lobby GameLobbyR GET POST
 /games/#Text/lobby/invite GameLobbyInviteR GET
 /games/#Text GameR GET
+/games/#Text/board.svg GameBoardSvgR GET
 
 /push/subscribe SubscribeR POST
 

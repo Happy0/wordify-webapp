@@ -11,7 +11,7 @@ module Modules.Notifications.PushService
   )
 where
 
-import ClassyPrelude (IO, Maybe (Nothing, Just), Either (..), pure, mapM_, ($), putStr, putStrLn, show, writeTQueue, (.), Functor (fmap), (<$>))
+import ClassyPrelude (IO, Maybe (Nothing, Just), Either (..), pure, mapM_, ($), putStr, putStrLn, show, writeTQueue, (.), Functor (fmap), (<$>), Bool (..), maybe)
 import Control.Lens ((.~))
 import qualified Data.Aeson as A
 import qualified Data.Text as T
@@ -40,12 +40,13 @@ data PushTokenSubscription = PushTokenSubscription
 -- | Notification message payload sent to the browser
 data NotificationMessage = NotificationMessage
   { notificationText :: T.Text,
-    notificationUrl :: T.Text
+    notificationUrl :: T.Text,
+    notificationIcon :: Maybe T.Text
   }
 
 instance A.ToJSON NotificationMessage where
   toJSON :: NotificationMessage -> A.Value
-  toJSON (NotificationMessage t u) = A.object ["title" A..= ("Wordify" :: T.Text), "body" A..= t, "url" A..= u]
+  toJSON (NotificationMessage t u icon) = A.object (["title" A..= ("Wordify" :: T.Text), "body" A..= t, "url" A..= u] ++ maybe [] (\i -> ["icon" A..= i]) icon)
 
 data PushEvent =
   MoveNotification {moveNotificationUserId :: T.Text, moveNotificationGameId :: T.Text}
@@ -106,21 +107,22 @@ processNotificationEvent pushController event = do
   forM_ subscriptions $
     \subscription ->
       let url = T.concat [baseHostName subscription, "/games/", gameId, urlSuffix]
-      in sendNotification pushController subscription message url
+          icon = if hasBoard then Just (T.concat [baseHostName subscription, "/games/", gameId, "/board.svg"]) else Nothing
+      in sendNotification pushController subscription message url icon
   where
-    (userId, message, gameId, urlSuffix) = case event of
-      MoveNotification user gId        -> (user, "It's your move!", gId, "")
-      GameOverNotification user gId    -> (user, "Your game has ended!", gId, "")
-      GameStartedNotification user gId -> (user, "Your game has started!", gId, "")
-      GameInviteNotification user gId  -> (user, "You've been invited to a game!", gId, "/lobby/invite")
+    (userId, message, gameId, urlSuffix, hasBoard) = case event of
+      MoveNotification user gId        -> (user, "It's your move!", gId, "", True)
+      GameOverNotification user gId    -> (user, "Your game has ended!", gId, "", True)
+      GameStartedNotification user gId -> (user, "Your game has started!", gId, "", True)
+      GameInviteNotification user gId  -> (user, "You've been invited to a game!", gId, "/lobby/invite", False)
 
-sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> IO ()
-sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _ _) notifText notifUrl =
+sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> Maybe T.Text -> IO ()
+sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _ _) notifText notifUrl notifIcon =
   case vapidKeys controller of
     Nothing -> putStrLn "vapid keys not configured"
     Just keys -> do
       let baseNotification = mkPushNotification subEndpoint subP256dh subAuth
-          notification = (pushMessage .~ NotificationMessage notifText notifUrl) baseNotification
+          notification = (pushMessage .~ NotificationMessage notifText notifUrl notifIcon) baseNotification
       result <- sendPushNotification keys (httpManager controller) notification
       case result of
         Left RecepientEndpointNotFound ->
