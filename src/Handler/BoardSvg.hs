@@ -65,16 +65,30 @@ renderSquare (pos, square) =
         Just (Blank _) -> True
         _              -> False
       bgColor = if hasTile then tileColor isBlank else squareColor square
-      tileSvg = case tileIfOccupied square >>= tileString of
-        Just letterStr ->
-          let letter = T.pack letterStr
-              cx = T.pack (show (x + sz `div` 2))
-              cy = T.pack (show (y + sz `div` 2 + 4))
-          in T.concat
-               [ "<text x=\"" , cx , "\" y=\"" , cy
-               , "\" text-anchor=\"middle\" font-family=\"Arial,sans-serif\" font-size=\"10\" font-weight=\"bold\" fill=\"#78350f\">"
-               , letter , "</text>"
-               ]
+      tileSvg = case tileIfOccupied square of
+        Just tile ->
+          let letterPart = case tileString tile of
+                Just letterStr ->
+                  let letter = T.pack letterStr
+                      cx = T.pack (show (x + sz `div` 2))
+                      cy = T.pack (show (y + sz `div` 2 + 3))
+                  in T.concat
+                       [ "<text x=\"" , cx , "\" y=\"" , cy
+                       , "\" text-anchor=\"middle\" font-family=\"Arial,sans-serif\" font-size=\"9\" font-weight=\"bold\" fill=\"#78350f\">"
+                       , letter , "</text>"
+                       ]
+                Nothing -> ""
+              valuePart = case tile of
+                Letter _ v ->
+                  let vx = T.pack (show (x + sz - 2))
+                      vy = T.pack (show (y + sz - 1))
+                  in T.concat
+                       [ "<text x=\"" , vx , "\" y=\"" , vy
+                       , "\" text-anchor=\"end\" font-family=\"Arial,sans-serif\" font-size=\"4\" fill=\"#92400e\">"
+                       , T.pack (show v) , "</text>"
+                       ]
+                Blank _ -> ""
+          in letterPart <> valuePart
         Nothing -> ""
   in T.concat
        [ "<rect x=\"" , xT , "\" y=\"" , yT , "\" width=\"" , szT , "\" height=\"" , szT
