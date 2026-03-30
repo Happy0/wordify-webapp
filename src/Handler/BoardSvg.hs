@@ -3,30 +3,30 @@
 module Handler.BoardSvg where
 
 import Import
-import Modules.Games.Api (getGame)
+import Control.Error (ExceptT (..), runExceptT)
+import Modules.Games.Api (getGame, GameService)
 import Controllers.Game.Model.ServerGame (ServerGame (game))
-import Wordify.Rules.Board (Board, allSquares)
+import Wordify.Rules.Board (Board, allSquares, emptyBoard)
 import Wordify.Rules.Square (Square (..), tileIfOccupied)
 import Wordify.Rules.Tile (Tile (..), tileString)
 import Wordify.Rules.Pos (Pos, xPos, yPos)
 import Wordify.Rules.Game (Game (board))
 import qualified Data.Text as T
+import Data.Either (fromRight)
 
 getGameBoardSvgR :: Text -> Handler TypedContent
 getGameBoardSvgR gameId = do
   app <- getYesod
-  result <- runResourceT $ do
-    (_, gameResult) <- getGame (gameService app) gameId
-    case gameResult of
-      Left err -> pure (Left err)
-      Right serverGame -> do
-        gameSoFar <- liftIO (readTVarIO (game serverGame))
-        pure (Right (board gameSoFar))
-  case result of
-    Left err -> invalidArgs [err]
-    Right brd -> do
-      cacheSeconds 30
-      pure $ TypedContent "image/svg+xml" $ toContent (boardToSvg brd)
+  boardResult <- liftIO $ getGameBoard (gameService app) gameId
+  let board = fromRight emptyBoard boardResult
+  cacheSeconds 30
+  pure $ TypedContent "image/svg+xml" $ toContent (boardToSvg board)
+  where
+    getGameBoard :: GameService -> Text -> IO (Either Text Board)
+    getGameBoard gameService gameId = do
+      runResourceT $ runExceptT $ do
+        serverGame <- ExceptT $ snd <$> getGame gameService gameId
+        liftIO $ board <$> readTVarIO (game serverGame)
 
 -- | Size of each square in the SVG grid
 squareSize :: Int
