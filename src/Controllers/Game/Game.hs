@@ -35,7 +35,7 @@ import Wordify.Rules.LetterBag
 import Wordify.Rules.Move
 import Wordify.Rules.Player
 import Wordify.Rules.Pos
-import Wordify.Rules.ScrabbleError
+import Wordify.Rules.WordifyError
 import Wordify.Rules.Tile
 import Prelude
 import Model.GameSetup (extraRules, LocalisedGameSetup (gameLanguageShortCode))

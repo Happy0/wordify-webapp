@@ -18,6 +18,7 @@ import Controllers.User.Model.ServerUser (ServerUser (ServerUser), userId)
 import Data.Aeson
 import Data.Conduit
 import qualified Data.Conduit.List as CL
+import Data.Bifunctor (first)
 import Data.Either (fromRight)
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
@@ -270,19 +271,13 @@ gameApp app gameId maybeUser = do
 
 gameToMoveSummaries :: G.Game -> Either Text [MoveSummary]
 gameToMoveSummaries game =
-  if not (null moves)
-    then do
-      let gameTransitions = restoreGameLazy emptyGame $ NE.fromList (toList moves)
-      let reconstructedGameSummaries = mapM (fmap transitionToSummary) $ NE.toList gameTransitions
-      case reconstructedGameSummaries of
-        Left err -> Left (pack (show err))
-        Right summaries -> Right summaries
-    else return []
+  case NE.nonEmpty (toList moves) of
+    Nothing -> Right []
+    Just nonEmptyMoves -> do
+      playersState <- makeGameStatePlayers (L.length $ G.players game)
+      gameTransitions <- first (pack . show) $ G.restoreGameLazy playersState originalBag (G.dictionary game) nonEmptyMoves
+      first (pack . show) $ mapM (fmap transitionToSummary) $ NE.toList gameTransitions
   where
-    -- TODO: Add function to make a new empty game from a game history to
-    -- wordify
-    Right playersState = makeGameStatePlayers (L.length $ G.players game)
-    Right emptyGame = G.makeGame playersState originalBag (G.dictionary game)
     (G.History originalBag moves) = G.history game
 
 sendPreviousDefinitions :: GameDefinitionController -> Text -> Maybe Int -> C.Connection -> IO ()

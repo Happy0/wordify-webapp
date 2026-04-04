@@ -28,7 +28,6 @@ import Wordify.Rules.Game (History (..), history, bag, makeGame)
 import Wordify.Rules.LetterBag
 import Wordify.Rules.Tile
 import qualified Data.List.Split as SL
-import Database.Esqueleto (ConnectionPool)
 import Model.GameSetup (LocalisedGameSetup(..))
 
 deleteLobby :: App -> T.Text -> IO ()

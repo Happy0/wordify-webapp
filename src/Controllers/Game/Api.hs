@@ -52,7 +52,7 @@ import Wordify.Rules.Move
 import Wordify.Rules.Player
 import qualified Wordify.Rules.Player as P
 import Wordify.Rules.Pos
-import Wordify.Rules.ScrabbleError (ScrabbleError)
+import Wordify.Rules.WordifyError (WordifyError)
 import Wordify.Rules.Square
 import Wordify.Rules.Tile
 import Prelude
@@ -190,21 +190,18 @@ instance ToJSON ServerResponse where
 
 getMoveCommandMessages :: G.Game -> [Move] -> Either Text [GameMessage]
 getMoveCommandMessages _ [] = Right []
-getMoveCommandMessages initialGameState moves =
-  case restoreGame initialGameState $ NE.fromList (toList moves) of
-    Left err -> Left $ T.pack (Prelude.show err)
-    Right transitions -> Right (NE.toList (NE.map transitionToMessage transitions))
+getMoveCommandMessages game (m:ms) = do
+  let (G.History originalBag _) = G.history game
+  playersState <- makeGameStatePlayers (L.length $ G.players game)
+  transitions <- first (T.pack . Prelude.show) $ G.restoreGame playersState originalBag (G.dictionary game) (m NE.:| ms)
+  Right (NE.toList (NE.map transitionToMessage transitions))
 
 initialSocketMessage :: ServerGameSnapshot -> Maybe ServerUser -> Either Text ServerResponse
 initialSocketMessage serverGameSnapshot authUser = do
   let gameSoFar = gameState serverGameSnapshot
-  let (G.History originalBag moves) = G.history gameSoFar
-  playersState <- makeGameStatePlayers (L.length $ G.players gameSoFar)
-  emptyGame <- case G.makeGame playersState originalBag (G.dictionary gameSoFar) of
-    Left err -> Left (T.pack (Prelude.show err))
-    Right x -> Right x
+  let (G.History _ moves) = G.history gameSoFar
 
-  moveCommands <- getMoveCommandMessages emptyGame (toList moves)
+  moveCommands <- getMoveCommandMessages gameSoFar (toList moves)
 
   let maybePlayerNumber = authUser >>= getSnapshotPlayerNumber serverGameSnapshot
   let rack = P.tilesOnRack <$> (maybePlayerNumber >>= G.getPlayer gameSoFar)

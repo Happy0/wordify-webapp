@@ -78,7 +78,7 @@ notificationsWebSocketHandler app userId callback = do
     runResourceT $ do
       (_, eitherChan) <- subscribeToUserChannel (userEventService app) userId
       case eitherChan of
-        Left _ -> return ()
+        Left _ -> liftIO $ C.sendCloseCode connection 1011 ("Unexpectedly failed to subscribe to notifications." :: Text)
         Right userEventChan -> liftIO $ do
           notifs <- notificationsForUser app userId
           C.sendTextData connection $ encode $ object
