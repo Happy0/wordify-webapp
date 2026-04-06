@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import Data.Time (UTCTime)
 import Network.HTTP.Client (Manager)
 import Repository.PushNotificationRepository (PushNotificationRepositoryImpl, PushSubscription (PushSubscription, baseHostName), saveSubscriptionImpl, getSubscriptionsByUserIdImpl, deleteSubscriptionImpl)
-import Web.WebPush (VAPIDKeys, PushNotificationError (RecepientEndpointNotFound), sendPushNotification, mkPushNotification, pushMessage)
+import Web.WebPush (VAPIDKeys, PushNotificationError (RecepientEndpointNotFound), sendPushNotification, mkPushNotification, pushMessage, pushTopic, PushTopic (PushTopic))
 import Control.Monad (forM_, replicateM)
 import Data.List ((++))
 import Control.Concurrent.STM (TQueue, readTQueue)
@@ -108,7 +108,7 @@ processNotificationEvent pushController event = do
     \subscription ->
       let url = T.concat [baseHostName subscription, "/games/", gameId, urlSuffix]
           icon = if hasBoard then Just (T.concat [baseHostName subscription, "/games/", gameId, "/board.svg"]) else Nothing
-      in sendNotification pushController subscription message url icon
+      in sendNotification pushController subscription message url icon gameId
   where
     (userId, message, gameId, urlSuffix, hasBoard) = case event of
       MoveNotification user gId        -> (user, "It's your move!", gId, "", True)
@@ -116,13 +116,13 @@ processNotificationEvent pushController event = do
       GameStartedNotification user gId -> (user, "Your game has started!", gId, "", True)
       GameInviteNotification user gId  -> (user, "You've been invited to a game!", gId, "/lobby/invite", False)
 
-sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> Maybe T.Text -> IO ()
-sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _ _) notifText notifUrl notifIcon =
+sendNotification :: PushController -> PushSubscription -> T.Text -> T.Text -> Maybe T.Text -> T.Text -> IO ()
+sendNotification controller (PushSubscription _ subEndpoint subAuth subP256dh _ _) notifText notifUrl notifIcon topic =
   case vapidKeys controller of
     Nothing -> putStrLn "vapid keys not configured"
     Just keys -> do
       let baseNotification = mkPushNotification subEndpoint subP256dh subAuth
-          notification = (pushMessage .~ NotificationMessage notifText notifUrl notifIcon) baseNotification
+          notification = (pushTopic .~ Just (PushTopic topic)) . (pushMessage .~ NotificationMessage notifText notifUrl notifIcon) $ baseNotification
       result <- sendPushNotification keys (httpManager controller) notification
       case result of
         Left RecepientEndpointNotFound ->
