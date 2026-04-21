@@ -74,20 +74,20 @@ function formatLastSeen(lastSeen: number | undefined): string {
         <div
           class="w-2 h-2 rounded-full flex-shrink-0"
           :class="{
-            'bg-green-500': player.connected,
-            'bg-gray-300': !player.connected
+            'bg-green-500': player.isMe || player.connected,
+            'bg-gray-300': !player.isMe && !player.connected
           }"
-          :title="player.connected ? 'Online' : `Last seen: ${formatLastSeen(player.lastSeen)}`"
+          :title="player.isMe || player.connected ? 'Online' : `Last seen: ${formatLastSeen(player.lastSeen)}`"
         />
 
         <!-- Player name -->
         <div class="flex-1 min-w-0">
           <div class="font-medium text-gray-800 truncate">
             {{ player.name }}
-            <span v-if="player.playerNumber === myPlayerNumber" class="text-xs text-blue-500">(you)</span>
+            <span v-if="player.isMe" class="text-xs text-blue-500">(you)</span>
           </div>
           <div
-            v-if="!player.connected && player.lastSeen"
+            v-if="!player.isMe && !player.connected && player.lastSeen"
             class="text-xs text-gray-400"
           >
             {{ formatLastSeen(player.lastSeen) }}

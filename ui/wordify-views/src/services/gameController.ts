@@ -257,7 +257,8 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
         score: p.score,
         endBonus: p.endBonus,
         connected: connStatus?.active ?? false,
-        lastSeen: connStatus?.lastSeen ? parseIsoTimestamp(connStatus.lastSeen) : undefined
+        lastSeen: connStatus?.lastSeen ? parseIsoTimestamp(connStatus.lastSeen) : undefined,
+        isMe: index + 1 === data.playerNumber
       }
     })
 
@@ -423,7 +424,8 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
         score: p.score,
         endBonus: p.endBonus,
         connected: existingPlayer?.connected ?? false,
-        lastSeen: existingPlayer?.lastSeen
+        lastSeen: existingPlayer?.lastSeen,
+        isMe: existingPlayer?.isMe ?? false
       }
     })
     store.updatePlayers(playerSummaries)
@@ -505,7 +507,8 @@ export class GameController implements IGameCommandSender, IGameMessageHandler {
         score: p.score,
         endBonus: p.endBonus,
         connected: existingPlayer?.connected ?? false,
-        lastSeen: existingPlayer?.lastSeen
+        lastSeen: existingPlayer?.lastSeen,
+        isMe: existingPlayer?.isMe ?? false
       }
     })
     store.updatePlayers(playerSummaries)

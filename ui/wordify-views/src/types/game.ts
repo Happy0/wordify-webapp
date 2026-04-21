@@ -14,6 +14,8 @@ export type PlayerSummary = {
   connected: boolean
   // Undefined if the user is active or has never been active, date + time the user was last seen if known (in milliseconds since the unix epoch)
   lastSeen: number | undefined
+  // True if this player is the viewing user
+  isMe: boolean
 }
 
 // Move summary types representing different types of moves

@@ -123,7 +123,10 @@ export const useGameStore = defineStore('game', () => {
   function initializeGame(state: GameState) {
     myPlayerNumber.value = state.myPlayerNumber
     playerToMove.value = state.playerToMove
-    players.value = state.players
+    players.value = state.players.map((player, index) => ({
+      ...player,
+      isMe: state.myPlayerNumber !== null && index + 1 === state.myPlayerNumber
+    }))
     moveHistory.value = state.moveHistory
     tilesRemaining.value = state.tilesRemaining
     potentialScore.value = state.potentialScore
