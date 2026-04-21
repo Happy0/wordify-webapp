@@ -17,9 +17,9 @@ primary_region = 'lhr'
   processes = ['app']
 
 [[vm]]
-  memory = '512mb'
+  memory = '1GB'
   cpu_kind = 'shared'
-  cpus = 1
+  cpus = 2
 
 [mounts]
   source = "game_data"
