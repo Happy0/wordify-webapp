@@ -6,7 +6,7 @@ import qualified Data.Text as T
 import Foundation
 import Repository.GameRepository
 import Yesod.Auth
-import Import.NoFoundation (wordifyCss, wordifyJs)
+import Import.NoFoundation (wordifyCss, wordifyHomeJs)
 import Model.GameSetup (LocalisedGameSetup(..), TileValues)
 import ClassyPrelude (undefined, Maybe (Nothing))
 import Controllers.User.Model.AuthUser (AuthUser(AuthUser), ident)
@@ -73,18 +73,20 @@ renderNotLoggedInPage = do
   let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
   defaultPageLayout $ do
     addStylesheet $ StaticR wordifyCss
-    addScript $ StaticR wordifyJs
+    toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyHomeJs}">|]
     [whamlet|
       <div #home>
 
         |]
     toWidget
       [julius|
-        const lobby = Wordify.createHome('#home', {
-          isLoggedIn: false,
-          games: [],
-          tileValues: {},
-          initialHomeTvGame: #{tvGameJson}
+        window.addEventListener('DOMContentLoaded', function() {
+          Wordify.createHome('#home', {
+            isLoggedIn: false,
+            games: [],
+            tileValues: {},
+            initialHomeTvGame: #{tvGameJson}
+          });
         });
       |]
 
@@ -101,19 +103,21 @@ renderActiveGamePage app gameRepository serverUser = do
   let tvGameJson = toJSON (fmap snapshotToTvSummary maybeTvGame)
   defaultPageLayout $ do
     addStylesheet (StaticR wordifyCss)
-    addScript $ StaticR wordifyJs
+    toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyHomeJs}">|]
     [whamlet|
       <div #home>
 
         |]
     toWidget
       [julius|
-        const lobby = Wordify.createHome('#home', {
-          isLoggedIn: true,
-          games: #{toJSON summaries},
-          tileValues: {},
-          notifications: #{toJSON notifs},
-          initialHomeTvGame: #{tvGameJson}
+        window.addEventListener('DOMContentLoaded', function() {
+          Wordify.createHome('#home', {
+            isLoggedIn: true,
+            games: #{toJSON summaries},
+            tileValues: {},
+            notifications: #{toJSON notifs},
+            initialHomeTvGame: #{tvGameJson}
+          });
         });
       |]
 

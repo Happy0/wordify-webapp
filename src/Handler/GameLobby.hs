@@ -50,7 +50,7 @@ getCreateGamePageR = do
         notifs <- liftIO $ notificationsForUser app (authenticatedUserId authedUser)
         defaultPageLayout $ do
           addStylesheet $ (StaticR wordifyCss)
-          addScript $ StaticR wordifyJs
+          toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyCreateGameJs}">|]
           [whamlet|
             <div #createlobby>
 
@@ -58,13 +58,15 @@ getCreateGamePageR = do
           toWidget
             [julius|
 
-              const lobby = Wordify.createCreateGame('#createlobby', {
-                locales: {
-                  "English": "en",
-                  "Spanish (FISE)": "es_fise"
-                },
-                isLoggedIn: true,
-                notifications: #{toJSON notifs}
+              window.addEventListener('DOMContentLoaded', function() {
+                Wordify.createCreateGame('#createlobby', {
+                  locales: {
+                    "English": "en",
+                    "Spanish (FISE)": "es_fise"
+                  },
+                  isLoggedIn: true,
+                  notifications: #{toJSON notifs}
+                });
               });
             |]
 
@@ -88,18 +90,17 @@ postCreateGameR =
 renderNotLoggedInLobbyPage :: Text -> WidgetFor App ()
 renderNotLoggedInLobbyPage message = do
   addStylesheet $ (StaticR wordifyCss)
-  addScript $ StaticR wordifyJs
+  toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyLoginJs}">|]
   [whamlet|
     <div #lobbylogin>
-        
+
       |]
   toWidget
     [julius|
-      var url = document.URL;
-      var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
-      
-      const login = Wordify.createLogin('#lobbylogin', {
-        message: #{message}
+      window.addEventListener('DOMContentLoaded', function() {
+        Wordify.createLogin('#lobbylogin', {
+          message: #{message}
+        });
       });
     |]
 
@@ -150,25 +151,27 @@ renderLobbyPage (Right (GL.ClientLobbyJoinResult broadcastChannel _ _ lobbySnaps
   let joinedPlayerNames = map playerUsername (snapshotLobbyPlayers lobbySnapshot)
 
   addStylesheet $ (StaticR wordifyCss)
-  addScript $ StaticR wordifyJs
+  toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyGameLobbyJs}">|]
   [whamlet|
     <div #lobby>
-        
+
       |]
   toWidget
     [julius|
-      var url = document.URL;
-      var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
-      
-      const lobby = Wordify.createGameLobby('#lobby', {
-        playerCount: #{toJSON (snapshotAwaiting lobbySnapshot)},
-        gameLobbyId: #{toJSON gameId},
-        joinedPlayers: #{toJSON joinedPlayerNames},
-        invitedPlayers: #{toJSON invitedPlayers},
-        language: #{toJSON (snapShotgameLanguage lobbySnapshot) },
-        websocketUrl: webSocketUrl,
-        isLoggedIn: true,
-        notifications: #{toJSON notifs}
+      window.addEventListener('DOMContentLoaded', function() {
+        var url = document.URL;
+        var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
+
+        Wordify.createGameLobby('#lobby', {
+          playerCount: #{toJSON (snapshotAwaiting lobbySnapshot)},
+          gameLobbyId: #{toJSON gameId},
+          joinedPlayers: #{toJSON joinedPlayerNames},
+          invitedPlayers: #{toJSON invitedPlayers},
+          language: #{toJSON (snapShotgameLanguage lobbySnapshot) },
+          websocketUrl: webSocketUrl,
+          isLoggedIn: true,
+          notifications: #{toJSON notifs}
+        });
       });
     |]
 
@@ -253,22 +256,24 @@ getGameLobbyInviteR gameId = do
 renderGameInvitePage :: Text -> Text -> Maybe Text -> [Value] -> Handler Html
 renderGameInvitePage gameId locale inviterUsername notifs = defaultPageLayout $ do
   addStylesheet $ (StaticR wordifyCss)
-  addScript $ StaticR wordifyJs
+  toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyGameInviteJs}">|]
   [whamlet|
     <div #gameinvite>
       |]
   toWidget
     [julius|
-      var url = document.URL;
-      var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
+      window.addEventListener('DOMContentLoaded', function() {
+        var url = document.URL;
+        var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
 
-      const invite = Wordify.createGameInvite('#gameinvite', {
-        websocketUrl: webSocketUrl,
-        gameLobbyId: #{toJSON gameId},
-        locale: #{toJSON locale},
-        invitedByUsername: #{toJSON (fromMaybe "Unknown" inviterUsername)},
-        isLoggedIn: true,
-        notifications: #{toJSON notifs}
+        Wordify.createGameInvite('#gameinvite', {
+          websocketUrl: webSocketUrl,
+          gameLobbyId: #{toJSON gameId},
+          locale: #{toJSON locale},
+          invitedByUsername: #{toJSON (fromMaybe "Unknown" inviterUsername)},
+          isLoggedIn: true,
+          notifications: #{toJSON notifs}
+        });
       });
     |]
 

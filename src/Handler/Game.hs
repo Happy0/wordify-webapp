@@ -137,42 +137,43 @@ renderGamePage app gameId maybeUser (Right serverGame) = do
 
   defaultPageLayout $ do
     addStylesheet $ StaticR wordifyCss
-    addScript $ StaticR wordifyJs
+    toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyRoundJs}">|]
     toWidget
       [julius|
 
-              var url = document.URL;
-              var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
+              window.addEventListener('DOMContentLoaded', function() {
+                var url = document.URL;
+                var webSocketUrl = url.replace("http:", "ws:").replace("https:", "wss:");
 
-              var initialState = {
-                myPlayerNumber: #{toJSON maybePlayerNumber},
-                playerToMove: #{toJSON playing},
-                players: #{toJSON clientPlayers},
-                moveHistory: #{toJSON summaries},
-                tilesRemaining: #{toJSON numTilesRemaining},
-                potentialScore: null,
-                lastMoveReceived: Date.now(),
+                var initialState = {
+                  myPlayerNumber: #{toJSON maybePlayerNumber},
+                  playerToMove: #{toJSON playing},
+                  players: #{toJSON clientPlayers},
+                  moveHistory: #{toJSON summaries},
+                  tilesRemaining: #{toJSON numTilesRemaining},
+                  potentialScore: null,
+                  lastMoveReceived: Date.now(),
 
-                // Let the websocket deal with these
-                chatMessages: [],
-                lastChatMessageReceived: 0,
-                lastDefinitionReceived: 0,
-                rack: #{toJSON rack},
-                boardLayout: Wordify.BOARD_LAYOUT,
-                boardString: #{toJSON boardString},
-                tileValues: #{toJSON tileValues},
-                gameEnded: false
-              }
-              
-              const game = Wordify.createRound('#wordifyround', {
-                initialState: initialState,
-                websocketUrl: webSocketUrl,
-                gameId: #{toJSON gameId},
-                isLoggedIn: #{toJSON isLoggedIn},
-                vapidPublicKey: #{toJSON (vapidPublicKey app)},
-                notifications: #{toJSON notifs}
+                  // Let the websocket deal with these
+                  chatMessages: [],
+                  lastChatMessageReceived: 0,
+                  lastDefinitionReceived: 0,
+                  rack: #{toJSON rack},
+                  boardLayout: Wordify.BOARD_LAYOUT,
+                  boardString: #{toJSON boardString},
+                  tileValues: #{toJSON tileValues},
+                  gameEnded: false
+                }
+
+                Wordify.createRound('#wordifyround', {
+                  initialState: initialState,
+                  websocketUrl: webSocketUrl,
+                  gameId: #{toJSON gameId},
+                  isLoggedIn: #{toJSON isLoggedIn},
+                  vapidPublicKey: #{toJSON (vapidPublicKey app)},
+                  notifications: #{toJSON notifs}
+                });
               });
-             
           |]
     [whamlet|
           <div #wordifyround>

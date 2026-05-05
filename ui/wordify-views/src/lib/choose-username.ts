@@ -48,3 +48,6 @@ export function createChooseUsername(
     }
   }
 }
+
+import { expose } from './expose'
+expose({ createChooseUsername })

@@ -20,11 +20,36 @@ import Yesod.Static
 --     StaticFile ["js", "script.js"] []
 staticFiles (appStaticDir compileTimeAppSettings)
 
--- Cache-busted routes. The filenames below are updated by build-ui.sh at build
--- time to include a timestamp suffix, so browsers always fetch the latest version
--- instead of serving a stale cached copy.
-wordifyJs :: StaticRoute
-wordifyJs = StaticRoute ["js", "wordify_20260421_205037.js"] []
+-- Cache-busted asset routes. The filenames below are updated by build-ui.sh
+-- at build time to include a timestamp suffix, so browsers always fetch the
+-- latest version instead of serving a stale cached copy.
+--
+-- The build splits the Vue UI into one JS bundle per page (round, create-game,
+-- game-lobby, etc.), so each handler should reference only the JS bundle it
+-- needs. CSS is shared across pages because almost all of it is global
+-- (primeicons + tailwind + base styles), so a single CSS file is loaded by
+-- every page and cached on the first hit.
 
 wordifyCss :: StaticRoute
-wordifyCss = StaticRoute ["css", "wordify_20260421_205037.css"] []
+wordifyCss = StaticRoute ["css", "wordify-shared_20260505_174324.css"] []
+
+wordifyRoundJs :: StaticRoute
+wordifyRoundJs = StaticRoute ["js", "round_20260505_174324.js"] []
+
+wordifyCreateGameJs :: StaticRoute
+wordifyCreateGameJs = StaticRoute ["js", "create-game_20260505_174324.js"] []
+
+wordifyGameLobbyJs :: StaticRoute
+wordifyGameLobbyJs = StaticRoute ["js", "game-lobby_20260505_174324.js"] []
+
+wordifyGameInviteJs :: StaticRoute
+wordifyGameInviteJs = StaticRoute ["js", "game-invite_20260505_174324.js"] []
+
+wordifyHomeJs :: StaticRoute
+wordifyHomeJs = StaticRoute ["js", "home_20260505_174324.js"] []
+
+wordifyLoginJs :: StaticRoute
+wordifyLoginJs = StaticRoute ["js", "login_20260505_174324.js"] []
+
+wordifyChooseUsernameJs :: StaticRoute
+wordifyChooseUsernameJs = StaticRoute ["js", "choose-username_20260505_174324.js"] []

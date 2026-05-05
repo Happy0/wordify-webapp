@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import GameTile from './GameTile.vue'
+
+// Dialog is only shown when the user opens the exchange flow, so defer loading
+// its chunk until that first interaction. The v-if guard below keeps it
+// unmounted on initial paint.
+const Dialog = defineAsyncComponent(() => import('primevue/dialog'))
 
 const emit = defineEmits<{
   (e: 'submit'): void
@@ -17,6 +21,10 @@ const { rack, isMyTurn, candidateTilesOnBoard } = storeToRefs(store)
 
 const exchangeMode = ref(false)
 const selectedForExchange = ref<Set<string>>(new Set())
+// Stays true after the first time the user opens the exchange dialog, so the
+// dialog stays mounted across opens (closing animations work) but isn't
+// instantiated on initial render.
+const exchangeDialogMounted = ref(false)
 
 const hasPlacedTiles = computed(() => candidateTilesOnBoard.value.length > 0)
 
@@ -33,6 +41,7 @@ function handleSubmit() {
 function openExchangeDialog() {
   if (canExchange.value) {
     selectedForExchange.value = new Set()
+    exchangeDialogMounted.value = true
     exchangeMode.value = true
   }
 }
@@ -95,6 +104,7 @@ defineExpose({ exchangeMode })
 
     <!-- Exchange Dialog -->
     <Dialog
+      v-if="exchangeDialogMounted"
       v-model:visible="exchangeMode"
       header="Select tiles to exchange"
       :modal="true"

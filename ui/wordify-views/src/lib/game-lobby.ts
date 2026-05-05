@@ -100,3 +100,6 @@ export function createGameLobby(
     updateNotifications: (notifications: NotificationItem[]) => notifStore.updateNotifications(notifications)
   }
 }
+
+import { expose } from './expose'
+expose({ createGameLobby })

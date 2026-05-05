@@ -48,3 +48,6 @@ export function createLogin(
     }
   }
 }
+
+import { expose } from './expose'
+expose({ createLogin })

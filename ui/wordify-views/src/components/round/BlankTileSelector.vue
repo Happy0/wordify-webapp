@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
-import Dialog from 'primevue/dialog'
+import { computed, defineAsyncComponent, inject, ref, watch } from 'vue'
 import type { TileValueMap } from '@/common/tile-value-map'
+
+// Dialog is only shown when the user is placing a blank tile, so defer loading
+// its chunk until that first interaction. The v-if guard below keeps it
+// unmounted until the parent first sets visible to true.
+const Dialog = defineAsyncComponent(() => import('primevue/dialog'))
 
 const props = defineProps<{
   visible: boolean
@@ -12,6 +16,13 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'select', letter: string): void
 }>()
+
+// Stays true after the first time the dialog has been requested, so reopens
+// don't pay the chunk-load cost again and closing animations can play.
+const dialogMounted = ref(false)
+watch(() => props.visible, (v) => {
+  if (v) dialogMounted.value = true
+})
 
 // Inject tileValues from the app-level provider (for locale support)
 const tileValues = inject<TileValueMap | null>('tileValues', null)
@@ -61,6 +72,7 @@ function handleClose() {
 
 <template>
   <Dialog
+    v-if="dialogMounted"
     :visible="visible"
     header="Assign Letter to Blank Tile"
     :modal="true"

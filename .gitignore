@@ -21,3 +21,4 @@ cabal.sandbox.config
 \#*
 wordify-webapp.cabal
 ui/node_modules
+wordify.env

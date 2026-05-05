@@ -1,7 +1,7 @@
 module Handler.Username where
 
     import Import
-    import Import.NoFoundation (wordifyCss, wordifyJs)
+    import Import.NoFoundation (wordifyCss, wordifyChooseUsernameJs)
     import Data.Aeson (FromJSON, (.:), (.=), object, withObject)
     import Controllers.User.UserController (setUsername, getUsernamesByPrefix)
     import Repository.UserRepository (SetUsernameResult(..))
@@ -16,14 +16,16 @@ module Handler.Username where
         _ <- requireAuthId
         defaultPageLayout $ do
             addStylesheet $ StaticR wordifyCss
-            addScript $ StaticR wordifyJs
+            toWidgetHead [hamlet|<script type="module" src="@{StaticR wordifyChooseUsernameJs}">|]
             [whamlet|
                 <div #choose-username-container>
             |]
             toWidget
                 [julius|
-                    Wordify.createChooseUsername('#choose-username-container', {
-                        redirectUrl: '/'
+                    window.addEventListener('DOMContentLoaded', function() {
+                        Wordify.createChooseUsername('#choose-username-container', {
+                            redirectUrl: '/'
+                        });
                     });
                 |]
 

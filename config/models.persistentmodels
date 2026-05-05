@@ -52,6 +52,7 @@ Player
     playerId Text
     playerNumber Int
     lastActive UTCTime Maybe
+    points Double Maybe
 
 Lobby
     gameId Text

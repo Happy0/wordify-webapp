@@ -126,3 +126,6 @@ export function createHome(
     updateNotifications: (notifications: NotificationItem[]) => notifStore.updateNotifications(notifications)
   }
 }
+
+import { expose } from './expose'
+expose({ createHome })

@@ -17,20 +17,35 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/lib.ts'),
-      name: 'Wordify', // Global variable name for UMD
-      fileName: (format) => `wordify.${format}.js`,
-      formats: ['umd', 'es'] // UMD for script tags, ES for bundlers
+      entry: {
+        round: resolve(__dirname, 'src/lib/round.ts'),
+        'create-game': resolve(__dirname, 'src/lib/create-game.ts'),
+        'game-lobby': resolve(__dirname, 'src/lib/game-lobby.ts'),
+        'game-invite': resolve(__dirname, 'src/lib/game-invite.ts'),
+        home: resolve(__dirname, 'src/lib/home.ts'),
+        login: resolve(__dirname, 'src/lib/login.ts'),
+        'choose-username': resolve(__dirname, 'src/lib/choose-username.ts')
+      },
+      formats: ['es']
     },
     rollupOptions: {
-      // Don't externalize anything - bundle everything for standalone use
       external: [],
       output: {
-        globals: {},
-        exports: 'named'
+        entryFileNames: '[name].js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name?.endsWith('.css')) {
+            // The build merges everything (primeicons + tailwind + global styles
+            // + per-view component styles) into one file because cssCodeSplit is
+            // off — most of the CSS is global anyway. Give it a stable name so
+            // build-ui.sh can pick it up by filename.
+            return 'wordify-shared[extname]'
+          }
+          return 'assets/[name]-[hash][extname]'
+        }
       }
     },
-    cssCodeSplit: false, // Bundle CSS into a single file
-    sourcemap: true // Generate source maps for debugging original .ts/.vue files in browser DevTools
+    cssCodeSplit: false,
+    sourcemap: true
   }
 })

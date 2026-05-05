@@ -1,6 +1,17 @@
 
 
-module Repository.SQL.SqlGameRepository (GameRepositorySQLBackend (GameRepositorySQLBackend), GameRepository (getActiveUserGames, getRecentlyActiveGames, getGame, startNewGame, saveBoardMove, savePassMove, saveExchangeMove, saveGameEnd, updatePlayerLastSeen)) where
+module Repository.SQL.SqlGameRepository (
+  GameRepositorySQLBackend (GameRepositorySQLBackend),
+  GameRepository (
+    getActiveUserGames,
+    getRecentlyActiveGames,
+    getGame,
+    startNewGame,
+    saveBoardMove,
+    savePassMove,
+    saveExchangeMove,
+    saveGameEnd,
+    updatePlayerLastSeen)) where
 
 import Control.Applicative ((<|>))
 import Control.Error.Util (note, hoistEither)
@@ -161,7 +172,7 @@ persistNewGame pool (GameEntity gameId game players createdAt lastMoveMadeAt fin
         currentMove
         boardRepresentation
     forM_ (L.zip [1 :: Int ..] players) $ \(playerNum, (ServerUser uid _, _)) ->
-      insert $ M.Player gameId uid playerNum Nothing
+      insert $ M.Player gameId uid playerNum Nothing Nothing
 
 sqlSaveBoardMove :: Pool SqlBackend -> T.Text -> Int -> [(Pos, Tile)] -> T.Text -> IO ()
 sqlSaveBoardMove pool gameId moveNumber placed boardText = do

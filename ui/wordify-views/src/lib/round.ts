@@ -122,7 +122,9 @@ export type { ConnectionState, IGameCommandSender } from '../services/interfaces
 export type { TileValueMap } from '../common/tile-value-map'
 
 // Export constants
-export { BOARD_LAYOUT, BOARD_SIZE } from '../types/game'
+import { BOARD_LAYOUT, BOARD_SIZE } from '../types/game'
+import { fromBoardTextRepresentation } from '../common/board-text-presentation'
+export { BOARD_LAYOUT, BOARD_SIZE, fromBoardTextRepresentation }
 
-// Export board text representation utilities
-export { fromBoardTextRepresentation } from '../common/board-text-presentation'
+import { expose } from './expose'
+expose({ createRound, BOARD_LAYOUT, BOARD_SIZE, fromBoardTextRepresentation })

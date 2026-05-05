@@ -73,3 +73,6 @@ export function createCreateGame(
     updateNotifications: (notifications: NotificationItem[]) => notifStore.updateNotifications(notifications)
   }
 }
+
+import { expose } from './expose'
+expose({ createCreateGame })
